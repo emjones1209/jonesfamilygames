@@ -1,0 +1,20 @@
+# Railway Deployment Configuration
+# This file instructs Railway how to build and deploy the app.
+
+[build]
+builder = "nixpacks"
+buildCommand = "cd client && npm ci && npm run build && cd ../server && npm ci"
+
+[deploy]
+startCommand = "cd server && node index.js"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "games-suite-web"
+
+[[services]]
+name = "games-suite-db"
+source = "postgres"

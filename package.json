@@ -1,0 +1,16 @@
+{
+  "name": "games_suite",
+  "version": "1.0.0",
+  "description": "Family Games Suite — ad-free web games for the family",
+  "scripts": {
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix client",
+    "start": "npm run start --prefix server"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
