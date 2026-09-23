@@ -11,6 +11,11 @@ import { TUTORIALS } from "../../components/tutorials";
 import api from "../../utils/api";
 
 const PLAYER_NAMES = ["You","CPU 1","CPU 2","CPU 3"];
+// Pacing of a computer turn (ms): pause before drawing, time showing the drawn
+// card, and time showing where it went before the next player's turn
+const AI_THINK_MS = 700, AI_SHOW_MS = 1300, AI_AFTER_MS = 1000;
+const SUIT_SYMBOL = { spades:"♠", hearts:"♥", diamonds:"♦", clubs:"♣" };
+const cardLabel = c => (c.suit==="joker" ? "Joker" : `${c.rank}${SUIT_SYMBOL[c.suit]}`);
 
 function cardValue(card) {
   if (!card) return 0;
@@ -128,6 +133,8 @@ export default function Golf6Game() {
   const [winner,setWinner]=useState(null);
   const [totalScores,setTotalScores]=useState([0,0,0,0]);
   const [msg,setMsg]=useState("");
+  const [aiMove,setAiMove]=useState(null);   // { pi, card } while a computer shows what it drew
+  const [flash,setFlash]=useState(null);     // { pi, row, col } spot a computer just changed
   const [showTutorial,setShowTutorial]=useState(false);
   const numPlayersRef = useRef(numPlayers);
 
@@ -139,6 +146,7 @@ export default function Golf6Game() {
     setTotalScores(Array(np).fill(0));
     setCurrentPlayer(0); setDrawn(null); setPeeksLeft(2);
     setFinalRound(false); setFinalTurnsLeft(0); setWinner(null);
+    setAiMove(null); setFlash(null);
     setMsg("Peek at 2 of your face-down cards to start!"); setPhase("peek");
   };
 
@@ -221,18 +229,29 @@ export default function Golf6Game() {
     setGrids(ng); checkAndAdvance(ng,0);
   };
 
+  // Latest state for the computer's turn, which runs over several timed steps
+  const latest = useRef({});
+  useEffect(()=>{ latest.current = { grids, stock, discard, difficulty, checkAndAdvance }; });
+
+  // Computer turns play out slowly enough to follow: think, show the card it
+  // drew (and where from), place or discard it with the spot highlighted, then pass.
   useEffect(()=>{
     const aiPlayers = Array.from({length:numPlayersRef.current-1},(_,i)=>i+1);
     if (phase!=="playing"||!aiPlayers.includes(currentPlayer)) return;
-    const t=setTimeout(()=>{
-      const pi=currentPlayer;
+    const pi=currentPlayer, name=PLAYER_NAMES[pi];
+    const timers=[];
+    const later=(fn,ms)=>timers.push(setTimeout(fn,ms));
+
+    later(()=>{
+      const { grids, stock, discard, difficulty } = latest.current;
       const ng=grids.map(g=>g.map(r=>[...r]));
       const refilled=refillStock(stock,discard);
       const nd=[...refilled.discard]; const ns=[...refilled.stock];
       const topD=nd[0];
       let drawnCard;
       const useD=topD&&(difficulty==="easy"?Math.random()<0.4:ng[pi].flat().filter(c=>c.faceUp).some(c=>cardValue(c)-cardValue(topD)>2));
-      if (useD||!ns.length) { drawnCard=nd.shift(); } else { drawnCard={...ns.shift(),faceUp:true}; }
+      const fromDiscard=useD||!ns.length;
+      if (fromDiscard) { drawnCard=nd.shift(); } else { drawnCard={...ns.shift(),faceUp:true}; }
       let bestRow=-1,bestCol=-1,bestGain=difficulty==="easy"?3:1;
       const dv=cardValue(drawnCard);
       for (let row=0;row<2;row++) for (let col=0;col<3;col++) {
@@ -247,21 +266,48 @@ export default function Golf6Game() {
         for (let row=0;row<2;row++) for (let col=0;col<3;col++) if (!ng[pi][row][col].faceUp) hidden.push([row,col]);
         if (hidden.length) [bestRow,bestCol]=hidden[Math.floor(Math.random()*hidden.length)];
       }
-      let finalDiscard;
+      // A card taken from the discard pile is always kept (throwing it straight
+      // back looks silly): replace the worst higher face-up card, else a face-down one
+      if (bestRow<0&&fromDiscard) {
+        let worst=null;
+        for (let row=0;row<2;row++) for (let col=0;col<3;col++) {
+          const cell=ng[pi][row][col];
+          if (cell.faceUp&&cardValue(cell)>dv&&(!worst||cardValue(cell)>worst.v)) worst={row,col,v:cardValue(cell)};
+        }
+        const hidden=[];
+        for (let row=0;row<2;row++) for (let col=0;col<3;col++) if (!ng[pi][row][col].faceUp) hidden.push([row,col]);
+        if (worst) [bestRow,bestCol]=[worst.row,worst.col];
+        else if (hidden.length) [bestRow,bestCol]=hidden[Math.floor(Math.random()*hidden.length)];
+      }
+      let finalDiscard, placedMsg;
       if (bestRow>=0) {
         const old=ng[pi][bestRow][bestCol];
         ng[pi][bestRow][bestCol]={...drawnCard,faceUp:true};
         finalDiscard={...old,faceUp:true};
+        placedMsg=old.faceUp?`${name} swaps it for their ${cardLabel(old)}`:`${name} swaps it for a face-down card (a ${cardLabel(old)})`;
       } else {
         finalDiscard=drawnCard;
+        placedMsg=`${name} discards it`;
       }
-      setGrids(ng);
-      setDiscard([finalDiscard,...nd]);
-      setStock(ns);
-      checkAndAdvance(ng,pi);
-    },700);
-    return ()=>clearTimeout(t);
-  },[currentPlayer,phase,grids,discard,stock,difficulty,checkAndAdvance]);
+
+      // Step 1: show the drawn card
+      setStock(ns); setDiscard(nd);
+      setAiMove({ pi, card: drawnCard });
+      setMsg(fromDiscard?`${name} takes the ${cardLabel(drawnCard)} from the discard pile…`:`${name} draws the ${cardLabel(drawnCard)} from the deck…`);
+
+      // Step 2: place it (or discard it), highlighting the spot
+      later(()=>{
+        setAiMove(null);
+        setGrids(ng); setDiscard([finalDiscard,...nd]);
+        setFlash(bestRow>=0?{ pi, row:bestRow, col:bestCol }:null);
+        setMsg(placedMsg);
+        // Step 3: pass to the next player
+        later(()=>{ setFlash(null); latest.current.checkAndAdvance(ng,pi); }, AI_AFTER_MS);
+      }, AI_SHOW_MS);
+    }, AI_THINK_MS);
+
+    return ()=>timers.forEach(clearTimeout);
+  },[currentPlayer,phase]);
 
   if (phase==="setup") return (
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-lime-900 p-5 flex flex-col">
@@ -338,25 +384,29 @@ export default function Golf6Game() {
         <div className="text-white/60 text-xs">{difficulty} {finalRound?"- Final Round!":""}</div>
         <div className="text-game-gold font-bold text-sm">You: {myScore}</div>
       </div>
-      {msg&&<p className="text-center text-amber-400 text-xs mb-2">{msg}</p>}
-      <div className="grid grid-cols-3 gap-2 mb-3">
+      {/* Always present (fixed height) so the board doesn't move when it changes */}
+      <p className="text-center text-amber-400 text-sm mb-2 min-h-[1.25rem]">{msg}</p>
+      <div className="flex justify-center gap-2 mb-3">
         {Array.from({length:numPlayers-1},(_,i)=>i+1).map(pi=>(
-          <div key={pi} className="card-panel p-2 text-center">
-            <div className="text-white/50 text-xs mb-1">{PLAYER_NAMES[pi]}{currentPlayer===pi?" ←":""}</div>
-            <div className="flex gap-1 justify-center flex-wrap">
-              {(grids[pi]||[]).flat().map((c,i)=>c.faceUp
-                ? (c.suit==="joker"
-                    ? <JokerCard key={i} size="xs" />
-                    : <PlayingCard key={i} card={c} size="xs"/>)
-                : <div key={i} className={`${CARD_BOX.xs} bg-blue-900 border border-blue-700 rounded-lg`}/>
-              )}
+          <div key={pi} className={`card-panel p-2 text-center flex-1 max-w-[14rem] transition-shadow ${currentPlayer===pi?"ring-2 ring-game-gold":""}`}>
+            <div className={`text-xs mb-1 ${currentPlayer===pi?"text-game-gold font-bold":"text-white/50"}`}>{PLAYER_NAMES[pi]}</div>
+            {/* 2 rows × 3 columns, laid out like your own grid */}
+            <div className="grid grid-cols-3 gap-1 justify-items-center w-fit mx-auto">
+              {[0,1].flatMap(row=>[0,1,2].map(col=>{
+                const c=grids[pi]?.[row]?.[col];
+                const lit=flash&&flash.pi===pi&&flash.row===row&&flash.col===col;
+                const face=!c?null:!c.faceUp
+                  ?<div className={`${CARD_BOX.xs} bg-blue-900 border border-blue-700 rounded-lg`}/>
+                  :c.suit==="joker"?<JokerCard size="xs"/>:<PlayingCard card={c} size="xs"/>;
+                return <div key={`${row}-${col}`} className={`rounded-lg transition-shadow ${lit?"ring-4 ring-game-gold":""}`}>{face}</div>;
+              }))}
             </div>
             <div className="text-white/40 text-xs mt-1">{grids[pi]?gridScore(grids[pi]):"?"}</div>
           </div>
         ))}
       </div>
-      <div className="flex justify-center gap-6 mb-3">
-        <div className="text-center">
+      <div className="flex justify-center gap-4 mb-3">
+        <div className="text-center w-24 flex flex-col items-center">
           <p className="text-white/40 text-xs mb-1">Stock ({stock.length})</p>
           {stock.length>0
             ?<div onClick={drawFromStock} className={currentPlayer===0&&!drawn?"cursor-pointer":""}>
@@ -369,7 +419,7 @@ export default function Golf6Game() {
                 </div>
               :<div className={`${CARD_BOX.md} border-2 border-dashed border-white/20 rounded-2xl`}/>}
         </div>
-        <div className="text-center">
+        <div className="text-center w-24 flex flex-col items-center">
           <p className="text-white/40 text-xs mb-1">Discard</p>
           {discard.length>0
             ?<div onClick={takeDiscard} className={currentPlayer===0&&!drawn?"cursor-pointer":""}>
@@ -379,17 +429,21 @@ export default function Golf6Game() {
              </div>
             :<div className={`${CARD_BOX.md} border-2 border-dashed border-white/20 rounded-2xl`}/>}
         </div>
-        {drawn&&(
-          <div className="text-center">
-            <p className="text-white/40 text-xs mb-1">In hand</p>
-            {drawn.suit==="joker"
-              ? <JokerCard size="md"/>
-              : <PlayingCard card={drawn} size="md"/>}
-            <button onClick={discardDrawn} className="text-white/40 hover:text-white text-xs mt-1 block mx-auto">
-              Discard it
-            </button>
-          </div>
-        )}
+        {/* The drawn card's slot is always there, so drawing doesn't shift the board */}
+        <div className="text-center w-24 flex flex-col items-center">
+          <p className={`text-xs mb-1 ${aiMove?"text-game-gold":"text-white/40"}`}>
+            {aiMove?`${PLAYER_NAMES[aiMove.pi]}'s card`:"In hand"}
+          </p>
+          {(()=>{
+            const held=aiMove?.card||drawn;
+            if (!held) return <div className={`${CARD_BOX.md} border-2 border-dashed border-white/15 rounded-2xl`}/>;
+            return held.suit==="joker"?<JokerCard size="md"/>:<PlayingCard card={held} size="md"/>;
+          })()}
+          <button onClick={discardDrawn}
+            className={`text-white/60 hover:text-white text-xs mt-1 px-2 py-1 rounded-lg bg-white/10 ${drawn?"":"invisible"}`}>
+            Discard it
+          </button>
+        </div>
       </div>
       <div className="flex justify-center">
         <div>
@@ -404,9 +458,9 @@ export default function Golf6Game() {
           />
         </div>
       </div>
-      {currentPlayer===0&&!drawn&&(
-        <p className="text-center text-white/30 text-xs mt-2">Draw a card or tap face-down to flip</p>
-      )}
+      <p className="text-center text-white/40 text-xs mt-2 min-h-[1rem]">
+        {currentPlayer===0&&phase==="playing"&&(drawn?"Tap a card in your grid to swap, or discard it":"Draw a card, or tap a face-down card to flip it")}
+      </p>
     </div>
   );
 }
