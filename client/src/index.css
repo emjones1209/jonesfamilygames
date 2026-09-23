@@ -3,6 +3,20 @@
 @tailwind utilities;
 
 @layer base {
+  /* Safe area: as an iPad Home Screen app the page is drawn under the status bar
+     and the home-indicator bar (viewport-fit=cover + black-translucent status bar
+     in index.html), so content is kept inside these insets. They're 0 in a normal
+     browser tab. Using variables lets everything below share one definition. */
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --screen-h: calc(100vh - var(--safe-top) - var(--safe-bottom));
+  }
+  @supports (height: 100dvh) {
+    :root { --screen-h: calc(100dvh - var(--safe-top) - var(--safe-bottom)); }
+  }
   html {
     font-family: system-ui, sans-serif;
     touch-action: manipulation;
@@ -12,10 +26,28 @@
     -webkit-tap-highlight-color: transparent;
     user-select: none;
     margin: 0;
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  }
+  /* Solid strip behind the status bar so content scrolling up doesn't show through */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: var(--safe-top);
+    background: theme('colors.game.bg');
+    z-index: 60;
+    pointer-events: none;
   }
   #root {
-    min-height: 100vh;
+    min-height: var(--screen-h);
   }
+}
+
+/* Full-screen pages fill the space between the insets, not the whole display */
+@layer utilities {
+  .min-h-screen { min-height: var(--screen-h); }
+  .h-screen { height: var(--screen-h); }
+  .top-safe { top: var(--safe-top); }
 }
 
 @layer components {

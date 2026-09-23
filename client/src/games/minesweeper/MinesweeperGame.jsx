@@ -189,7 +189,7 @@ export default function MinesweeperGame() {
       style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-game-bg/90 backdrop-blur-md border-b border-white/10">
+      <header className="sticky top-safe z-10 bg-game-bg/90 backdrop-blur-md border-b border-white/10">
         <div className="max-w-lg mx-auto flex items-center justify-between px-4 py-3">
           <button
             onClick={() => navigate('/')}

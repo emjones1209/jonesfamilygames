@@ -33,7 +33,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-game-card">
       {/* Header */}
-      <header className="sticky top-0 z-20 bg-game-bg/80 backdrop-blur-md border-b border-white/10">
+      <header className="sticky top-safe z-20 bg-game-bg/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-4xl mx-auto flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2">
             <span className="text-2xl">🎮</span>
