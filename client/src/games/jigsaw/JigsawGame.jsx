@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, Trash2, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -60,16 +60,13 @@ function vEdge(ctx, x, y0, y1, tabAmt) {
 function drawJigsawPath(ctx, ox, oy, pw, ph, td, edges) {
   ctx.beginPath();
   ctx.moveTo(ox, oy);
-  // TOP: left → right, tab up = negative y = positive tabAmt in hEdge convention
-  hEdge(ctx, ox, oy, ox + pw, edges.top * td);
-  // RIGHT: top → bottom, tab right = positive x = positive tabAmt in vEdge
-  vEdge(ctx, ox + pw, oy, oy + ph, edges.right * td);
-  // BOTTOM: right → left (invert x), tab down = positive y = hEdge tabAmt positive
-  // When going right→left: x0=ox+pw, x1=ox → w is negative → bezier goes in the right direction
-  hEdge(ctx, ox + pw, oy + ph, ox, edges.bottom * td);
-  // LEFT: bottom → top (invert y), tab left = negative x = vEdge tabAmt negative
-  // When going bottom→top: y0=oy+ph, y1=oy → h is negative → bezier works correctly
-  vEdge(ctx, ox, oy + ph, oy, edges.left * td);
+  // hEdge bulges up for a positive amount and vEdge bulges right, whichever way
+  // the edge is traced. So "+1 = tab sticks out" means +td on the top and right
+  // edges but −td on the bottom (a tab goes down) and left (a tab goes left).
+  hEdge(ctx, ox, oy, ox + pw, edges.top * td);               // TOP: left → right
+  vEdge(ctx, ox + pw, oy, oy + ph, edges.right * td);        // RIGHT: top → bottom
+  hEdge(ctx, ox + pw, oy + ph, ox, -edges.bottom * td);      // BOTTOM: right → left
+  vEdge(ctx, ox, oy + ph, oy, -edges.left * td);             // LEFT: bottom → top
   ctx.closePath();
 }
 
@@ -77,14 +74,11 @@ function drawJigsawPath(ctx, ox, oy, pw, ph, td, edges) {
 function buildTabDirs(rows, cols) {
   // hBound[r][c]: tab direction of BOTTOM edge of piece(r,c) (only defined for r < rows-1)
   // +1 = tab sticks down from piece(r,c), -1 = notch on piece(r,c)'s bottom
-  const hBound = Array.from({ length: rows - 1 }, (_, r) =>
-    Array.from({ length: cols }, (_, c) => ((r * cols + c) % 2 === 0 ? 1 : -1))
-  );
+  const coin = () => (Math.random() < 0.5 ? 1 : -1);   // a new set of shapes every puzzle
+  const hBound = Array.from({ length: rows - 1 }, () => Array.from({ length: cols }, coin));
   // vBound[r][c]: tab direction of RIGHT edge of piece(r,c) (only defined for c < cols-1)
   // +1 = tab sticks right from piece(r,c), -1 = notch on piece(r,c)'s right
-  const vBound = Array.from({ length: rows }, (_, r) =>
-    Array.from({ length: cols - 1 }, (_, c) => ((r + c) % 2 === 0 ? 1 : -1))
-  );
+  const vBound = Array.from({ length: rows }, () => Array.from({ length: cols - 1 }, coin));
   return { hBound, vBound };
 }
 
@@ -99,11 +93,25 @@ function pieceEdges(r, c, rows, cols, tabDirs) {
   };
 }
 
-/** Slice an image into jigsaw-shaped pieces. Returns { pieces, pw, ph, overhang }. */
-function sliceJigsawPieces(imgSrc, rows, cols, pw, ph) {
+/**
+ * Slice an image into jigsaw-shaped pieces sized to fit `maxBoardW`.
+ * Pieces follow the photo's proportions (within limits; anything beyond is
+ * cropped from the centre). Returns { pieces, pw, ph, overhang }.
+ */
+function sliceJigsawPieces(imgSrc, rows, cols, maxBoardW) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
+      // Piece shape: the photo's cell aspect, kept between 2:3 and 3:2
+      const cellAspect = Math.min(1.5, Math.max(2 / 3, (img.height / rows) / (img.width / cols)));
+      const pw = Math.max(40, Math.min(100, Math.floor(maxBoardW / cols)));
+      const ph = Math.round(pw * cellAspect);
+      // Centre crop of the photo matching the board's shape
+      const boardAspect = (rows * ph) / (cols * pw);
+      let cropW = img.width, cropH = img.width * boardAspect;
+      if (cropH > img.height) { cropH = img.height; cropW = img.height / boardAspect; }
+      const cropX = (img.width - cropW) / 2, cropY = (img.height - cropH) / 2;
+
       const td  = Math.round(Math.min(pw, ph) * 0.28); // tab depth
       const ovh = td + 3;                               // overhang for tab overflow
       const tabDirs = buildTabDirs(rows, cols);
@@ -121,14 +129,11 @@ function sliceJigsawPieces(imgSrc, rows, cols, pw, ph) {
           drawJigsawPath(ctx, ovh, ovh, pw, ph, td, edges);
           ctx.save(); ctx.clip();
 
-          // Draw image slice (mapped so the piece content lands at offset ovh,ovh)
-          ctx.drawImage(img,
-            Math.floor(c * img.width / cols),
-            Math.floor(r * img.height / rows),
-            Math.ceil(img.width / cols),
-            Math.ceil(img.height / rows),
-            ovh, ovh, pw, ph
-          );
+          // Draw the whole (cropped) photo positioned so this piece's cell lands
+          // at (ovh, ovh). The clip keeps just this piece, tabs included, so
+          // neighbouring pieces fit together without gaps.
+          ctx.drawImage(img, cropX, cropY, cropW, cropH,
+            ovh - c * pw, ovh - r * ph, cols * pw, rows * ph);
           ctx.restore();
 
           // Draw the outline on top of the clip
@@ -165,7 +170,7 @@ const DIFFS = {
   hard:   { label: 'Hard (8×8 = 64)',   rows: 8, cols: 8 },
 };
 
-const SNAP_DIST = 40; // px: snap to correct slot when dropped within this distance
+const TRAY_PIECE_H = 84;   // pieces are shown scaled down to this height in the tray
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function JigsawGame() {
@@ -221,14 +226,10 @@ export default function JigsawGame() {
   const handleStart = useCallback(async () => {
     if (!selPhoto) return;
     const { rows, cols } = DIFFS[diff];
-    // Compute piece size to fit screen
-    const availW = Math.min(window.innerWidth, 900) - 32;
-    const pw = Math.max(40, Math.min(100, Math.floor(availW / cols)));
-    const ph = pw; // square pieces
-
-    const result = await sliceJigsawPieces(selPhoto.dataUrl, rows, cols, pw, ph);
+    const availW = Math.min(window.innerWidth, 900) - 32;   // fit the screen
+    const result = await sliceJigsawPieces(selPhoto.dataUrl, rows, cols, availW);
     setPieces(result.pieces);
-    setConfig({ rows, cols, pw, ph, overhang: result.overhang });
+    setConfig({ rows, cols, pw: result.pw, ph: result.ph, overhang: result.overhang });
     setBoardSlots({});
     setLocked(new Set());
     setSecs(0);
@@ -264,7 +265,6 @@ export default function JigsawGame() {
 
     const piece = pieces.find(p => p.id === id);
     const boardEl = boardRef.current;
-    let placed = false;
 
     if (piece && boardEl) {
       const rect  = boardEl.getBoundingClientRect();
@@ -273,14 +273,9 @@ export default function JigsawGame() {
       const bx = x - rect.left - overhang;
       const by = y - rect.top  - overhang;
 
-      // Find nearest slot
+      // Nearest slot to the drop point
       const nc = Math.max(0, Math.min(cols - 1, Math.round((bx - pw / 2) / pw)));
       const nr = Math.max(0, Math.min(rows - 1, Math.round((by - ph / 2) / ph)));
-
-      // Snap distance: distance from drop point to center of nearest slot
-      const slotCx = nc * pw + pw / 2;
-      const slotCy = nr * ph + ph / 2;
-      const dist = Math.sqrt((bx - slotCx) ** 2 + (by - slotCy) ** 2);
 
       if (bx > -overhang && bx < cols * pw + overhang && by > -overhang && by < rows * ph + overhang) {
         // On board area: always place in nearest slot
@@ -291,20 +286,15 @@ export default function JigsawGame() {
         if (!locked.has(existingId)) {
           setBoardSlots(prev => ({ ...prev, [slotKey]: id }));
 
-          const isCorrect = piece.correctPos.row === nr && piece.correctPos.col === nc;
-          if (isCorrect && dist <= SNAP_DIST) {
-            setLocked(prev => {
-              const n = new Set(prev);
-              n.add(id);
-              // Check win after locking
-              if (n.size >= pieces.length) {
-                clearInterval(timerRef.current);
-                setTimeout(() => setJokeOpen(true), 600);
-              }
-              return n;
-            });
+          // A piece dropped into its own slot locks in place
+          if (piece.correctPos.row === nr && piece.correctPos.col === nc) {
+            const nowLocked = new Set(locked).add(id);
+            setLocked(nowLocked);
+            if (nowLocked.size >= pieces.length) {
+              clearInterval(timerRef.current);
+              setTimeout(() => setJokeOpen(true), 600);
+            }
           }
-          placed = true;
         }
       }
     }
@@ -330,9 +320,8 @@ export default function JigsawGame() {
   const handleJokeClose = useCallback(async () => {
     setJokeOpen(false);
     setPhase('win');
-    try {
-      await api.post('/scores', { game: 'jigsaw', score: Math.max(0, 10000 - secs * 5), difficulty: diff });
-    } catch (_) {}
+    await api.post('/scores', { game: 'jigsaw', score: Math.max(0, 10000 - secs * 5), difficulty: diff })
+      .catch(() => {});   // a failed score save shouldn't block the win screen
   }, [secs, diff]);
 
   // ── Derived values ─────────────────────────────────────────────────────────
@@ -486,7 +475,7 @@ export default function JigsawGame() {
       {/* Tray */}
       <div className="shrink-0 bg-black/40 border-t border-white/10 p-2">
         <p className="text-white/40 text-xs mb-1.5">{trayPieces.length} pieces remaining</p>
-        <div className="flex gap-1.5 overflow-x-auto pb-1" style={{ maxHeight: '120px' }}>
+        <div className="flex gap-1.5 overflow-x-auto pb-1 items-center" style={{ minHeight: TRAY_PIECE_H }}>
           {trayPieces.map(piece => (
             <img
               key={piece.id}
@@ -494,7 +483,8 @@ export default function JigsawGame() {
               alt=""
               draggable={false}
               style={{
-                width: piece.cvW, height: piece.cvH,
+                height: Math.min(piece.cvH, TRAY_PIECE_H),
+                width: piece.cvW * Math.min(1, TRAY_PIECE_H / piece.cvH),
                 flexShrink: 0, cursor: 'grab', touchAction: 'none',
                 opacity: drag?.id === piece.id ? 0.3 : 1,
               }}
