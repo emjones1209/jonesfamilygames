@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DadJokeModal } from '../../components/DadJokeModal';
 import api from '../../utils/api';
+import {
+  emptyBoard, placeMines, floodReveal, chordReveal, revealAllMines, countRevealed,
+} from './minesweeperLogic';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -25,133 +28,6 @@ const NUM_COLORS = [
   '#9ca3af', // 8 – gray-400
 ];
 
-// ─── Pure game logic ──────────────────────────────────────────────────────────
-
-function emptyBoard(rows, cols) {
-  return Array.from({ length: rows }, () =>
-    Array.from({ length: cols }, () => ({
-      mine: false, revealed: false, flagged: false,
-      count: 0, exploded: false, wrongFlag: false,
-    }))
-  );
-}
-
-function placeMines(rows, cols, mineCount, safeR, safeC) {
-  const board = emptyBoard(rows, cols);
-
-  // Guarantee a 3×3 safe zone around the first tap
-  const safe = new Set();
-  for (let dr = -1; dr <= 1; dr++) {
-    for (let dc = -1; dc <= 1; dc++) {
-      const nr = safeR + dr, nc = safeC + dc;
-      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) safe.add(`${nr},${nc}`);
-    }
-  }
-
-  let placed = 0;
-  while (placed < mineCount) {
-    const r = Math.floor(Math.random() * rows);
-    const c = Math.floor(Math.random() * cols);
-    if (!board[r][c].mine && !safe.has(`${r},${c}`)) {
-      board[r][c].mine = true;
-      placed++;
-    }
-  }
-
-  // Compute neighbour counts
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (board[r][c].mine) continue;
-      let count = 0;
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const nr = r + dr, nc = c + dc;
-          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && board[nr][nc].mine) count++;
-        }
-      }
-      board[r][c].count = count;
-    }
-  }
-  return board;
-}
-
-// BFS flood-reveal: reveals the tapped cell and cascades through zero-count cells
-function floodReveal(board, rows, cols, startR, startC) {
-  const next = board.map(row => row.map(cell => ({ ...cell })));
-  const queue = [[startR, startC]];
-  const visited = new Set([`${startR},${startC}`]);
-
-  while (queue.length > 0) {
-    const [r, c] = queue.shift();
-    next[r][c].revealed = true;
-
-    if (next[r][c].count === 0) {
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          if (dr === 0 && dc === 0) continue;
-          const nr = r + dr, nc = c + dc;
-          const key = `${nr},${nc}`;
-          if (
-            nr >= 0 && nr < rows && nc >= 0 && nc < cols &&
-            !visited.has(key) && !next[nr][nc].flagged && !next[nr][nc].revealed
-          ) {
-            visited.add(key);
-            queue.push([nr, nc]);
-          }
-        }
-      }
-    }
-  }
-  return next;
-}
-
-// Chord-reveal: when a numbered cell's flag count matches its number,
-// reveal all unflagged neighbours (standard Minesweeper chord mechanic)
-function chordReveal(board, rows, cols, r, c) {
-  const cell = board[r][c];
-  if (!cell.revealed || cell.count === 0) return null;
-
-  let flagCount = 0;
-  const unflagged = [];
-  for (let dr = -1; dr <= 1; dr++) {
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      const nr = r + dr, nc = c + dc;
-      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
-      if (board[nr][nc].flagged) flagCount++;
-      else if (!board[nr][nc].revealed) unflagged.push([nr, nc]);
-    }
-  }
-
-  if (flagCount !== cell.count || unflagged.length === 0) return null;
-
-  // Check whether any unflagged neighbour is a mine
-  const explodeCell = unflagged.find(([nr, nc]) => board[nr][nc].mine);
-  if (explodeCell) return { explode: explodeCell };
-
-  // Safe to reveal all unflagged neighbours
-  let next = board;
-  for (const [nr, nc] of unflagged) {
-    next = floodReveal(next, rows, cols, nr, nc);
-  }
-  return { board: next };
-}
-
-function revealAllMines(board, explodeR, explodeC) {
-  return board.map((row, r) =>
-    row.map((cell, c) => {
-      if (cell.mine) return { ...cell, revealed: true, exploded: r === explodeR && c === explodeC };
-      if (cell.flagged) return { ...cell, revealed: true, wrongFlag: true };
-      return cell;
-    })
-  );
-}
-
-function countRevealed(board) {
-  return board.reduce((sum, row) => sum + row.filter(c => c.revealed).length, 0);
-}
-
 function vibrate(pattern) {
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     navigator.vibrate(pattern);
@@ -169,12 +45,18 @@ export default function MinesweeperGame() {
   const [minesLeft, setMinesLeft] = useState(10);
   const [timeElapsed, setTimeElapsed] = useState(0);
   const [showJoke, setShowJoke] = useState(false);
+  // Covered squares highlighted after tapping a number that isn't satisfied yet
+  const [hint, setHint] = useState(null);          // Set of "r,c" keys
+  const hintTimer = useRef(null);
+  useEffect(() => () => clearTimeout(hintTimer.current), []);
 
   const timerRef = useRef(null);
   const timeRef = useRef(0); // shadow of timeElapsed for use in callbacks
 
   const startNewGame = useCallback((diff) => {
     clearInterval(timerRef.current);
+    clearTimeout(hintTimer.current);
+    setHint(null);
     const d = DIFFICULTIES[diff];
     setDifficulty(diff);
     setBoard(emptyBoard(d.rows, d.cols));
@@ -237,6 +119,14 @@ export default function MinesweeperGame() {
     if (cell.revealed) {
       const result = chordReveal(currentBoard, rows, cols, r, c);
       if (!result) return;
+      if (result.hint) {
+        // Not enough flags yet: briefly highlight the squares this number counts
+        clearTimeout(hintTimer.current);
+        setHint(new Set(result.hint.map(([hr, hc]) => `${hr},${hc}`)));
+        hintTimer.current = setTimeout(() => setHint(null), 900);
+        vibrate([15]);
+        return;
+      }
       if (result.explode) {
         const [er, ec] = result.explode;
         setBoard(revealAllMines(currentBoard, er, ec));
@@ -276,9 +166,10 @@ export default function MinesweeperGame() {
   }, [board, phase]);
 
   const handleCellTap = useCallback((r, c) => {
-    if (flagMode) handleFlag(r, c);
+    // A revealed number can't be flagged, so tapping one always chords (even in Flag mode)
+    if (flagMode && !board?.[r]?.[c]?.revealed) handleFlag(r, c);
     else handleReveal(r, c);
-  }, [flagMode, handleFlag, handleReveal]);
+  }, [flagMode, board, handleFlag, handleReveal]);
 
   const formatTime = s =>
     `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
@@ -406,6 +297,7 @@ export default function MinesweeperGame() {
                     key={`${r}-${c}`}
                     cell={cell}
                     cols={cols}
+                    hinted={!!hint?.has(`${r},${c}`)}
                     onTap={() => handleCellTap(r, c)}
                     onFlag={() => handleFlag(r, c)}
                   />
@@ -418,7 +310,7 @@ export default function MinesweeperGame() {
         <p className="text-white/25 text-xs text-center leading-snug">
           {flagMode
             ? 'Tap a cell to place or remove a flag'
-            : 'Tap to reveal • Hold to flag • Tap a number to chord-reveal'}
+            : 'Tap to reveal • Hold to flag • Tap a number to open around it, or to see which squares it counts'}
         </p>
       </div>
 
@@ -484,7 +376,7 @@ export default function MinesweeperGame() {
 
 // ─── Cell ─────────────────────────────────────────────────────────────────────
 
-function Cell({ cell, cols, onTap, onFlag }) {
+function Cell({ cell, cols, hinted, onTap, onFlag }) {
   const pressTimer = useRef(null);
   const hasMoved = useRef(false);
   const didLongPress = useRef(false);
@@ -528,7 +420,8 @@ function Cell({ cell, cols, onTap, onFlag }) {
   let bg, content, contentColor;
 
   if (!cell.revealed) {
-    bg = cell.flagged ? '#b91c1c' : '#6b7280';
+    // Hinted squares look pressed in and lit up, like classic Minesweeper
+    bg = cell.flagged ? '#b91c1c' : hinted ? '#fbbf24' : '#6b7280';
     content = cell.flagged ? '🚩' : null;
   } else if (cell.wrongFlag) {
     bg = '#374151';
@@ -545,7 +438,7 @@ function Cell({ cell, cols, onTap, onFlag }) {
   // Font scales with grid size
   const fontSize = cols <= 9 ? 15 : cols <= 12 ? 13 : 11;
 
-  const boxShadow = !cell.revealed && !cell.flagged
+  const boxShadow = !cell.revealed && !cell.flagged && !hinted
     ? 'inset 1px 1px 0 rgba(255,255,255,0.22), inset -1px -1px 0 rgba(0,0,0,0.28)'
     : 'none';
 
@@ -576,7 +469,9 @@ function Cell({ cell, cols, onTap, onFlag }) {
       animate={
         cell.exploded
           ? { scale: [1, 1.5, 1], transition: { duration: 0.3 } }
-          : {}
+          : hinted
+            ? { scale: [1, 0.85, 0.92], transition: { duration: 0.25 } }
+            : { scale: 1 }
       }
     >
       {content}
