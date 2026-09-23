@@ -4,14 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDrag, useDrop } from 'react-dnd';
 import { ArrowLeft, RefreshCw, Undo2, HelpCircle } from 'lucide-react';
 import { buildDeck, shuffle, SUITS, RANK_VALUES } from '../../utils/cardEngine';
-
-// Aces are low in Solitaire (the shared table ranks them high for trick-taking games)
-const SOL_RANK = { ...RANK_VALUES, A: 1 };
 import { PlayingCard, EmptyCardSlot } from '../../components/PlayingCard';
 import { Button } from '../../components/Button';
 import { TutorialModal } from '../../components/TutorialModal';
 import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
+
+// Aces are low in Solitaire (the shared table ranks them high for trick-taking games)
+const SOL_RANK = { ...RANK_VALUES, A: 1 };
 
 const DRAG_TYPE = 'CARD_STACK';
 
@@ -343,7 +343,7 @@ export default function SolitaireGame() {
       {/* Tableau */}
       <div className="flex gap-1.5 overflow-x-auto pb-4">
         {game.tableau.map((col, colIdx) => {
-          const colHeight = Math.max(120, col.length * 22 + 70);
+          const colHeight = Math.max(120, col.length * 22 + 90);   // cards + the tap zone below them
           return (
             <DroppableTableau key={colIdx} colIdx={colIdx}
               canDrop={canDropOnTableau} onDrop={handleDrop}
@@ -375,9 +375,10 @@ export default function SolitaireGame() {
                   </div>
                 );
               })}
-              {/* Invisible drop/click zone at the bottom of each column */}
+              {/* Invisible drop/click zone just below the last card (cards are 64px
+                  tall, stacked 22px apart — starting it any higher covers the card) */}
               <div
-                style={{ position: 'absolute', top: `${col.length * 22}px`, zIndex: col.length + 1, width: '100%', height: '48px', cursor: 'pointer' }}
+                style={{ position: 'absolute', top: `${col.length ? (col.length - 1) * 22 + 64 : 0}px`, zIndex: col.length + 1, width: '100%', height: '48px', cursor: 'pointer' }}
                 onClick={() => handleTableauClick(colIdx)}
               />
             </DroppableTableau>
