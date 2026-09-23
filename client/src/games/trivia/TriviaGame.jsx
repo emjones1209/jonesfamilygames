@@ -48,12 +48,10 @@ export default function TriviaGame() {
       const { data } = await api.get('/trivia', {
         params: { category, difficulty, limit: config.questionsPerRound }
       });
-      if (data.length === 0) {
-        // Fallback: use sample questions if DB empty
-        setQuestions(getSampleQuestions(category, difficulty));
-      } else {
-        setQuestions(data);
-      }
+      // Top up short rounds from the built-in bank (skipping questions already chosen)
+      const seen = new Set(data.map(q => q.question));
+      const extra = getSampleQuestions(category, difficulty).filter(q => !seen.has(q.question));
+      setQuestions([...data, ...extra].slice(0, config.questionsPerRound));
       setPhase('playing');
     } catch {
       setQuestions(getSampleQuestions(category, difficulty));

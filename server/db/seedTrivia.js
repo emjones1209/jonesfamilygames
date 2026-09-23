@@ -112,18 +112,19 @@ const ALL_QUESTIONS = [...BIBLE_QUESTIONS, ...HISTORY_QUESTIONS, ...GEOGRAPHY_QU
 
 async function seed() {
   try {
-    const existing = await pool.query('SELECT COUNT(*) FROM trivia_questions');
-    if (parseInt(existing.rows[0].count) > 0) {
-      console.log('ℹ️  Trivia questions already seeded, skipping...');
-      return;
-    }
+    // Insert only questions that aren't already present, so re-running tops up
+    // a partially seeded database instead of skipping it or duplicating rows
+    let added = 0;
     for (const q of ALL_QUESTIONS) {
+      const existing = await pool.query(`SELECT 1 FROM trivia_questions WHERE question = $1`, [q.question]);
+      if (existing.rows.length > 0) continue;
       await pool.query(
         `INSERT INTO trivia_questions (category, difficulty, question, correct_answer, wrong_answers) VALUES ($1,$2,$3,$4,$5)`,
         [q.category, q.difficulty, q.question, q.correct_answer, q.wrong_answers]
       );
+      added++;
     }
-    console.log(`✅ Seeded ${ALL_QUESTIONS.length} trivia questions`);
+    console.log(`✅ Seeded ${added} new trivia questions (${ALL_QUESTIONS.length - added} already present)`);
   } catch (err) {
     console.error('❌ Seed failed:', err.message);
     throw err;

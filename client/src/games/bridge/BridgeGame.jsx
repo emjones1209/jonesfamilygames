@@ -21,7 +21,7 @@ function dealHands() {
   return [
     deck.slice(0,13).map(c=>({...c,faceUp:true})),
     deck.slice(13,26).map(c=>({...c,faceUp:false})),
-    deck.slice(26,39).map(c=>({...c,faceUp:true})), // dummy shows after bidding
+    deck.slice(26,39).map(c=>({...c,faceUp:false})), // revealed if this seat becomes dummy
     deck.slice(39,52).map(c=>({...c,faceUp:false})),
   ];
 }
@@ -185,29 +185,26 @@ export default function BridgeGame() {
       },900);
     } else {
       setHands(nh); setTrick(nt); setSelected(null);
-      let next=(pi+1)%4;
-      // Skip dummy — declarer plays for dummy
-      if (next===dummy) next=(next+1)%4;
-      setCurrentPlayer(next);
+      // Dummy takes its turn in normal rotation; the declarer chooses its card
+      setCurrentPlayer((pi+1)%4);
     }
-  },[trick,hands,contract,tricksWon,scores,difficulty,dummy]);
+  },[trick,hands,contract,tricksWon,scores,difficulty]);
 
-  // AI plays + declarer plays dummy
+  // Who chooses the card for the current seat: the declarer plays dummy's hand
+  const controller=currentPlayer===dummy?contract?.declarer:currentPlayer;
+
+  // AI plays its own hand, and dummy's hand when an AI is declarer
   useEffect(()=>{
-    if (phase!=="playing") return;
-    const effectivePlayer=currentPlayer===dummy?contract?.declarer:currentPlayer;
-    if (effectivePlayer!==undefined&&!AI_PLAYERS.includes(effectivePlayer)&&currentPlayer!==dummy) return;
-    if (!AI_PLAYERS.includes(currentPlayer)&&currentPlayer!==dummy) return;
+    if (phase!=="playing"||controller===0) return;
     const t=setTimeout(()=>{
-      const playFor=currentPlayer===dummy?dummy:currentPlayer;
-      const legal=legalCards(playFor);
+      const legal=legalCards(currentPlayer);
       if (!legal.length) return;
       const ls=trick[0]?.card.suit||null;
       const card=aiChooseCard({hand:legal,trick,leadSuit:ls,trumpSuit:contract?.trumpSuit||null,difficulty,gameType:"bridge"});
-      playCard(card,playFor);
+      playCard(card,currentPlayer);
     },800);
     return ()=>clearTimeout(t);
-  },[currentPlayer,phase,trick,difficulty,playCard,legalCards,dummy,contract]);
+  },[currentPlayer,controller,phase,trick,difficulty,playCard,legalCards,contract]);
 
   if (phase==="setup") return (
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-teal-900 p-5 flex flex-col">
@@ -267,9 +264,28 @@ export default function BridgeGame() {
 
   const myHand=hands[0]||[];
   const dummyHand=hands[dummy]||[];
-  const myLegal=legalCards(0);
-  const isMyTurn=currentPlayer===0;
+  const isMyTurn=controller===0;              // your own seat, or dummy's when you declare
+  const iAmDummy=dummy===0;
+  const myLegal=currentPlayer===0&&isMyTurn?legalCards(0):[];
+  const dummyLegal=currentPlayer===dummy&&isMyTurn?legalCards(dummy):[];
   const contractStr=contract?`${contract.bid} by ${PLAYER_NAMES[contract.declarer]}`:"";
+  const tapCard=(card,pi,legal)=>{
+    if (!legal.some(c=>c.id===card.id)) return;
+    if (selected?.id===card.id) playCard(card,pi); else setSelected(card);
+  };
+  const cardBacks=(n,vertical)=>Array.from({length:n},(_,i)=>(
+    <div key={i} className={`${vertical?"w-8 h-5":"w-5 h-8"} bg-blue-900 border border-blue-700 rounded`}/>
+  ));
+  // A side seat shows dummy's cards face-up once dummy is revealed
+  const sideHand=(pi)=>pi===dummy
+    ?<div className="flex flex-col gap-0.5 items-center">
+        <p className="text-white/40 text-[10px]">Dummy</p>
+        {dummyHand.map(c=><PlayingCard key={c.id} card={c} size="xs"
+          selected={selected?.id===c.id}
+          disabled={!dummyLegal.some(l=>l.id===c.id)}
+          onClick={()=>tapCard(c,pi,dummyLegal)}/>)}
+      </div>
+    :<div className="flex flex-col gap-0.5">{cardBacks((hands[pi]||[]).length,true)}</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-teal-900 p-3 flex flex-col">
@@ -281,38 +297,49 @@ export default function BridgeGame() {
       <div className="text-center text-white/40 text-xs mb-2">
         Tricks: NS={tricksWon[0]+tricksWon[2]} EW={tricksWon[1]+tricksWon[3]} | Need: {contract?bidLevel(contract.bid)+6:0}
       </div>
-      {/* Dummy hand (North) */}
-      {dummy!==null&&(
-        <div className="mb-2">
-          <p className="text-white/40 text-xs text-center mb-1">Dummy (North)</p>
-          <div className="flex flex-wrap justify-center gap-1">
-            {dummyHand.map(c=><PlayingCard key={c.id} card={c} size="xs"/>)}
-          </div>
+      {/* North: partner's hidden hand, or dummy's cards face-up */}
+      <div className="mb-2">
+        <p className="text-white/40 text-xs text-center mb-1">
+          {dummy===2?"Dummy — North (Partner)":PLAYER_NAMES[2]}
+          {dummy===2&&contract?.declarer===0&&" · you play these cards"}
+        </p>
+        <div className="flex flex-wrap justify-center gap-1">
+          {dummy===2
+            ?dummyHand.map(c=><PlayingCard key={c.id} card={c} size="xs"
+                selected={selected?.id===c.id}
+                disabled={!dummyLegal.some(l=>l.id===c.id)}
+                onClick={()=>tapCard(c,2,dummyLegal)}/>)
+            :cardBacks((hands[2]||[]).length,false)}
         </div>
-      )}
+      </div>
       {/* Trick area + side hands */}
       <div className="flex items-center mb-2">
-        <div className="flex flex-col gap-0.5">{(hands[1]||[]).map((_,i)=><div key={i} className="w-8 h-5 bg-blue-900 border border-blue-700 rounded"/>)}</div>
+        {sideHand(1)}
         <div className="flex-1 flex flex-col items-center min-h-[100px]">
-          <p className="text-white/40 text-xs mb-2">{isMyTurn?"🎯 Your turn":PLAYER_NAMES[currentPlayer]+"..."}</p>
+          <p className="text-white/40 text-xs mb-2">
+            {isMyTurn
+              ?(currentPlayer===dummy?"🎯 Play from dummy":"🎯 Your turn")
+              :PLAYER_NAMES[currentPlayer]+(currentPlayer===dummy?` (played by ${PLAYER_NAMES[controller]})`:"")+"..."}
+          </p>
           <div className="grid grid-cols-2 gap-2">
             {trick.map(({card,playerId})=>(
               <div key={card.id} className="text-center"><PlayingCard card={card} size="sm"/><div className="text-white/40 text-xs">{PLAYER_NAMES[playerId]}</div></div>
             ))}
           </div>
         </div>
-        <div className="flex flex-col gap-0.5">{(hands[3]||[]).map((_,i)=><div key={i} className="w-8 h-5 bg-blue-900 border border-blue-700 rounded"/>)}</div>
+        {sideHand(3)}
       </div>
       {/* My hand */}
       <div className="mt-auto">
-        <p className="text-white/40 text-xs text-center mb-1">Your Hand (South)</p>
+        <p className="text-white/40 text-xs text-center mb-1">
+          {iAmDummy?"Your Hand (South) — you're dummy, North plays these":"Your Hand (South)"}
+        </p>
         <div className="flex flex-wrap justify-center gap-1">
-          {myHand.map(card=>{
-            const isLegal=myLegal.some(c=>c.id===card.id);
-            return <PlayingCard key={card.id} card={card} size="sm" selected={selected?.id===card.id}
-              disabled={!isMyTurn||!isLegal}
-              onClick={()=>{ if(!isMyTurn||!isLegal) return; if(selected?.id===card.id) playCard(card,0); else setSelected(card); }}/>;
-          })}
+          {myHand.map(card=>(
+            <PlayingCard key={card.id} card={card} size="sm" selected={selected?.id===card.id}
+              disabled={!myLegal.some(c=>c.id===card.id)}
+              onClick={()=>tapCard(card,0,myLegal)}/>
+          ))}
         </div>
         {selected&&isMyTurn&&<p className="text-center text-white/40 text-xs mt-1">Tap again to play</p>}
       </div>

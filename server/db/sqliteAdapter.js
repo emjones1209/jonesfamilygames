@@ -41,6 +41,9 @@ const JSON_FIELDS = new Set(['wrong_answers', 'state', 'players', 'metadata']);
 function serializeParams(params) {
   if (!params) return [];
   return params.map(p => {
+    // Store dates in SQLite's datetime('now') format so comparisons like
+    // `expires_at > NOW()` work (JSON.stringify would wrap them in quotes)
+    if (p instanceof Date) return p.toISOString().replace('T', ' ').slice(0, 19);
     if (Array.isArray(p) || (p && typeof p === 'object')) return JSON.stringify(p);
     return p;
   });

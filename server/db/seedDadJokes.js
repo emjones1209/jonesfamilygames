@@ -104,15 +104,15 @@ const DAD_JOKES = [
 
 async function seed() {
   try {
-    const existing = await pool.query('SELECT COUNT(*) FROM dad_jokes');
-    if (parseInt(existing.rows[0].count) > 0) {
-      console.log('ℹ️  Dad jokes already seeded, skipping...');
-      return;
-    }
+    // Insert only jokes that aren't already present (safe to re-run)
+    let added = 0;
     for (const j of DAD_JOKES) {
+      const existing = await pool.query('SELECT 1 FROM dad_jokes WHERE joke = $1', [j.joke]);
+      if (existing.rows.length > 0) continue;
       await pool.query('INSERT INTO dad_jokes (joke, punchline) VALUES ($1, $2)', [j.joke, j.punchline]);
+      added++;
     }
-    console.log(`✅ Seeded ${DAD_JOKES.length} dad jokes`);
+    console.log(`✅ Seeded ${added} new dad jokes (${DAD_JOKES.length - added} already present)`);
   } catch (err) {
     console.error('❌ Seed failed:', err.message);
     throw err;

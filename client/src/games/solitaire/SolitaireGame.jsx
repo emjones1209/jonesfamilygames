@@ -4,6 +4,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useDrag, useDrop } from 'react-dnd';
 import { ArrowLeft, RefreshCw, Undo2, HelpCircle } from 'lucide-react';
 import { buildDeck, shuffle, SUITS, RANK_VALUES } from '../../utils/cardEngine';
+
+// Aces are low in Solitaire (the shared table ranks them high for trick-taking games)
+const SOL_RANK = { ...RANK_VALUES, A: 1 };
 import { PlayingCard, EmptyCardSlot } from '../../components/PlayingCard';
 import { Button } from '../../components/Button';
 import { TutorialModal, TUTORIALS } from '../../components/TutorialModal';
@@ -39,7 +42,7 @@ function DraggableCard({ card, from, cards, selected, onSelect, size = 'sm' }) {
     type: DRAG_TYPE,
     item: { cards, from },
     collect: (monitor) => ({ isDragging: monitor.isDragging() }),
-  }));
+  }), [cards, from]); // deps required: without them react-dnd keeps the first render's stack
   return (
     <div ref={drag} style={{ opacity: isDragging ? 0.4 : 1 }}
          onClick={onSelect}>
@@ -55,7 +58,7 @@ function DroppableTableau({ colIdx, canDrop: canDropFn, onDrop, children, style 
     drop: (item) => onDrop(item, colIdx),
     canDrop: (item) => canDropFn(item.cards[0], colIdx),
     collect: (monitor) => ({ isOver: monitor.isOver(), canAccept: monitor.canDrop() }),
-  }));
+  }), [colIdx, canDropFn, onDrop]); // deps required: otherwise drops apply to the initial deal
   return (
     <div ref={drop} style={style}
          className={`relative flex-1 min-w-0 rounded-lg transition-colors ${isOver && canAccept ? 'ring-2 ring-primary-400' : ''}`}>
@@ -71,7 +74,7 @@ function DroppableFoundation({ suit, canDrop: canDropFn, onDrop, children }) {
     drop: (item) => onDrop(item, suit),
     canDrop: (item) => item.cards.length === 1 && canDropFn(item.cards[0], suit),
     collect: (monitor) => ({ isOver: monitor.isOver(), canAccept: monitor.canDrop() }),
-  }));
+  }), [suit, canDropFn, onDrop]);
   return (
     <div ref={drop} className={`cursor-pointer rounded-lg transition-colors ${isOver && canAccept ? 'ring-2 ring-primary-400' : ''}`}>
       {children}
@@ -123,14 +126,14 @@ export default function SolitaireGame() {
     if (!top.faceUp) return false;
     const isRed = (s) => s === 'hearts' || s === 'diamonds';
     const colorsDiffer = isRed(card.suit) !== isRed(top.suit);
-    return colorsDiffer && RANK_VALUES[card.rank] === RANK_VALUES[top.rank] - 1;
+    return colorsDiffer && SOL_RANK[card.rank] === SOL_RANK[top.rank] - 1;
   };
 
   // Can a card be placed on a foundation
   const canPlaceOnFoundation = (card) => {
     const pile = game.foundations[card.suit];
     if (pile.length === 0) return card.rank === 'A';
-    return RANK_VALUES[card.rank] === RANK_VALUES[pile[pile.length - 1].rank] + 1;
+    return SOL_RANK[card.rank] === SOL_RANK[pile[pile.length - 1].rank] + 1;
   };
 
   const handleCardClick = (card, from) => {
@@ -428,5 +431,5 @@ function removeCards(game, from, cards) {
 function canPlaceOnFoundationG(card, g) {
   const pile = g.foundations[card.suit];
   if (pile.length === 0) return card.rank === 'A';
-  return RANK_VALUES[card.rank] === RANK_VALUES[pile[pile.length - 1].rank] + 1;
+  return SOL_RANK[card.rank] === SOL_RANK[pile[pile.length - 1].rank] + 1;
 }

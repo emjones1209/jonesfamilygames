@@ -17,7 +17,10 @@ api.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
+    // A 401 from login/register means bad credentials, not an expired session:
+    // let the form show the error instead of redirecting (which reloads /login)
+    const isAuthCall = original?.url?.startsWith('/auth/');
+    if (error.response?.status === 401 && !original._retry && !isAuthCall) {
       original._retry = true;
       try {
         const refreshToken = localStorage.getItem('refreshToken');

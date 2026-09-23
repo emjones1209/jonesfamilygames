@@ -75,6 +75,12 @@ function dealGame(numPlayers) {
   return {grids, stock:stockArr, discard:discardArr};
 }
 
+/** If the stock is empty, shuffle the discard pile (keeping its top card) back into it. */
+function refillStock(stock, discard) {
+  if (stock.length || discard.length < 2) return { stock, discard };
+  return { stock: shuffle(discard.slice(1)).map(c=>({...c,faceUp:false})), discard: [discard[0]] };
+}
+
 function PlayerGrid({grid, onCardClick, interactive, highlight}) {
   if (!grid||!grid[0]) return null;
   return (
@@ -177,8 +183,10 @@ export default function Golf6Game() {
   },[finalRound,finalTurnsLeft,totalScores,endGame]);
 
   const drawFromStock=()=>{
-    if (phase!=="playing"||currentPlayer!==0||drawn||!stock.length) return;
-    setDrawn({...stock[0],faceUp:true}); setStock(s=>s.slice(1));
+    if (phase!=="playing"||currentPlayer!==0||drawn) return;
+    const {stock:s,discard:d}=refillStock(stock,discard);
+    if (!s.length) return;
+    setDrawn({...s[0],faceUp:true}); setStock(s.slice(1)); setDiscard(d);
   };
 
   const takeDiscard=()=>{
@@ -212,17 +220,25 @@ export default function Golf6Game() {
     const t=setTimeout(()=>{
       const pi=currentPlayer;
       const ng=grids.map(g=>g.map(r=>[...r]));
-      const nd=[...discard]; const ns=[...stock];
+      const refilled=refillStock(stock,discard);
+      const nd=[...refilled.discard]; const ns=[...refilled.stock];
       const topD=nd[0];
       let drawnCard;
       const useD=topD&&(difficulty==="easy"?Math.random()<0.4:ng[pi].flat().filter(c=>c.faceUp).some(c=>cardValue(c)-cardValue(topD)>2));
-      if (useD) { drawnCard=nd.shift(); } else { if (!ns.length) return; drawnCard={...ns.shift(),faceUp:true}; }
+      if (useD||!ns.length) { drawnCard=nd.shift(); } else { drawnCard={...ns.shift(),faceUp:true}; }
       let bestRow=-1,bestCol=-1,bestGain=difficulty==="easy"?3:1;
       const dv=cardValue(drawnCard);
       for (let row=0;row<2;row++) for (let col=0;col<3;col++) {
         const cell=ng[pi][row][col];
         if (!cell.faceUp) { if (dv<=-2&&bestGain>0) { bestGain=0;bestRow=row;bestCol=col; } }
         else { const gain=cardValue(cell)-dv; if (gain>bestGain) { bestGain=gain;bestRow=row;bestCol=col; } }
+      }
+      // No good swap: place a low card over a face-down one so the AI makes progress
+      // towards finishing (otherwise it can keep drawing forever)
+      if (bestRow<0&&dv<=(difficulty==="easy"?6:4)) {
+        const hidden=[];
+        for (let row=0;row<2;row++) for (let col=0;col<3;col++) if (!ng[pi][row][col].faceUp) hidden.push([row,col]);
+        if (hidden.length) [bestRow,bestCol]=hidden[Math.floor(Math.random()*hidden.length)];
       }
       let finalDiscard;
       if (bestRow>=0) {
@@ -335,7 +351,12 @@ export default function Golf6Game() {
             ?<div onClick={drawFromStock} className={currentPlayer===0&&!drawn?"cursor-pointer":""}>
               <PlayingCard card={{...stock[0],faceUp:false}} faceDown size="md"/>
              </div>
-            :<div className="w-14 h-20 border-2 border-dashed border-white/20 rounded-2xl"/>}
+            :discard.length>1
+              ?<div onClick={drawFromStock}
+                  className={`w-14 h-20 border-2 border-dashed border-white/40 rounded-2xl flex items-center justify-center text-white/60 text-[10px] text-center leading-tight ${currentPlayer===0&&!drawn?"cursor-pointer":""}`}>
+                  Tap to<br/>reshuffle
+                </div>
+              :<div className="w-14 h-20 border-2 border-dashed border-white/20 rounded-2xl"/>}
         </div>
         <div className="text-center">
           <p className="text-white/40 text-xs mb-1">Discard</p>

@@ -44,7 +44,8 @@ app.use('/api/rooms',     roomRoutes);
 // Serve static client in production
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
-  app.get('*', (req, res) => {
+  // Express 5 requires named wildcards ('*' alone throws at startup)
+  app.get('/{*splat}', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
   });
 }
