@@ -52,7 +52,7 @@ export const TUTORIALS = {
     { emoji: '🧩', heading: 'Goal', body: 'Assemble all the puzzle pieces to recreate the original photo. Choose a photo from your library to get started!' },
     { emoji: '📸', heading: 'Choose a Photo', body: 'Tap "Add a Photo" to pick one from your photo library (or take a new one). The puzzle will be cut from that picture.' },
     { emoji: '🖐️', heading: 'Placing Pieces', body: 'Drag pieces up from the tray onto the board (swipe sideways to scroll the tray). Drop a piece close to its correct spot and it locks into place. Tap "Picture" any time to see the finished picture.' },
-    { emoji: '🎚️', heading: 'Difficulty', body: 'Easy: 16 pieces • Medium: 30 pieces • Hard: 64 pieces.' },
+    { emoji: '🎚️', heading: 'Difficulty', body: 'Easy: 16 pieces • Medium: 30 pieces • Hard: 64 pieces • Expert: 100 pieces.' },
   ],
   match3: [
     { emoji: '🌸', heading: 'Goal', body: 'Swipe a flower toward a neighbour to swap them (or tap one, then the other) and line up 3 or more of the same kind. Reach the level goal before you run out of moves!' },

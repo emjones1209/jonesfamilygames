@@ -18,8 +18,8 @@ const DRAG_TYPE = 'CARD_STACK';
 // Cards are stacked with pixel offsets, so the layout needs each card's real
 // height at the current screen width (see the md/sm sizes in components/cardSizes.js).
 const CARD_LAYOUTS = [
-  { query: '(min-width: 1024px)', size: 'md', height: 112, step: 34 },
-  { query: '(min-width: 768px)',  size: 'md', height: 96,  step: 30 },
+  { query: '(min-width: 1024px)', size: 'md', height: 144, step: 38 },
+  { query: '(min-width: 768px)',  size: 'md', height: 120, step: 34 },
   { query: null,                  size: 'sm', height: 64,  step: 22 },
 ];
 const pickLayout = () => CARD_LAYOUTS.find(l => !l.query || window.matchMedia(l.query).matches);

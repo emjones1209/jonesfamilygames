@@ -405,6 +405,9 @@ export default function Golf6Game() {
           </div>
         ))}
       </div>
+      {/* Piles above your grid; side by side on a wide landscape screen (e.g. an
+          iPad held sideways) so the bigger cards still fit without scrolling */}
+      <div className="flex flex-col items-center lg:landscape:flex-row lg:landscape:justify-center lg:landscape:gap-12">
       <div className="flex justify-center gap-4 mb-3">
         <div className="text-center w-24 flex flex-col items-center">
           <p className="text-white/40 text-xs mb-1">Stock ({stock.length})</p>
@@ -457,6 +460,7 @@ export default function Golf6Game() {
             highlight={!!drawn}
           />
         </div>
+      </div>
       </div>
       <p className="text-center text-white/40 text-xs mt-2 min-h-[1rem]">
         {currentPlayer===0&&phase==="playing"&&(drawn?"Tap a card in your grid to swap, or discard it":"Draw a card, or tap a face-down card to flip it")}

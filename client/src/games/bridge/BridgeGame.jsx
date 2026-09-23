@@ -147,7 +147,7 @@ export default function BridgeGame() {
 
   // Dummy's cards face-up after the opening lead; you tap them when you declare
   const dummyView = (
-    <div className={dummy === 2 ? '' : 'max-w-[7.5rem] md:max-w-[11rem]'}>
+    <div className={dummy === 2 ? '' : 'max-w-[7.5rem] md:max-w-[11rem] lg:max-w-[12.5rem]'}>
       <CardHand cards={dummyCards} size="xs" wrap={dummy !== 2}
         legal={iAmDeclarer && table?.turn === dummy ? legalFor(dummy) : []}
         onPlay={card => play(dummy, card)} />

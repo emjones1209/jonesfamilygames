@@ -98,13 +98,17 @@ function pieceEdges(r, c, rows, cols, tabDirs) {
  * Pieces follow the photo's proportions (within limits; anything beyond is
  * cropped from the centre). Returns { pieces, pw, ph, overhang }.
  */
-function sliceJigsawPieces(imgSrc, rows, cols, maxBoardW) {
+function sliceJigsawPieces(imgSrc, rows, cols, maxBoardW, maxBoardH) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
       // Piece shape: the photo's cell aspect, kept between 2:3 and 3:2
       const cellAspect = Math.min(1.5, Math.max(2 / 3, (img.height / rows) / (img.width / cols)));
-      const pw = Math.max(40, Math.min(100, Math.floor(maxBoardW / cols)));
+      // Largest piece (up to 100px) whose whole board fits, including the tabs that
+      // stick out around its edge (about 0.28 of a piece plus 3px on each side)
+      const pw = Math.max(40, Math.min(100,
+        Math.floor((maxBoardW - 6) / (cols + 0.56)),
+        Math.floor((maxBoardH - 6) / (rows * cellAspect + 0.56))));
       const ph = Math.round(pw * cellAspect);
       // Centre crop of the photo matching the board's shape
       const boardAspect = (rows * ph) / (cols * pw);
@@ -198,6 +202,7 @@ const DIFFS = {
   easy:   { label: 'Easy (4×4 = 16)',   rows: 4, cols: 4 },
   medium: { label: 'Medium (5×6 = 30)', rows: 5, cols: 6 },
   hard:   { label: 'Hard (8×8 = 64)',   rows: 8, cols: 8 },
+  expert: { label: 'Expert (10×10 = 100)', rows: 10, cols: 10 },
 };
 
 const TRAY_PIECE_H = 84;   // pieces are shown scaled down to this height in the tray
@@ -260,8 +265,13 @@ export default function JigsawGame() {
   const handleStart = useCallback(async () => {
     if (!selPhoto) return;
     const { rows, cols } = DIFFS[diff];
-    const availW = Math.min(window.innerWidth, 900) - 32;   // fit the screen
-    const result = await sliceJigsawPieces(selPhoto.dataUrl, rows, cols, availW);
+    // Fit the board on screen: the width, and the height left after the header,
+    // hint, piece tray and the iPad's safe-area insets
+    const bodyStyle = getComputedStyle(document.body);
+    const insets = parseFloat(bodyStyle.paddingTop) + parseFloat(bodyStyle.paddingBottom);
+    const availW = Math.min(window.innerWidth, 900) - 32;
+    const availH = window.innerHeight - insets - 250;
+    const result = await sliceJigsawPieces(selPhoto.dataUrl, rows, cols, availW, availH);
     setPieces(result.pieces);
     setConfig({ rows, cols, pw: result.pw, ph: result.ph, overhang: result.overhang });
     setReference(result.reference);
