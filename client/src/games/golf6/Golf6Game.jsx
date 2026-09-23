@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, HelpCircle } from "lucide-react";
 import { buildDeck, shuffle } from "../../utils/cardEngine";
 import { PlayingCard } from "../../components/PlayingCard";
+import { CARD_BOX } from "../../components/cardSizes";
 import { Button } from "../../components/Button";
 import { TutorialModal } from "../../components/TutorialModal";
 import { TUTORIALS } from "../../components/tutorials";
@@ -30,7 +31,7 @@ function buildGolfDeck() {
 }
 
 function JokerCard({ size="md", faceDown=false, selected=false, onClick, disabled=false }) {
-  const sz = size==="md"?"w-14 h-20":size==="sm"?"w-10 h-16":"w-8 h-12";
+  const sz = CARD_BOX[size];
   if (faceDown) return (
     <div className={`${sz} bg-blue-900 border-2 border-blue-700 rounded-xl flex items-center justify-center ${disabled?"opacity-50":""} ${onClick?"cursor-pointer":""}`}
       onClick={disabled?undefined:onClick}>
@@ -91,7 +92,7 @@ function PlayerGrid({grid, onCardClick, interactive, highlight}) {
         <div key={col} className="flex flex-col gap-2">
           {[0,1].map(row=>{
             const card=grid[row]?.[col];
-            if (!card) return <div key={row} className="w-14 h-20 rounded-2xl bg-white/5"/>;
+            if (!card) return <div key={row} className={`${CARD_BOX.md} rounded-2xl bg-white/5`}/>;
             const clickFn=interactive?()=>onCardClick(row,col):undefined;
             if (card.suit==="joker") return (
               <JokerCard key={row} size="md" faceDown={!card.faceUp}
@@ -347,7 +348,7 @@ export default function Golf6Game() {
                 ? (c.suit==="joker"
                     ? <JokerCard key={i} size="xs" />
                     : <PlayingCard key={i} card={c} size="xs"/>)
-                : <div key={i} className="w-6 h-9 bg-blue-900 border border-blue-700 rounded"/>
+                : <div key={i} className={`${CARD_BOX.xs} bg-blue-900 border border-blue-700 rounded-lg`}/>
               )}
             </div>
             <div className="text-white/40 text-xs mt-1">{grids[pi]?gridScore(grids[pi]):"?"}</div>
@@ -363,10 +364,10 @@ export default function Golf6Game() {
              </div>
             :discard.length>1
               ?<div onClick={drawFromStock}
-                  className={`w-14 h-20 border-2 border-dashed border-white/40 rounded-2xl flex items-center justify-center text-white/60 text-[10px] text-center leading-tight ${currentPlayer===0&&!drawn?"cursor-pointer":""}`}>
+                  className={`${CARD_BOX.md} border-2 border-dashed border-white/40 rounded-2xl flex items-center justify-center text-white/60 text-[10px] text-center leading-tight ${currentPlayer===0&&!drawn?"cursor-pointer":""}`}>
                   Tap to<br/>reshuffle
                 </div>
-              :<div className="w-14 h-20 border-2 border-dashed border-white/20 rounded-2xl"/>}
+              :<div className={`${CARD_BOX.md} border-2 border-dashed border-white/20 rounded-2xl`}/>}
         </div>
         <div className="text-center">
           <p className="text-white/40 text-xs mb-1">Discard</p>
@@ -376,7 +377,7 @@ export default function Golf6Game() {
                 ? <JokerCard size="md" onClick={currentPlayer===0&&!drawn?takeDiscard:undefined}/>
                 : <PlayingCard card={discard[0]} size="md"/>}
              </div>
-            :<div className="w-14 h-20 border-2 border-dashed border-white/20 rounded-2xl"/>}
+            :<div className={`${CARD_BOX.md} border-2 border-dashed border-white/20 rounded-2xl`}/>}
         </div>
         {drawn&&(
           <div className="text-center">

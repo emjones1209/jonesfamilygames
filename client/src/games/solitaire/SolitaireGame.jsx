@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDrag, useDrop } from 'react-dnd';
@@ -14,6 +14,26 @@ import api from '../../utils/api';
 const SOL_RANK = { ...RANK_VALUES, A: 1 };
 
 const DRAG_TYPE = 'CARD_STACK';
+
+// Cards are stacked with pixel offsets, so the layout needs each card's real
+// height at the current screen width (see the md/sm sizes in components/cardSizes.js).
+const CARD_LAYOUTS = [
+  { query: '(min-width: 1024px)', size: 'md', height: 112, step: 34 },
+  { query: '(min-width: 768px)',  size: 'md', height: 96,  step: 30 },
+  { query: null,                  size: 'sm', height: 64,  step: 22 },
+];
+const pickLayout = () => CARD_LAYOUTS.find(l => !l.query || window.matchMedia(l.query).matches);
+
+function useCardLayout() {
+  const [layout, setLayout] = useState(pickLayout);
+  useEffect(() => {
+    const onChange = () => setLayout(pickLayout());
+    const queries = CARD_LAYOUTS.filter(l => l.query).map(l => window.matchMedia(l.query));
+    queries.forEach(q => q.addEventListener('change', onChange));
+    return () => queries.forEach(q => q.removeEventListener('change', onChange));
+  }, []);
+  return layout;
+}
 
 function initGame() {
   const deck = shuffle(buildDeck());
@@ -90,6 +110,7 @@ export default function SolitaireGame() {
   const [won, setWon] = useState(false);
   const [selected, setSelected] = useState(null); // { from, cards }
   const [showTutorial, setShowTutorial] = useState(false);
+  const { size, height: cardH, step } = useCardLayout();
 
   const saveHistory = (g) => setHistory(h => [...h.slice(-20), JSON.stringify(g)]);
 
@@ -306,8 +327,8 @@ export default function SolitaireGame() {
         {/* Stock */}
         <div onClick={drawStock} className="cursor-pointer">
           {game.stock.length > 0
-            ? <PlayingCard card={{ suit: 'spades', rank: 'A', faceUp: false }} faceDown size="sm" />
-            : <EmptyCardSlot size="sm" label="↩️" onClick={drawStock} />}
+            ? <PlayingCard card={{ suit: 'spades', rank: 'A', faceUp: false }} faceDown size={size} />
+            : <EmptyCardSlot size={size} label="↩️" onClick={drawStock} />}
         </div>
 
         {/* Waste */}
@@ -316,11 +337,11 @@ export default function SolitaireGame() {
               card={game.waste[0]}
               from={{ type: 'waste' }}
               cards={[game.waste[0]]}
-              size="sm"
+              size={size}
               selected={selected?.from?.type === 'waste'}
               onSelect={() => handleCardClick(game.waste[0], { type: 'waste' })}
             />
-          : <EmptyCardSlot size="sm" />}
+          : <EmptyCardSlot size={size} />}
 
         <div className="flex-1" />
 
@@ -334,8 +355,8 @@ export default function SolitaireGame() {
               canDrop={canDropOnFoundation} onDrop={handleFoundationDrop}>
               <div onClick={() => handleFoundationClick(suit)} className="cursor-pointer">
                 {top
-                  ? <PlayingCard card={top} size="sm" />
-                  : <EmptyCardSlot size="sm" label={symbols[suit]} />}
+                  ? <PlayingCard card={top} size={size} />
+                  : <EmptyCardSlot size={size} label={symbols[suit]} />}
               </div>
             </DroppableFoundation>
           );
@@ -345,13 +366,13 @@ export default function SolitaireGame() {
       {/* Tableau */}
       <div className="flex gap-1.5 overflow-x-auto pb-4">
         {game.tableau.map((col, colIdx) => {
-          const colHeight = Math.max(120, col.length * 22 + 90);   // cards + the tap zone below them
+          const colHeight = Math.max(120, (Math.max(col.length, 1) - 1) * step + cardH + 48);   // cards + the tap zone below them
           return (
             <DroppableTableau key={colIdx} colIdx={colIdx}
               canDrop={canDropOnTableau} onDrop={handleDrop}
               style={{ minHeight: `${colHeight}px`, position: 'relative' }}>
               {col.length === 0 && (
-                <EmptyCardSlot size="sm" className="absolute inset-0 w-full"
+                <EmptyCardSlot size={size} className="absolute inset-0 w-full"
                   onClick={() => handleTableauClick(colIdx)} />
               )}
               {col.map((card, rowIdx) => {
@@ -361,26 +382,26 @@ export default function SolitaireGame() {
                   && card.faceUp;
                 const dragCards = col.slice(rowIdx);
                 return (
-                  <div key={card.id} style={{ position: 'absolute', top: `${rowIdx * 22}px`, zIndex: rowIdx }}>
+                  <div key={card.id} style={{ position: 'absolute', top: `${rowIdx * step}px`, zIndex: rowIdx }}>
                     {card.faceUp ? (
                       <DraggableCard
                         card={card}
                         from={{ type: 'tableau', colIdx, rowIdx }}
                         cards={dragCards}
-                        size="sm"
+                        size={size}
                         selected={isSelected}
                         onSelect={() => card.faceUp && handleCardClick(card, { type: 'tableau', colIdx, rowIdx })}
                       />
                     ) : (
-                      <PlayingCard card={card} size="sm" faceDown />
+                      <PlayingCard card={card} size={size} faceDown />
                     )}
                   </div>
                 );
               })}
-              {/* Invisible drop/click zone just below the last card (cards are 64px
-                  tall, stacked 22px apart — starting it any higher covers the card) */}
+              {/* Invisible drop/click zone just below the last card (starting it
+                  any higher would cover the card and swallow taps on it) */}
               <div
-                style={{ position: 'absolute', top: `${col.length ? (col.length - 1) * 22 + 64 : 0}px`, zIndex: col.length + 1, width: '100%', height: '48px', cursor: 'pointer' }}
+                style={{ position: 'absolute', top: `${col.length ? (col.length - 1) * step + cardH : 0}px`, zIndex: col.length + 1, width: '100%', height: '48px', cursor: 'pointer' }}
                 onClick={() => handleTableauClick(colIdx)}
               />
             </DroppableTableau>

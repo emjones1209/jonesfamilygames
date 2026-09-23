@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
+import { CARD_BOX, CARD_TEXT } from '../../components/cardSizes';
 import { TUTORIALS } from '../../components/tutorials';
 import { nextSeat, teamOf } from '../cards/tricks';
 import { useTrickTable } from '../cards/useTrickTable';
@@ -18,7 +19,6 @@ import api from '../../utils/api';
 const NAMES = ['You', 'Left', 'Partner', 'Right'];
 
 // ── Card face ─────────────────────────────────────────────────────────────────
-const SIZES = { xs: 'w-8 h-11 text-xs', sm: 'w-10 h-14 text-sm', md: 'w-12 h-16 text-base' };
 
 function RookCard({ card, size = 'sm', selected, disabled, onClick }) {
   const color = card.isRook ? '#f97316' : COLOUR_STYLE[card.colour].color;
@@ -26,14 +26,14 @@ function RookCard({ card, size = 'sm', selected, disabled, onClick }) {
     <motion.div
       onClick={onClick}
       whileTap={onClick ? { scale: 0.95 } : {}}
-      className={`${SIZES[size]} rounded-lg border-2 flex flex-col items-center justify-center select-none shrink-0
+      className={`${CARD_BOX[size]} ${CARD_TEXT[size]} rounded-lg border-2 flex flex-col items-center justify-center select-none shrink-0
         ${selected ? 'border-yellow-400 -translate-y-2 shadow-lg shadow-yellow-400/40' : 'border-transparent'}
         ${disabled ? 'opacity-50' : ''} ${onClick ? 'cursor-pointer' : ''}`}
       style={{ color, backgroundColor: '#1f2937' }}
     >
       <span className="font-bold leading-none">{card.isRook ? '🐦' : card.value}</span>
-      <span className="text-[9px] leading-none mt-0.5 uppercase">{card.isRook ? 'Rook' : COLOUR_STYLE[card.colour].label}</span>
-      {cardPoints(card) > 0 && !card.isRook && <span className="text-[8px] text-white/50 leading-none">{cardPoints(card)}pt</span>}
+      <span className="text-[9px] md:text-[11px] leading-none mt-0.5 uppercase">{card.isRook ? 'Rook' : COLOUR_STYLE[card.colour].label}</span>
+      {cardPoints(card) > 0 && !card.isRook && <span className="text-[8px] md:text-[10px] text-white/50 leading-none">{cardPoints(card)}pt</span>}
     </motion.div>
   );
 }

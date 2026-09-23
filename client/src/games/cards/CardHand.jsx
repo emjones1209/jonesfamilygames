@@ -16,6 +16,7 @@ export function CardHand({
   size = 'sm',
   renderCard = defaultRender,
   label,
+  wrap = false,
 }) {
   const [selectedId, setSelectedId] = useState(null);
   const active = legal.length > 0;
@@ -31,11 +32,15 @@ export function CardHand({
   return (
     <div>
       {label && <p className="text-white/40 text-xs text-center mb-1">{label}</p>}
-      <div className="flex flex-wrap justify-center gap-1">
-        {cards.map(card => {
+      {/* One row that fans (cards overlap) when space runs short, so a full hand
+          of big cards still fits; `wrap` lays cards out in rows instead. */}
+      <div className={`flex justify-center gap-1 ${wrap ? 'flex-wrap' : ''}`}>
+        {cards.map((card, i) => {
           const playable = legal.some(c => c.id === card.id);
+          const last = i === cards.length - 1;
           return (
-            <div key={card.id}>
+            <div key={card.id}
+              className={`relative ${wrap || last ? 'shrink-0' : 'min-w-0'} ${selected === card.id ? 'z-10' : ''}`}>
               {renderCard(card, {
                 selected: selected === card.id,
                 disabled: !playable,

@@ -12,7 +12,7 @@ export function HiddenHand({ count, vertical = false }) {
   return (
     <div className={`flex ${vertical ? 'flex-col -space-y-3' : '-space-x-3'} items-center`}>
       {Array.from({ length: shown }, (_, i) => (
-        <div key={i} className={`${vertical ? 'w-8 h-5' : 'w-5 h-8'} bg-blue-900 border border-blue-600 rounded shadow`} />
+        <div key={i} className={`${vertical ? 'w-8 h-5 md:w-11 md:h-7' : 'w-5 h-8 md:w-7 md:h-11'} bg-blue-900 border border-blue-600 rounded shadow`} />
       ))}
     </div>
   );

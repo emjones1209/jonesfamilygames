@@ -5,6 +5,7 @@
  */
 import { motion, AnimatePresence } from 'framer-motion';
 import { PlayingCard } from '../../components/PlayingCard';
+import { CARD_BOX } from '../../components/cardSizes';
 
 // Grid cell and entry offset for seats 0-3 (bottom, left, top, right)
 const SEAT_POS = [
@@ -38,7 +39,7 @@ export function TrickArea({ plays, names, winner = null, message, renderCard = d
           ))}
         </AnimatePresence>
         {/* Keep the grid's shape when the trick is empty */}
-        <div style={{ gridArea: '2 / 2' }} className="w-10 h-16" />
+        <div style={{ gridArea: '2 / 2' }} className={CARD_BOX.sm} />
       </div>
       <p className="text-white/60 text-xs mt-2 h-4 text-center">{message}</p>
     </div>
