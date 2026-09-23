@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
 
@@ -13,12 +14,31 @@ function signTokens(user) {
   return { accessToken, refreshToken };
 }
 
+/**
+ * Registration needs the family invite code (FAMILY_INVITE_CODE) so strangers
+ * who find the site can't sign up. Required in production; optional locally.
+ * Returns an error message, or null if the code is acceptable.
+ */
+function inviteCodeError(given) {
+  const expected = process.env.FAMILY_INVITE_CODE?.trim();
+  if (!expected) {
+    return process.env.NODE_ENV === 'production'
+      ? 'Registration is turned off (the site has no family invite code set)'
+      : null;
+  }
+  // Compare hashes so the check takes the same time however much matches
+  const hash = s => crypto.createHash('sha256').update(String(s ?? '').trim().toLowerCase()).digest();
+  return crypto.timingSafeEqual(hash(given), hash(expected)) ? null : 'That family invite code isn\'t right';
+}
+
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
-  const { email, displayName, password } = req.body;
+  const { email, displayName, password, inviteCode } = req.body;
   if (!email || !displayName || !password) {
     return res.status(400).json({ error: 'email, displayName, and password are required' });
   }
+  const inviteError = inviteCodeError(inviteCode);
+  if (inviteError) return res.status(403).json({ error: inviteError });
   try {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     const result = await pool.query(

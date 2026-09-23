@@ -1,20 +1,17 @@
-# Railway Deployment Configuration
-# This file instructs Railway how to build and deploy the app.
+# Railway deployment configuration (config-as-code).
+# The PostgreSQL database is a separate service you add in the Railway
+# dashboard; this file only describes the web service. See README.md.
 
 [build]
-builder = "nixpacks"
-buildCommand = "cd client && npm ci && npm run build && cd ../server && npm ci"
+builder = "RAILPACK"
+buildCommand = "cd client && npm ci && npm run build && cd ../server && npm ci --omit=dev"
 
 [deploy]
+# Runs before each deploy: creates missing tables and seeds any missing trivia
+# questions and dad jokes. Safe to repeat — existing data is left alone.
+preDeployCommand = ["cd server && npm run setup"]
 startCommand = "cd server && node index.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
-restartPolicyType = "on_failure"
+restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
-
-[[services]]
-name = "games-suite-web"
-
-[[services]]
-name = "games-suite-db"
-source = "postgres"

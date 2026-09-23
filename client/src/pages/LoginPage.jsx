@@ -8,7 +8,7 @@ export default function LoginPage() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [form, setForm] = useState({ email: '', displayName: '', password: '' });
+  const [form, setForm] = useState({ email: '', displayName: '', password: '', inviteCode: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +21,7 @@ export default function LoginPage() {
         await login(form.email, form.password);
       } else {
         if (!form.displayName.trim()) { setError('Display name required'); setLoading(false); return; }
-        await register(form.email, form.displayName, form.password);
+        await register(form.email, form.displayName, form.password, form.inviteCode);
       }
       navigate('/');
     } catch (err) {
@@ -94,6 +94,18 @@ export default function LoginPage() {
             required
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
           />
+          {mode === 'register' && (
+            <input
+              type="text"
+              placeholder="Family invite code"
+              className={inputClass}
+              value={form.inviteCode}
+              onChange={(e) => setForm(f => ({ ...f, inviteCode: e.target.value }))}
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          )}
 
           {error && (
             <motion.p
