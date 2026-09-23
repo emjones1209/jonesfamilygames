@@ -14,7 +14,8 @@ const FLOWERS = ['🌸', '🌻', '🌺', '🌼', '💐', '🌷'];
 const SPECIAL_ICON = { row: '🌟', col: '💧', area: '☀️' };
 
 // ── Levels ────────────────────────────────────────────────────────────────────
-// Targets tuned by simulating a greedy player (win rate falls from ~100% to ~60%)
+// Targets tuned by simulating a greedy player (win rate falls from ~100% to ~60%),
+// including points for flowers cleared by special-tile blasts
 const LEVELS = [
   // Levels 1-5: Intro — still easy but not trivially so
   { id:  1, target: { type: 'score',   value:   800 }, moves: 15 },
@@ -37,22 +38,22 @@ const LEVELS = [
   // Levels 11-15: Tough
   { id: 11, target: { type: 'collect', value:    16, flowerType: 1 }, moves: 13,
     obstacles: [{ row: 0, col: 0 }, { row: 0, col: 6 }, { row: 6, col: 0 }, { row: 6, col: 6 }] },
-  { id: 12, target: { type: 'score',   value:  9000 }, moves: 12,
+  { id: 12, target: { type: 'score',   value:  9500 }, moves: 12,
     obstacles: [{ row: 1, col: 1 }, { row: 1, col: 5 }, { row: 5, col: 1 }, { row: 5, col: 5 }, { row: 3, col: 3 }] },
   { id: 13, target: { type: 'clear',   value:     6 }, moves: 16,
     obstacles: [{ row: 1, col: 1 }, { row: 1, col: 3 }, { row: 1, col: 5 }, { row: 5, col: 1 }, { row: 5, col: 3 }, { row: 5, col: 5 }] },
-  { id: 14, target: { type: 'score',   value: 10000 }, moves: 12 },
+  { id: 14, target: { type: 'score',   value: 10700 }, moves: 12 },
   { id: 15, target: { type: 'collect', value:    20, flowerType: 2 }, moves: 14,
     obstacles: [{ row: 2, col: 2 }, { row: 2, col: 4 }, { row: 4, col: 2 }, { row: 4, col: 4 }] },
   // Levels 16-20: Expert
-  { id: 16, target: { type: 'score',   value: 11000 }, moves: 13,
+  { id: 16, target: { type: 'score',   value: 11500 }, moves: 13,
     obstacles: [{ row: 0, col: 3 }, { row: 3, col: 0 }, { row: 3, col: 6 }, { row: 6, col: 3 }, { row: 3, col: 3 }] },
   { id: 17, target: { type: 'clear',   value:     8 }, moves: 18,
     obstacles: [{ row: 1, col: 1 }, { row: 1, col: 3 }, { row: 1, col: 5 }, { row: 3, col: 1 }, { row: 3, col: 5 }, { row: 5, col: 1 }, { row: 5, col: 3 }, { row: 5, col: 5 }] },
-  { id: 18, target: { type: 'score',   value: 12000 }, moves: 14 },
+  { id: 18, target: { type: 'score',   value: 12700 }, moves: 14 },
   { id: 19, target: { type: 'collect', value:    22, flowerType: 3 }, moves: 14,
     obstacles: [{ row: 0, col: 0 }, { row: 0, col: 6 }, { row: 3, col: 3 }, { row: 6, col: 0 }, { row: 6, col: 6 }] },
-  { id: 20, target: { type: 'score',   value: 13500 }, moves: 15,
+  { id: 20, target: { type: 'score',   value: 14300 }, moves: 15,
     obstacles: [{ row: 1, col: 1 }, { row: 1, col: 3 }, { row: 1, col: 5 }, { row: 3, col: 0 }, { row: 3, col: 6 }, { row: 5, col: 1 }, { row: 5, col: 3 }, { row: 5, col: 5 }] },
 ];
 
@@ -113,29 +114,51 @@ function getMatchGroups(b) {
   return groups;
 }
 
+const BLAST_POINTS = 60;   // per flower cleared by a special's blast
+
+const specialAt = (b, key) => { const [r, c] = key.split(',').map(Number); return b[r][c].special; };
+
+/** Squares a special clears: its row (star), column (drop) or 3×3 area (sun). Never blockers. */
+function blastArea(b, r, c, kind) {
+  const cells = [];
+  const add = (rr, cc) => {
+    if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && !b[rr][cc].isBlocker) cells.push(`${rr},${cc}`);
+  };
+  if (kind === 'row') for (let cc = 0; cc < COLS; cc++) add(r, cc);
+  if (kind === 'col') for (let rr = 0; rr < ROWS; rr++) add(rr, c);
+  if (kind === 'area') for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) add(r + dr, c + dc);
+  return cells;
+}
+
 function processMatches(b, groups, targetType = -1) {
   const nb = b.map(row => row.map(cl => ({ ...cl })));
   const toRemove = new Set();
   let score = 0, collected = 0, blockersRemoved = 0;
 
-  // Activate special tiles and accumulate removal set
+  // Matched tiles are removed
+  const matched = new Set();
   groups.forEach(g => {
-    g.cells.forEach(({ r, c }) => {
-      const orig = b[r][c];
-      if (orig.special === 'row') {
-        for (let cc = 0; cc < COLS; cc++) if (!nb[r][cc].isBlocker) toRemove.add(`${r},${cc}`);
-      } else if (orig.special === 'col') {
-        for (let rr = 0; rr < ROWS; rr++) if (!nb[rr][c].isBlocker) toRemove.add(`${rr},${c}`);
-      } else if (orig.special === 'area') {
-        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-          const nr = r+dr, nc = c+dc;
-          if (nr>=0 && nr<ROWS && nc>=0 && nc<COLS && !nb[nr][nc].isBlocker) toRemove.add(`${nr},${nc}`);
-        }
-      }
-      toRemove.add(`${r},${c}`);
-    });
+    g.cells.forEach(({ r, c }) => { matched.add(`${r},${c}`); toRemove.add(`${r},${c}`); });
     score += g.len * 100 * (g.len >= 5 ? 3 : g.len >= 4 ? 2 : 1);
   });
+
+  // Set off specials: any in a match, then any caught in another's blast
+  // (chain reactions), until nothing new goes off
+  const queue = [...toRemove].filter(key => specialAt(b, key));
+  const fired = new Set();
+  while (queue.length) {
+    const key = queue.shift();
+    if (fired.has(key)) continue;
+    fired.add(key);
+    const [r, c] = key.split(',').map(Number);
+    for (const hit of blastArea(b, r, c, b[r][c].special)) {
+      if (toRemove.has(hit)) continue;
+      toRemove.add(hit);
+      if (specialAt(b, hit)) queue.push(hit);
+    }
+  }
+  // Flowers cleared by a blast (rather than matched) score points too
+  score += [...toRemove].filter(key => !matched.has(key)).length * BLAST_POINTS;
 
   // Damage adjacent blockers
   [...toRemove].forEach(key => {
@@ -430,7 +453,6 @@ export default function Match3Game() {
   const cellEmoji = cl => {
     if (cl.isBlocker)  return '🟫';
     if (cl.type < 0)   return '✨';          // just cleared
-    if (cl.special)    return SPECIAL_ICON[cl.special];
     return FLOWERS[cl.type];
   };
 
@@ -527,16 +549,25 @@ export default function Match3Game() {
                 animate={{ scale: isSel ? 1.15 : 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 className={[
-                    'flex items-center justify-center rounded-lg md:rounded-xl',
+                    'relative flex items-center justify-center rounded-lg md:rounded-xl',
                   'transition-colors duration-100 active:opacity-70',
                   cl.isBlocker
                     ? 'bg-amber-900/60 cursor-not-allowed'
                     : isSel
                       ? 'bg-game-gold/40 ring-2 ring-game-gold'
-                      : 'bg-game-accent/40 hover:bg-game-accent/60 cursor-pointer',
+                      : cl.special
+                        ? 'bg-game-accent/60 ring-2 ring-yellow-300/70 cursor-pointer'   // specials glow
+                        : 'bg-game-accent/40 hover:bg-game-accent/60 cursor-pointer',
                 ].join(' ')}
               >
                 {cellEmoji(cl)}
+                {/* A special still shows its flower (that's what it matches with), plus a badge */}
+                {cl.special && !cl.isBlocker && cl.type >= 0 && (
+                  <span className="absolute -top-1 -right-1 pointer-events-none drop-shadow"
+                    style={{ fontSize: 'calc(var(--tile) * 0.34)' }}>
+                    {SPECIAL_ICON[cl.special]}
+                  </span>
+                )}
               </motion.button>
             );
           })

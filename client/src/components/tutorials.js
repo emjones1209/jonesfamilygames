@@ -56,7 +56,7 @@ export const TUTORIALS = {
   ],
   match3: [
     { emoji: '🌸', heading: 'Goal', body: 'Swipe a flower toward a neighbour to swap them (or tap one, then the other) and line up 3 or more of the same kind. Reach the level goal before you run out of moves!' },
-    { emoji: '✨', heading: 'Special Tiles', body: '🌟 Match 4 in a line = star (clears its row)\n💧 Match 5 in a line = water drop (clears its column)\n☀️ Match in an L or T shape = sunflower (clears a 3×3 area)\nMatch a special tile to set it off.' },
+    { emoji: '✨', heading: 'Special Tiles', body: '🌟 Match 4 in a line = star (clears its row)\n💧 Match 5 in a line = water drop (clears its column)\n☀️ Match in an L or T shape = sun (clears a 3×3 area)\n\nA special keeps its flower, with a badge in the corner — match it with that flower to set it off. Everything a blast clears scores points, and a blast that hits another special sets it off too!' },
     { emoji: '🪨', heading: 'Blockers', body: 'Brown blocker tiles can\'t be moved or matched. Make a match right next to one to break it.' },
     { emoji: '🎯', heading: 'Level Goals', body: 'Score: reach the target score\nCollect: match a certain flower enough times\nClear: break all the blockers\n\nIf no moves are possible, the board reshuffles for you.' },
   ],
