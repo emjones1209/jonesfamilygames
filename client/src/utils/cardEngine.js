@@ -1,6 +1,7 @@
 /**
  * Standard deck utilities used across all card games.
- * Rook uses a separate deck (see rookDeck.js).
+ * Rook uses its own deck (see games/rook/rookRules.js); trick-taking rules
+ * live in games/cards/tricks.js.
  */
 
 export const SUITS = ['spades', 'hearts', 'diamonds', 'clubs'];
@@ -28,34 +29,4 @@ export function shuffle(arr) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
-}
-
-/** Compare two cards by rank value. Returns positive if a > b. */
-export function compareRank(a, b) {
-  return RANK_VALUES[a.rank] - RANK_VALUES[b.rank];
-}
-
-/** Determine which card wins a trick given lead suit and optional trump suit */
-export function trickWinner(trick, leadSuit, trumpSuit = null) {
-  let best = trick[0];
-  for (let i = 1; i < trick.length; i++) {
-    const card = trick[i];
-    const bestTrump = best.suit === trumpSuit;
-    const cardTrump = card.suit === trumpSuit;
-    if (cardTrump && !bestTrump) {
-      best = card;
-    } else if (cardTrump && bestTrump) {
-      if (RANK_VALUES[card.rank] > RANK_VALUES[best.rank]) best = card;
-    } else if (!cardTrump && !bestTrump) {
-      if (card.suit === leadSuit && best.suit !== leadSuit) best = card;
-      else if (card.suit === leadSuit && best.suit === leadSuit &&
-               RANK_VALUES[card.rank] > RANK_VALUES[best.rank]) best = card;
-    }
-  }
-  return best;
-}
-
-/** Deal n cards from the top of a deck */
-export function dealCards(deck, n) {
-  return { hand: deck.slice(0, n), remaining: deck.slice(n) };
 }
