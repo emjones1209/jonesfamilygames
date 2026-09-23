@@ -138,7 +138,6 @@ export default function SolitaireGame() {
   };
 
   const handleCardClick = (card, from) => {
-    // Try auto-move to foundation on double-tap behavior (single-tap on foundation zones)
     if (!selected) {
       setSelected({ card, from });
       return;
@@ -146,6 +145,22 @@ export default function SolitaireGame() {
 
     // Try to place selected cards
     const { card: selCard, from: selFrom } = selected;
+
+    // Tapping the selected card again sends it to its foundation when it can go
+    // there (e.g. tap an Ace twice), like "tap again to play" in the card games
+    if (selCard.id === card.id) {
+      const selCards = getSelectedCards(game, selFrom, selCard);
+      if (selFrom.type !== 'foundation' && selCards.length === 1 && canPlaceOnFoundation(selCard)) {
+        saveHistory(game);
+        const newGame = removeCards(game, selFrom, selCards);
+        newGame.foundations[selCard.suit] = [...newGame.foundations[selCard.suit], selCard];
+        update(newGame);
+      } else {
+        setSelected(null);                // second tap on a card that can't go up: deselect
+      }
+      return;
+    }
+
     if (from.type === 'foundation') {
       if (canPlaceOnFoundation(selCard) && selCard.suit === from.suit && selFrom.type !== 'foundation') {
         saveHistory(game);
@@ -191,13 +206,6 @@ export default function SolitaireGame() {
       saveHistory(game);
       const newGame = removeCards(game, selFrom, selCards);
       newGame.tableau[colIdx] = [...newGame.tableau[colIdx], ...selCards];
-      // Flip top card of source if needed
-      if (selFrom.type === 'tableau') {
-        const srcCol = newGame.tableau[selFrom.colIdx];
-        if (srcCol.length > 0 && !srcCol[srcCol.length - 1].faceUp) {
-          srcCol[srcCol.length - 1] = { ...srcCol[srcCol.length - 1], faceUp: true };
-        }
-      }
       update(newGame);
     } else {
       setSelected(null);
@@ -210,12 +218,6 @@ export default function SolitaireGame() {
     saveHistory(game);
     const newGame = removeCards(game, dragFrom, dragCards);
     newGame.tableau[colIdx] = [...newGame.tableau[colIdx], ...dragCards];
-    if (dragFrom.type === 'tableau') {
-      const srcCol = newGame.tableau[dragFrom.colIdx];
-      if (srcCol.length > 0 && !srcCol[srcCol.length - 1].faceUp) {
-        srcCol[srcCol.length - 1] = { ...srcCol[srcCol.length - 1], faceUp: true };
-      }
-    }
     update(newGame);
   }, [game, canPlaceOnTableau]);
 
@@ -333,7 +335,7 @@ export default function SolitaireGame() {
               <div onClick={() => handleFoundationClick(suit)} className="cursor-pointer">
                 {top
                   ? <PlayingCard card={top} size="sm" />
-                  : <EmptyCardSlot size="sm" label={symbols[suit]} onClick={() => handleFoundationClick(suit)} />}
+                  : <EmptyCardSlot size="sm" label={symbols[suit]} />}
               </div>
             </DroppableFoundation>
           );
@@ -432,7 +434,11 @@ function removeCards(game, from, cards) {
     g.waste = g.waste.slice(1);
   } else if (from.type === 'tableau') {
     const idx = g.tableau[from.colIdx].findIndex(c => c.id === cards[0].id);
-    g.tableau[from.colIdx] = g.tableau[from.colIdx].slice(0, idx);
+    const col = g.tableau[from.colIdx].slice(0, idx);
+    // Turn over the card that's now on top of the column. Doing it here means
+    // every move (to another column or to a foundation, by tap or drag) does it.
+    if (col.length && !col[col.length - 1].faceUp) col[col.length - 1] = { ...col[col.length - 1], faceUp: true };
+    g.tableau[from.colIdx] = col;
   } else if (from.type === 'foundation') {
     g.foundations[from.suit].pop();
   }
