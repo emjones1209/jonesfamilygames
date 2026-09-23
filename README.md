@@ -103,6 +103,11 @@ a domain.
    create the CNAME record Railway shows at your DNS provider. HTTPS is issued
    automatically once DNS resolves.
 
+After that, every push to `main` deploys automatically. If Railway shows the
+repo in red or "Could not load branches", its GitHub app can't see this repo:
+on GitHub go to Settings → Applications → Railway → Configure and grant access
+to this repository.
+
 ### Create Admin Account
 
 Register on the live site, then run this in the Postgres service's **Data → Query** tab:
