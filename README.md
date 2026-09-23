@@ -14,25 +14,26 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - ⛳ 6-Card Golf
 - 🧩 Jigsaw Puzzle (use your own photos!)
 - 🌸 Garden Match (Candy Crush-style)
+- 💣 Minesweeper
 
 ## Features
-- Full user accounts (JWT auth) — up to 5 family members
+- Full user accounts (JWT auth)
 - Easy / Medium / Hard AI opponents
-- Real-time family multiplayer (Socket.io)
 - Dad jokes between levels 😄
 - PWA — installable to iPad home screen
 
 ## Tech Stack
 - **Frontend**: React + Vite + Tailwind CSS
 - **Backend**: Node.js + Express + Socket.io
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL in production; SQLite automatically in local development
+- **Tests**: Vitest (game rules and full-hand simulations)
 - **Deployment**: Railway
 
 ## Getting Started
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL database
+- PostgreSQL (production only — leave `DATABASE_URL` unset locally to use SQLite)
 
 ### Local Development
 
@@ -46,13 +47,14 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 2. **Configure the server**
    ```bash
    cp server/.env.example server/.env
-   # Edit server/.env with your DATABASE_URL and JWT secrets
+   # Edit server/.env with your JWT secrets (and DATABASE_URL for PostgreSQL)
    ```
 
 3. **Set up the database**
    ```bash
    cd server && npm run setup
-   # This runs migrations + seeds dad jokes & trivia questions
+   # This runs migrations + seeds dad jokes & trivia questions.
+   # Safe to re-run: it only adds questions and jokes that are missing.
    ```
 
 4. **Run the app**
@@ -62,6 +64,11 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
    # Client: http://localhost:5173
    # Server: http://localhost:3001
    ```
+
+### Running the tests
+```bash
+cd client && npm test
+```
 
 ### Railway Deployment
 
@@ -93,6 +100,7 @@ games_suite/
 │       ├── components/   # Shared UI components
 │       ├── context/      # Auth & Socket contexts
 │       ├── games/        # Individual game implementations
+│       │   └── cards/    # Shared trick-taking engine, AI and table UI
 │       ├── pages/        # App pages (Landing, Login, Profile, Admin)
 │       └── utils/        # API client, card engine, AI opponent
 ├── server/          # Node.js + Express + Socket.io
@@ -102,3 +110,9 @@ games_suite/
 │   └── socket/      # WebSocket handlers
 └── railway.toml     # Railway deployment config
 ```
+
+## Multiplayer (unfinished)
+The server has room and Socket.io code, and the client has a `MultiplayerLobby`
+component, but no game uses them yet, so multiplayer is hidden. The socket
+layer only relays messages between players; a working version needs the server
+to hold each game's state and to check that players belong to the room.

@@ -1,3 +1,4 @@
+// UNFINISHED — multiplayer is hidden: no game uses this yet (see README).
 const express = require('express');
 const crypto = require('crypto');
 const pool = require('../db/pool');

@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { SocketProvider } from "./context/SocketContext";
+// Multiplayer is unfinished and hidden: SocketProvider (context/SocketContext) and
+// MultiplayerLobby are kept for later but not mounted, so no socket is opened.
 import { FullPageLoader } from "./components/LoadingSpinner";
 
 // Pages
@@ -69,9 +70,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <SocketProvider>
-          <AppRoutes />
-        </SocketProvider>
+        <AppRoutes />
       </AuthProvider>
     </BrowserRouter>
   );

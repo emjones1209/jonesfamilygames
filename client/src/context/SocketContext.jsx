@@ -1,3 +1,6 @@
+// UNFINISHED — multiplayer is hidden: no game uses this yet (see README).
+// Not mounted in App.jsx. Before re-enabling, refresh the socket's token: it
+// currently keeps the first access token, which expires after 15 minutes.
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';

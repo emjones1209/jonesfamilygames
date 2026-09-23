@@ -1,3 +1,6 @@
+// UNFINISHED — multiplayer is hidden: no game uses this yet (see README).
+// This only relays actions between players; a real version needs server-side
+// game state and checks that the sender is in the room.
 const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
 

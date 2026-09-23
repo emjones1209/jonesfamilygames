@@ -1,5 +1,6 @@
 /**
  * MultiplayerLobby — creates or joins a game room for live play.
+ * UNFINISHED — multiplayer is hidden: no game uses this yet (see README).
  * Used by card games that support multiplayer.
  */
 import { useState, useEffect, useCallback } from 'react';
