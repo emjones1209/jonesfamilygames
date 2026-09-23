@@ -47,6 +47,12 @@ export default function LandingPage() {
               <span className="text-lg">{getAvatarEmoji(user?.avatar)}</span>
               <span className="text-white text-sm font-medium hidden sm:block">{user?.displayName}</span>
             </button>
+            <button
+              onClick={() => navigate('/welcome')}
+              className="text-sm text-white/60 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-2xl px-3 py-2"
+            >
+              📖 Guide
+            </button>
             {user?.isAdmin && (
               <button
                 onClick={() => navigate('/admin')}

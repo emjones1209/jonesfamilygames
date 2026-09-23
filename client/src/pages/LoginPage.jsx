@@ -23,7 +23,8 @@ export default function LoginPage() {
         if (!form.displayName.trim()) { setError('Display name required'); setLoading(false); return; }
         await register(form.email, form.displayName, form.password, form.inviteCode);
       }
-      navigate('/');
+      // New accounts see the welcome guide first
+      navigate(mode === 'register' ? '/welcome' : '/');
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong');
     } finally {
