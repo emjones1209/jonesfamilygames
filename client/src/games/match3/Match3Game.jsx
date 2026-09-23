@@ -260,6 +260,7 @@ function reshuffleBoard(b) {
 const isAdj = (r1, c1, r2, c2) => Math.abs(r1-r2) + Math.abs(c1-c2) === 1;
 const getDiff = id => id <= 7 ? 'easy' : id <= 14 ? 'medium' : 'hard';
 const STEP_MS = 260;   // pause between animation stages
+const SWIPE_PX = 18;   // how far a finger must move for a swipe
 
 function goalText(level) {
   const { target: t } = level;
@@ -325,20 +326,12 @@ export default function Match3Game() {
     return false;
   }, [level]);
 
-  const handleTap = useCallback((r, c) => {
+  /** Swap two neighbouring tiles (after a tap-tap or a swipe): they slide into
+   *  each other's places, then any matches play out — or they slide back. */
+  const swapTiles = useCallback((r1, c1, r2, c2) => {
     if (!board || phase !== 'playing' || locked) return;
-    const tapped = board[r][c];
-    if (tapped.isBlocker) return;
-
-    // First tap: select
-    if (!sel) { setSel({ r, c }); return; }
-    // Same tile: deselect
-    if (sel.r === r && sel.c === c) { setSel(null); return; }
-    // Non-adjacent: re-select
-    if (!isAdj(sel.r, sel.c, r, c)) { setSel({ r, c }); return; }
-
-    // Adjacent tap: slide the two tiles into each other's places
-    const swapped = trySwapBoard(board, sel.r, sel.c, r, c);
+    if (!isAdj(r1, c1, r2, c2) || board[r1][c1].isBlocker || board[r2][c2].isBlocker) return;
+    const swapped = trySwapBoard(board, r1, c1, r2, c2);
     setSel(null);
     setBoard(swapped);
     setLocked(true);
@@ -377,7 +370,23 @@ export default function Match3Game() {
         later(() => setPhase('gameOver'), 250);
       }
     }, STEP_MS * (res.steps.length + 1));
-  }, [board, phase, locked, sel, level, score, collected, blockersLeft, movesLeft, isComplete]);
+  }, [board, phase, locked, level, score, collected, blockersLeft, movesLeft, isComplete]);
+
+  const handleTap = useCallback((r, c) => {
+    if (!board || phase !== 'playing' || locked) return;
+    const tapped = board[r][c];
+    if (tapped.isBlocker) return;
+
+    // First tap: select
+    if (!sel) { setSel({ r, c }); return; }
+    // Same tile: deselect
+    if (sel.r === r && sel.c === c) { setSel(null); return; }
+    // Non-adjacent: re-select
+    if (!isAdj(sel.r, sel.c, r, c)) { setSel({ r, c }); return; }
+
+    // Adjacent tap: swap them
+    swapTiles(sel.r, sel.c, r, c);
+  }, [board, phase, locked, sel, swapTiles]);
 
   const handleJokeClose = useCallback(async () => {
     setJokeOpen(false);
@@ -387,6 +396,30 @@ export default function Match3Game() {
     loadLevel(lvlIdx + 1);
     setLvlIdx(i => i + 1);
   }, [score, level, lvlIdx, loadLevel]);
+
+  // Swipe to swap. Remember where a press started; once the finger has moved far
+  // enough, swap with the neighbour in that direction. The press's own click is
+  // then ignored so it doesn't also select the tile.
+  const swipe = useRef(null);       // { r, c, x, y, swiped }
+  const onTilePointerDown = (e, r, c) => {
+    swipe.current = { r, c, x: e.clientX, y: e.clientY, swiped: false };
+    // Keep getting moves past the tile's edge (can throw if the pointer is already gone)
+    try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* not essential */ }
+  };
+  const onTilePointerMove = e => {
+    const s = swipe.current;
+    if (!s || s.swiped) return;
+    const dx = e.clientX - s.x, dy = e.clientY - s.y;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_PX) return;
+    s.swiped = true;
+    const [dr, dc] = Math.abs(dx) > Math.abs(dy) ? [0, Math.sign(dx)] : [Math.sign(dy), 0];
+    const r2 = s.r + dr, c2 = s.c + dc;
+    if (r2 >= 0 && r2 < ROWS && c2 >= 0 && c2 < COLS) swapTiles(s.r, s.c, r2, c2);
+  };
+  const onTileClick = (r, c) => {
+    if (swipe.current?.swiped) return;   // that press was a swipe, not a tap
+    handleTap(r, c);
+  };
 
   const cellEmoji = cl => {
     if (cl.isBlocker)  return '🟫';
@@ -469,7 +502,8 @@ export default function Match3Game() {
 
       {/* Board */}
       <div className="bg-game-card p-2 rounded-2xl shadow-xl"
-        style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, 2.75rem)`, gap: '3px' }}>
+        // touch-action: none stops the iPad scrolling the page during a swipe
+        style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, 2.75rem)`, gap: '3px', touchAction: 'none' }}>
         {board.map((row, r) =>
           row.map((cl, c) => {
             const isSel = sel?.r === r && sel?.c === c;
@@ -478,7 +512,9 @@ export default function Match3Game() {
               <motion.button
                 key={cl.id}
                 layout
-                onClick={() => handleTap(r, c)}
+                onPointerDown={e => onTilePointerDown(e, r, c)}
+                onPointerMove={onTilePointerMove}
+                onClick={() => onTileClick(r, c)}
                 // New tiles drop in from above; cleared spots pop a sparkle
                 initial={cleared ? { scale: 0.3, opacity: 0 } : { y: -28, opacity: 0 }}
                 animate={{ scale: isSel ? 1.15 : 1, opacity: 1, y: 0 }}
@@ -501,7 +537,7 @@ export default function Match3Game() {
       </div>
 
       <p className={`text-xs text-center ${notice ? 'text-game-gold font-semibold' : 'text-white/30'}`}>
-        {notice || 'Tap a flower, then tap an adjacent flower to swap'}
+        {notice || 'Swipe a flower toward a neighbour to swap them — or tap one, then the other'}
       </p>
 
       <DadJokeModal isOpen={jokeOpen} onClose={handleJokeClose} />
