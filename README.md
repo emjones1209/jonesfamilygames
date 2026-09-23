@@ -72,9 +72,10 @@ cd client && npm test
 
 ### Railway Deployment
 
-The repo's `railway.toml` tells Railway how to build and start the app, and
-runs `npm run setup` (tables + trivia/joke seeds, safe to repeat) before every
-deploy. You only need to create the services, set variables and add a domain.
+The repo's `railway.toml` tells Railway how to build and start the app. On
+startup the server creates any missing tables and seeds trivia and dad jokes
+(safe to repeat). You only need to create the services, set variables and add
+a domain.
 
 1. **Create the services.** In Railway, create a project (or open an existing
    one) and add:

@@ -7,9 +7,8 @@ builder = "RAILPACK"
 buildCommand = "cd client && npm ci && npm run build && cd ../server && npm ci --omit=dev"
 
 [deploy]
-# Runs before each deploy: creates missing tables and seeds any missing trivia
-# questions and dad jokes. Safe to repeat — existing data is left alone.
-preDeployCommand = ["cd server && npm run setup"]
+# The server creates missing tables and seeds trivia/jokes itself on startup
+# (server/db/setup.js), so no separate pre-deploy step is needed.
 startCommand = "cd server && node index.js"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60

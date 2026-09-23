@@ -12,6 +12,7 @@ const triviaRoutes = require('./routes/trivia');
 const dadJokeRoutes = require('./routes/dadJokes');
 const roomRoutes = require('./routes/rooms');
 const { initSocketHandlers } = require('./socket/handlers');
+const { setup } = require('./db/setup');
 
 const app = express();
 const server = http.createServer(app);
@@ -54,6 +55,17 @@ if (process.env.NODE_ENV === 'production') {
 initSocketHandlers(io);
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`🎮 Games Suite server running on port ${PORT}`);
+
+async function start() {
+  // PostgreSQL: create tables and seed content before taking requests
+  // (idempotent). Local SQLite sets itself up in sqliteAdapter.js.
+  if (process.env.DATABASE_URL) await setup();
+  server.listen(PORT, () => {
+    console.log(`🎮 Games Suite server running on port ${PORT}`);
+  });
+}
+
+start().catch(err => {
+  console.error('❌ Server failed to start:', err);
+  process.exit(1);
 });

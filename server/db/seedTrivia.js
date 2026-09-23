@@ -131,4 +131,7 @@ async function seed() {
   }
 }
 
-seed().then(() => process.exit(0)).catch(() => process.exit(1));
+module.exports = { seedTrivia: seed };
+
+// Run directly: `node db/seedTrivia.js`
+if (require.main === module) seed().then(() => process.exit(0)).catch(() => process.exit(1));

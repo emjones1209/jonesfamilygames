@@ -119,4 +119,7 @@ async function seed() {
   }
 }
 
-seed().then(() => process.exit(0)).catch(() => process.exit(1));
+module.exports = { seedDadJokes: seed };
+
+// Run directly: `node db/seedDadJokes.js`
+if (require.main === module) seed().then(() => process.exit(0)).catch(() => process.exit(1));
