@@ -50,8 +50,8 @@ export const TUTORIALS = {
   ],
   jigsaw: [
     { emoji: '🧩', heading: 'Goal', body: 'Assemble all the puzzle pieces to recreate the original photo. Choose a photo from your library to get started!' },
-    { emoji: '📸', heading: 'Choose a Photo', body: 'Tap "Upload Photo" to pick any image from your device. The puzzle will be cut from that image.' },
-    { emoji: '🖐️', heading: 'Placing Pieces', body: 'Drag pieces from the tray onto the board. Drop a piece close to its correct spot and it locks into place.' },
+    { emoji: '📸', heading: 'Choose a Photo', body: 'Tap "Add a Photo" to pick one from your photo library (or take a new one). The puzzle will be cut from that picture.' },
+    { emoji: '🖐️', heading: 'Placing Pieces', body: 'Drag pieces up from the tray onto the board (swipe sideways to scroll the tray). Drop a piece close to its correct spot and it locks into place. Tap "Picture" any time to see the finished picture.' },
     { emoji: '🎚️', heading: 'Difficulty', body: 'Easy: 16 pieces • Medium: 30 pieces • Hard: 64 pieces.' },
   ],
   match3: [

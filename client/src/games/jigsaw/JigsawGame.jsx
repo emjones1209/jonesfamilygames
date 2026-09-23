@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Trash2, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Trash2, HelpCircle, Image as ImageIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../../components/Button';
 import { DadJokeModal } from '../../components/DadJokeModal';
@@ -157,11 +157,41 @@ function sliceJigsawPieces(imgSrc, rows, cols, maxBoardW) {
         [pieces[i], pieces[j]] = [pieces[j], pieces[i]];
       }
 
-      resolve({ pieces, pw, ph, overhang: ovh });
+      // The whole (cropped) picture, for the "Picture" reference view
+      const ref = document.createElement('canvas');
+      ref.width = cols * pw; ref.height = rows * ph;
+      ref.getContext('2d').drawImage(img, cropX, cropY, cropW, cropH, 0, 0, ref.width, ref.height);
+
+      resolve({ pieces, pw, ph, overhang: ovh, reference: ref.toDataURL('image/jpeg', 0.85) });
     };
     img.src = imgSrc;
   });
 }
+
+// ── Photos ────────────────────────────────────────────────────────────────────
+const MAX_PHOTO_PX = 1600;   // longest side kept; plenty for the board and much faster to cut
+
+/** Read an image file and scale it down so its longest side is at most MAX_PHOTO_PX. */
+function shrinkPhoto(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, MAX_PHOTO_PX / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * scale);
+      cv.height = Math.round(img.height * scale);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      resolve(cv.toDataURL('image/jpeg', 0.9));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image')); };
+    img.src = url;
+  });
+}
+
+const alertPhotoError = () =>
+  window.alert("Sorry, that picture couldn't be opened. Please try a different photo.");
 
 // ── Difficulty config ─────────────────────────────────────────────────────────
 const DIFFS = {
@@ -192,6 +222,8 @@ export default function JigsawGame() {
   const [locked,      setLocked]      = useState(new Set());
   const [secs,        setSecs]        = useState(0);
   const [jokeOpen,    setJokeOpen]    = useState(false);
+  const [reference,   setReference]   = useState(null);   // the finished picture, to look at
+  const [showRef,     setShowRef]     = useState(false);
 
   // ── Drag state ─────────────────────────────────────────────────────────────
   const [drag,       setDrag]      = useState(null); // { id, x, y }
@@ -203,16 +235,18 @@ export default function JigsawGame() {
   useEffect(() => () => clearInterval(timerRef.current), []);
 
   // ── Photo management ───────────────────────────────────────────────────────
-  const handleUpload = useCallback(e => {
-    const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async ev => {
-      const p = { id: Date.now(), name: file.name, dataUrl: ev.target.result };
+  const handleUpload = useCallback(async e => {
+    const file = e.target.files?.[0];
+    e.target.value = '';                  // allow picking the same photo again later
+    if (!file) return;
+    try {
+      const p = { id: Date.now(), name: file.name, dataUrl: await shrinkPhoto(file) };
       await savePhoto(p);
       setPhotos(prev => [...prev, p]);
       setSelPhoto(p);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      alertPhotoError();
+    }
   }, []);
 
   const handleDeletePhoto = useCallback(async (id, e) => {
@@ -230,6 +264,8 @@ export default function JigsawGame() {
     const result = await sliceJigsawPieces(selPhoto.dataUrl, rows, cols, availW);
     setPieces(result.pieces);
     setConfig({ rows, cols, pw: result.pw, ph: result.ph, overhang: result.overhang });
+    setReference(result.reference);
+    setShowRef(false);
     setBoardSlots({});
     setLocked(new Set());
     setSecs(0);
@@ -239,80 +275,77 @@ export default function JigsawGame() {
   }, [selPhoto, diff]);
 
   // ── Drag handlers ──────────────────────────────────────────────────────────
+  // Pointer events cover finger, mouse and pencil alike. The piece being dragged
+  // stays on the page (faded) until it's dropped: iPad Safari stops sending a
+  // touch's events if the element the finger started on is removed.
   const onDragStart = useCallback((e, id, fromSlot) => {
-    if (locked.has(id)) return;
-    if (e.cancelable) e.preventDefault();
-    const { clientX: x, clientY: y } = e.touches ? e.touches[0] : e;
-    dragRef.current = { id, x, y, fromSlot: fromSlot || null };
-    setDrag({ id, x, y });
-    // Remove from board if dragging from board
-    if (fromSlot) {
-      setBoardSlots(prev => { const n = { ...prev }; delete n[fromSlot]; return n; });
-    }
+    if (locked.has(id) || dragRef.current) return;
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* not essential */ }
+    dragRef.current = { id, x: e.clientX, y: e.clientY, fromSlot: fromSlot || null, pointerId: e.pointerId };
+    setDrag({ id, x: e.clientX, y: e.clientY });
   }, [locked]);
 
   const onDragMove = useCallback(e => {
-    if (!dragRef.current?.id) return;
-    const { clientX: x, clientY: y } = e.touches ? e.touches[0] : e;
-    dragRef.current = { ...dragRef.current, x, y };
-    setDrag(d => d ? { ...d, x, y } : null);
+    const d = dragRef.current;
+    if (!d || e.pointerId !== d.pointerId) return;
+    d.x = e.clientX; d.y = e.clientY;
+    setDrag({ id: d.id, x: d.x, y: d.y });
   }, []);
 
-  const onDragEnd = useCallback(() => {
-    if (!dragRef.current?.id) return;
-    const { id, x, y } = dragRef.current;
+  const onDragEnd = useCallback(e => {
+    const d = dragRef.current;
+    if (!d || e.pointerId !== d.pointerId) return;
     dragRef.current = null;
+    setDrag(null);
+    // The browser took the gesture over (e.g. to scroll the tray): leave the piece where it was
+    if (e.type === 'pointercancel') return;
 
+    const { id, x, y, fromSlot } = d;
     const piece = pieces.find(p => p.id === id);
     const boardEl = boardRef.current;
+    if (!piece || !boardEl) return;
 
-    if (piece && boardEl) {
-      const rect  = boardEl.getBoundingClientRect();
-      const { pw, ph, overhang, rows, cols } = config;
-      // Board content (grid) origin is at (rect.left + overhang, rect.top + overhang)
-      const bx = x - rect.left - overhang;
-      const by = y - rect.top  - overhang;
+    const rect  = boardEl.getBoundingClientRect();
+    const { pw, ph, overhang, rows, cols } = config;
+    // Board content (grid) origin is at (rect.left + overhang, rect.top + overhang)
+    const bx = x - rect.left - overhang;
+    const by = y - rect.top  - overhang;
+    const onBoard = bx > -overhang && bx < cols * pw + overhang && by > -overhang && by < rows * ph + overhang;
 
-      // Nearest slot to the drop point
-      const nc = Math.max(0, Math.min(cols - 1, Math.round((bx - pw / 2) / pw)));
-      const nr = Math.max(0, Math.min(rows - 1, Math.round((by - ph / 2) / ph)));
+    // Nearest slot to the drop point
+    const nc = Math.max(0, Math.min(cols - 1, Math.round((bx - pw / 2) / pw)));
+    const nr = Math.max(0, Math.min(rows - 1, Math.round((by - ph / 2) / ph)));
+    const slotKey = `${nr}-${nc}`;
+    const placed = onBoard && !locked.has(boardSlots[slotKey]);   // can't cover a locked piece
 
-      if (bx > -overhang && bx < cols * pw + overhang && by > -overhang && by < rows * ph + overhang) {
-        // On board area: always place in nearest slot
-        const slotKey = `${nr}-${nc}`;
-        const existingId = boardSlots[slotKey];
+    setBoardSlots(prev => {
+      const next = { ...prev };
+      if (fromSlot && next[fromSlot] === id) delete next[fromSlot];   // it has left its old spot
+      if (placed) next[slotKey] = id;             // an unlocked piece already there returns to the tray
+      return next;                                // dropped off the board: back to the tray
+    });
 
-        // Don't overwrite a locked piece
-        if (!locked.has(existingId)) {
-          setBoardSlots(prev => ({ ...prev, [slotKey]: id }));
-
-          // A piece dropped into its own slot locks in place
-          if (piece.correctPos.row === nr && piece.correctPos.col === nc) {
-            const nowLocked = new Set(locked).add(id);
-            setLocked(nowLocked);
-            if (nowLocked.size >= pieces.length) {
-              clearInterval(timerRef.current);
-              setTimeout(() => setJokeOpen(true), 600);
-            }
-          }
-        }
+    // A piece dropped into its own slot locks in place
+    if (placed && piece.correctPos.row === nr && piece.correctPos.col === nc) {
+      const nowLocked = new Set(locked).add(id);
+      setLocked(nowLocked);
+      if (nowLocked.size >= pieces.length) {
+        clearInterval(timerRef.current);
+        setTimeout(() => setJokeOpen(true), 600);
       }
     }
-
-    setDrag(null);
   }, [pieces, locked, boardSlots, config]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
-    window.addEventListener('mousemove', onDragMove);
-    window.addEventListener('mouseup',   onDragEnd);
-    window.addEventListener('touchmove', onDragMove, { passive: false });
-    window.addEventListener('touchend',  onDragEnd);
+    window.addEventListener('pointermove',   onDragMove);
+    window.addEventListener('pointerup',     onDragEnd);
+    window.addEventListener('pointercancel', onDragEnd);
     return () => {
-      window.removeEventListener('mousemove', onDragMove);
-      window.removeEventListener('mouseup',   onDragEnd);
-      window.removeEventListener('touchmove', onDragMove);
-      window.removeEventListener('touchend',  onDragEnd);
+      window.removeEventListener('pointermove',   onDragMove);
+      window.removeEventListener('pointerup',     onDragEnd);
+      window.removeEventListener('pointercancel', onDragEnd);
     };
   }, [phase, onDragMove, onDragEnd]);
 
@@ -329,7 +362,7 @@ export default function JigsawGame() {
   const boardW  = cols * pw + 2 * overhang;
   const boardH  = rows * ph + 2 * overhang;
   const boardPieceIds = new Set(Object.values(boardSlots));
-  const trayPieces    = pieces.filter(p => !boardPieceIds.has(p.id) && drag?.id !== p.id);
+  const trayPieces    = pieces.filter(p => !boardPieceIds.has(p.id));   // includes one being dragged (shown faded)
   const dragPiece     = drag ? pieces.find(p => p.id === drag.id) : null;
   const mm = String(Math.floor(secs / 60)).padStart(2, '0');
   const ss = String(secs % 60).padStart(2, '0');
@@ -346,8 +379,9 @@ export default function JigsawGame() {
       </div>
 
       <label className="flex items-center gap-2 bg-game-accent text-white px-4 py-3 rounded-xl cursor-pointer self-start">
-        <Upload size={18} /><span>Upload Photo</span>
-        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUpload} />
+        <Upload size={18} /><span>Add a Photo</span>
+        {/* No "capture" attribute, so the iPad offers the Photo Library as well as the camera */}
+        <input type="file" accept="image/*" className="hidden" onChange={handleUpload} />
       </label>
 
       {photos.length === 0 && <p className="text-white/40 text-center py-8">Upload a photo to get started</p>}
@@ -409,7 +443,13 @@ export default function JigsawGame() {
           <ArrowLeft size={20} />
         </Button>
         <span className="text-white/60 text-sm font-mono">{mm}:{ss}</span>
-        <span className="text-white/60 text-sm">{locked.size} / {pieces.length} locked</span>
+        <div className="flex items-center gap-3">
+          <span className="text-white/60 text-sm hidden sm:inline">{locked.size} / {pieces.length} placed</span>
+          <button onClick={() => setShowRef(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold min-h-[44px] ${showRef ? 'bg-game-gold text-game-bg' : 'bg-white/10 text-white'}`}>
+            <ImageIcon size={16} /> Picture
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -422,6 +462,16 @@ export default function JigsawGame() {
       {/* Board (scrollable) */}
       <div className="flex-1 overflow-auto p-2">
         <p className="text-white/40 text-xs text-center mb-1">Drag pieces onto the board — they snap into place when correct</p>
+
+        {/* The finished picture, shown over the board until tapped */}
+        {showRef && reference && (
+          <button onClick={() => setShowRef(false)}
+            className="fixed inset-x-0 z-40 mx-auto flex flex-col items-center gap-2 p-3 rounded-2xl bg-black/80 shadow-2xl"
+            style={{ top: 'calc(var(--safe-top) + 4.5rem)', width: `min(92vw, ${boardW + 24}px)` }}>
+            <img src={reference} alt="The finished picture" className="w-full rounded-lg" draggable={false} />
+            <span className="text-white/70 text-xs">Tap to hide</span>
+          </button>
+        )}
 
         {/* Puzzle board */}
         <div ref={boardRef}
@@ -444,7 +494,7 @@ export default function JigsawGame() {
           {/* Placed pieces on board */}
           {Object.entries(boardSlots).map(([slotKey, pieceId]) => {
             const piece = pieces.find(p => p.id === pieceId);
-            if (!piece || drag?.id === pieceId) return null;
+            if (!piece) return null;
             const [r, c] = slotKey.split('-').map(Number);
             const isLocked = locked.has(pieceId);
             return (
@@ -462,10 +512,11 @@ export default function JigsawGame() {
                   cursor: isLocked ? 'default' : 'grab',
                   filter: isLocked ? 'none' : 'drop-shadow(0 0 4px rgba(255,255,255,0.3))',
                   zIndex: isLocked ? 1 : 2,
+                  opacity: drag?.id === pieceId ? 0.25 : 1,     // being dragged: faded in place
                   touchAction: 'none',
+                  WebkitTouchCallout: 'none',                   // no iPad image menu on long-press
                 }}
-                onMouseDown={e => !isLocked && onDragStart(e, pieceId, slotKey)}
-                onTouchStart={e => !isLocked && onDragStart(e, pieceId, slotKey)}
+                onPointerDown={e => !isLocked && onDragStart(e, pieceId, slotKey)}
               />
             );
           })}
@@ -485,11 +536,13 @@ export default function JigsawGame() {
               style={{
                 height: Math.min(piece.cvH, TRAY_PIECE_H),
                 width: piece.cvW * Math.min(1, TRAY_PIECE_H / piece.cvH),
-                flexShrink: 0, cursor: 'grab', touchAction: 'none',
+                flexShrink: 0, cursor: 'grab',
+                // Sideways swipes still scroll the tray; moving up picks the piece up
+                touchAction: 'pan-x',
+                WebkitTouchCallout: 'none',
                 opacity: drag?.id === piece.id ? 0.3 : 1,
               }}
-              onMouseDown={e => onDragStart(e, piece.id, null)}
-              onTouchStart={e => onDragStart(e, piece.id, null)}
+              onPointerDown={e => onDragStart(e, piece.id, null)}
             />
           ))}
           {trayPieces.length === 0 && locked.size < pieces.length && (
