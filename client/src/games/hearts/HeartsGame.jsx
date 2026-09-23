@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildDeck, shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
-import { TUTORIALS } from '../../components/TutorialModal';
+import { TUTORIALS } from '../../components/tutorials';
 import { PlayingCard } from '../../components/PlayingCard';
 import { sortHand, trickWinner } from '../cards/tricks';
 import { useTrickTable } from '../cards/useTrickTable';

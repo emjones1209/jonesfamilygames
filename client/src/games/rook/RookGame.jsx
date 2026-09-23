@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
-import { TUTORIALS } from '../../components/TutorialModal';
+import { TUTORIALS } from '../../components/tutorials';
 import { nextSeat, teamOf } from '../cards/tricks';
 import { useTrickTable } from '../cards/useTrickTable';
 import { CardTable } from '../cards/CardTable';
@@ -26,7 +26,7 @@ function RookCard({ card, size = 'sm', selected, disabled, onClick }) {
     <motion.div
       onClick={onClick}
       whileTap={onClick ? { scale: 0.95 } : {}}
-      className={`${SIZES[size]} rounded-lg bg-white border-2 flex flex-col items-center justify-center select-none shrink-0
+      className={`${SIZES[size]} rounded-lg border-2 flex flex-col items-center justify-center select-none shrink-0
         ${selected ? 'border-yellow-400 -translate-y-2 shadow-lg shadow-yellow-400/40' : 'border-transparent'}
         ${disabled ? 'opacity-50' : ''} ${onClick ? 'cursor-pointer' : ''}`}
       style={{ color, backgroundColor: '#1f2937' }}

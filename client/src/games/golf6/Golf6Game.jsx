@@ -1,10 +1,12 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, HelpCircle } from "lucide-react";
 import { buildDeck, shuffle } from "../../utils/cardEngine";
 import { PlayingCard } from "../../components/PlayingCard";
 import { Button } from "../../components/Button";
+import { TutorialModal } from "../../components/TutorialModal";
+import { TUTORIALS } from "../../components/tutorials";
 import api from "../../utils/api";
 
 const PLAYER_NAMES = ["You","CPU 1","CPU 2","CPU 3"];
@@ -125,6 +127,7 @@ export default function Golf6Game() {
   const [winner,setWinner]=useState(null);
   const [totalScores,setTotalScores]=useState([0,0,0,0]);
   const [msg,setMsg]=useState("");
+  const [showTutorial,setShowTutorial]=useState(false);
   const numPlayersRef = useRef(numPlayers);
 
   const startGame=(diff,np=numPlayers)=>{
@@ -162,18 +165,21 @@ export default function Golf6Game() {
     const minS=Math.min(...nt);
     setWinner(nt[0]===minS?0:nt.findIndex(s=>s===minS));
     setPhase("gameOver");
-    api.post("/scores",{game:"golf6",score:-totalScores[0],difficulty}).catch(()=>{});
+    api.post("/scores",{game:"golf6",score:-nt[0],difficulty}).catch(()=>{});   // negated: low golf scores rank high
   },[difficulty]);
 
   const checkAndAdvance=useCallback((ng,pi)=>{
     const np = numPlayersRef.current;
     let fr=finalRound, ftl=finalTurnsLeft;
+    const next=(pi+1)%np;
     if (!fr&&allFaceUp(ng[pi])) {
-      fr=true; ftl=np-1;
+      // Everyone else gets one more turn; the finishing turn itself doesn't count
+      ftl=np-1;
       setFinalRound(true); setFinalTurnsLeft(ftl);
       setMsg(`${PLAYER_NAMES[pi]} finished! ${ftl} more turn${ftl!==1?"s":""}.`);
+      setCurrentPlayer(next);
+      return;
     }
-    const next=(pi+1)%np;
     if (fr) {
       const left=ftl-1;
       if (left<=0) { endGame(ng,totalScores); return; }
@@ -283,14 +289,18 @@ export default function Golf6Game() {
             <Button key={d} variant="primary" className="w-full text-lg" onClick={()=>startGame(d,numPlayers)}>{l}</Button>
           ))}
         </div>
+        <button onClick={()=>setShowTutorial(true)} className="flex items-center gap-2 text-white/40 hover:text-white/70 text-sm mt-4 min-h-[44px]">
+          <HelpCircle size={16}/> How to play
+        </button>
       </div>
+      <TutorialModal isOpen={showTutorial} onClose={()=>setShowTutorial(false)} title="6-Card Golf" slides={TUTORIALS.golf6}/>
     </div>
   );
 
   if (phase==="gameOver") return (
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-lime-900 p-5 flex flex-col items-center justify-center">
       <motion.div className="card-panel text-center max-w-sm w-full" initial={{scale:0.8}} animate={{scale:1}}>
-        <div className="text-5xl mb-3">{winner===0?"&#127942;":"&#9971;"}</div>
+        <div className="text-5xl mb-3">{winner===0?"🏆":"⛳"}</div>
         <h2 className="text-2xl font-bold text-game-gold mb-4">{winner===0?"You Win!":PLAYER_NAMES[winner]+" Wins!"}</h2>
         <div className="space-y-1 mb-6">
           {PLAYER_NAMES.slice(0,numPlayers).map((p,i)=>(

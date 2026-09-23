@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { buildDeck, shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
-import { TUTORIALS } from '../../components/TutorialModal';
+import { TUTORIALS } from '../../components/tutorials';
 import { sortHand, trickWinner, followSuit, nextSeat } from '../cards/tricks';
 import { useTrickTable } from '../cards/useTrickTable';
 import { CardTable } from '../cards/CardTable';

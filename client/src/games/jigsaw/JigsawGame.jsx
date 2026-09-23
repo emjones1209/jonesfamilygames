@@ -4,7 +4,8 @@ import { ArrowLeft, Upload, Trash2, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../../components/Button';
 import { DadJokeModal } from '../../components/DadJokeModal';
-import { TutorialModal, TUTORIALS } from '../../components/TutorialModal';
+import { TutorialModal } from '../../components/TutorialModal';
+import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
 
 // ── IndexedDB helpers ─────────────────────────────────────────────────────────

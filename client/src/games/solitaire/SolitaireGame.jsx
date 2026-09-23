@@ -9,7 +9,8 @@ import { buildDeck, shuffle, SUITS, RANK_VALUES } from '../../utils/cardEngine';
 const SOL_RANK = { ...RANK_VALUES, A: 1 };
 import { PlayingCard, EmptyCardSlot } from '../../components/PlayingCard';
 import { Button } from '../../components/Button';
-import { TutorialModal, TUTORIALS } from '../../components/TutorialModal';
+import { TutorialModal } from '../../components/TutorialModal';
+import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
 
 const DRAG_TYPE = 'CARD_STACK';
@@ -151,6 +152,15 @@ export default function SolitaireGame() {
         const newGame = removeCards(game, selFrom, [selCard]);
         newGame.foundations[selCard.suit] = [...newGame.foundations[selCard.suit], selCard];
         update(newGame);
+        return;
+      }
+    }
+    // Tapping the bottom card of another column moves the selection onto it
+    if (from.type === 'tableau' && !(selFrom.type === 'tableau' && selFrom.colIdx === from.colIdx)) {
+      const col = game.tableau[from.colIdx];
+      const selCards = getSelectedCards(game, selFrom, selCard);
+      if (col[col.length - 1]?.id === card.id && canPlaceOnTableau(selCards[0], from.colIdx)) {
+        handleTableauClick(from.colIdx);
         return;
       }
     }

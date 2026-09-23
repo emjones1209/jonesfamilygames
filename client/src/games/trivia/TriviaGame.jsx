@@ -5,7 +5,8 @@ import { ArrowLeft, Clock, Zap, Trophy, HelpCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { DadJokeModal } from '../../components/DadJokeModal';
 import { LoadingSpinner } from '../../components/LoadingSpinner';
-import { TutorialModal, TUTORIALS } from '../../components/TutorialModal';
+import { TutorialModal } from '../../components/TutorialModal';
+import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
 
 const CATEGORY_META = {

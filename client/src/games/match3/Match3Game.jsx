@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../../components/Button';
 import { DadJokeModal } from '../../components/DadJokeModal';
+import { TutorialModal } from '../../components/TutorialModal';
+import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
@@ -56,7 +58,9 @@ const LEVELS = [
 
 // ── Board logic ───────────────────────────────────────────────────────────────
 const rnd  = () => Math.floor(Math.random() * FLOWERS.length);
-const mkCell = (type, special = null, isBlocker = false) => ({ type, special, isBlocker });
+// Every tile gets a unique id so it can animate as it moves around the board
+let tileSeq = 0;
+const mkCell = (type, special = null, isBlocker = false) => ({ id: ++tileSeq, type, special, isBlocker });
 
 function initBoard(level) {
   const b = Array.from({ length: ROWS }, () =>
@@ -195,18 +199,23 @@ function applyGravity(b) {
 const fillBoard = b =>
   b.map(row => row.map(cl => (!cl.isBlocker && cl.type < 0 ? mkCell(rnd()) : cl)));
 
+/** Resolve every match. `steps` holds the board after each stage (matches
+ *  cleared, then tiles dropped and refilled, repeated) so it can be animated. */
 function fullCascade(b, targetType = -1) {
   let cur = b, totalScore = 0, totalCollected = 0, totalBlockers = 0;
+  const steps = [];
   let groups = getMatchGroups(cur);
   while (groups.length > 0) {
     const res = processMatches(cur, groups, targetType);
     totalScore    += res.score;
     totalCollected += res.collected;
     totalBlockers  += res.blockersRemoved;
+    steps.push(res.board);
     cur = fillBoard(applyGravity(res.board));
+    steps.push(cur);
     groups = getMatchGroups(cur);
   }
-  return { board: cur, totalScore, totalCollected, totalBlockers };
+  return { board: cur, steps, totalScore, totalCollected, totalBlockers };
 }
 
 function trySwapBoard(b, r1, c1, r2, c2) {
@@ -250,6 +259,7 @@ function reshuffleBoard(b) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const isAdj = (r1, c1, r2, c2) => Math.abs(r1-r2) + Math.abs(c1-c2) === 1;
 const getDiff = id => id <= 7 ? 'easy' : id <= 14 ? 'medium' : 'hard';
+const STEP_MS = 260;   // pause between animation stages
 
 function goalText(level) {
   const { target: t } = level;
@@ -280,11 +290,19 @@ export default function Match3Game() {
   const [jokeOpen,     setJokeOpen]     = useState(false);
   const [locked,       setLocked]       = useState(false); // prevent input during cascade
   const [notice,       setNotice]       = useState('');
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // Pending animation timers, cancelled when a level (re)loads or we leave
+  const timers = useRef([]);
+  const later = (fn, ms) => { timers.current.push(setTimeout(fn, ms)); };
+  const cancelTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+  useEffect(() => cancelTimers, []);
 
   const level = LEVELS[lvlIdx] ?? LEVELS[LEVELS.length - 1];
 
   const loadLevel = useCallback(idx => {
     const lv = LEVELS[idx];
+    cancelTimers();
     if (!lv) { setPhase('allDone'); return; }
     const b = initBoard(lv);
     setBoard(hasValidMove(b) ? b : reshuffleBoard(b));
@@ -319,18 +337,18 @@ export default function Match3Game() {
     // Non-adjacent: re-select
     if (!isAdj(sel.r, sel.c, r, c)) { setSel({ r, c }); return; }
 
-    // Adjacent tap: try swap
+    // Adjacent tap: slide the two tiles into each other's places
     const swapped = trySwapBoard(board, sel.r, sel.c, r, c);
     setSel(null);
+    setBoard(swapped);
+    setLocked(true);
 
     if (getMatchGroups(swapped).length === 0) {
-      // Invalid — flash the selection briefly and bail
-      setSel({ r: sel.r, c: sel.c });
-      setTimeout(() => setSel(null), 350);
+      // No match: slide them back
+      later(() => { setBoard(board); setLocked(false); }, STEP_MS + 80);
       return;
     }
 
-    setLocked(true);
     const ft = level.target.type === 'collect' ? level.target.flowerType : -1;
     const res = fullCascade(swapped, ft);
     const newScore    = score    + res.totalScore;
@@ -338,25 +356,27 @@ export default function Match3Game() {
     const newBlockers = Math.max(0, blockersLeft - res.totalBlockers);
     const newMoves    = movesLeft - 1;
 
-    // Never leave the player stuck with no possible move
-    if (hasValidMove(res.board)) {
-      setBoard(res.board);
-    } else {
-      setBoard(reshuffleBoard(res.board));
-      setNotice('No moves left — reshuffled!');
-      setTimeout(() => setNotice(''), 1500);
-    }
-    setScore(newScore);
-    setCollected(newCollect);
-    setBlockersLeft(newBlockers);
-    setMovesLeft(newMoves);
-    setLocked(false);
+    // Play the cascade: matches sparkle away, tiles fall, new ones drop in
+    res.steps.forEach((step, i) => later(() => setBoard(step), STEP_MS * (i + 1)));
 
-    if (isComplete(newScore, newCollect, newBlockers)) {
-      setTimeout(() => setJokeOpen(true), 250);
-    } else if (newMoves <= 0) {
-      setTimeout(() => setPhase('gameOver'), 250);
-    }
+    later(() => {
+      // Never leave the player stuck with no possible move
+      if (!hasValidMove(res.board)) {
+        setBoard(reshuffleBoard(res.board));
+        setNotice('No moves left — reshuffled!');
+        later(() => setNotice(''), 1500);
+      }
+      setScore(newScore);
+      setCollected(newCollect);
+      setBlockersLeft(newBlockers);
+      setMovesLeft(newMoves);
+      setLocked(false);
+      if (isComplete(newScore, newCollect, newBlockers)) {
+        later(() => setJokeOpen(true), 250);
+      } else if (newMoves <= 0) {
+        later(() => setPhase('gameOver'), 250);
+      }
+    }, STEP_MS * (res.steps.length + 1));
   }, [board, phase, locked, sel, level, score, collected, blockersLeft, movesLeft, isComplete]);
 
   const handleJokeClose = useCallback(async () => {
@@ -370,7 +390,7 @@ export default function Match3Game() {
 
   const cellEmoji = cl => {
     if (cl.isBlocker)  return '🟫';
-    if (cl.type < 0)   return '';
+    if (cl.type < 0)   return '✨';          // just cleared
     if (cl.special)    return SPECIAL_ICON[cl.special];
     return FLOWERS[cl.type];
   };
@@ -414,7 +434,12 @@ export default function Match3Game() {
       {/* Header row */}
       <div className="flex items-center justify-between w-full max-w-sm">
         <Button variant="ghost" onClick={() => navigate('/')}><ArrowLeft size={20} /></Button>
-        <h1 className="text-game-gold font-bold text-lg">Level {level.id}</h1>
+        <div className="flex items-center gap-1">
+          <h1 className="text-game-gold font-bold text-lg">Level {level.id}</h1>
+          <button onClick={() => setShowTutorial(true)} className="p-2 text-white/40 hover:text-white/70" aria-label="How to play">
+            <HelpCircle size={16} />
+          </button>
+        </div>
         <span className={`font-bold text-sm ${movesLeft <= 5 ? 'text-game-red' : 'text-white/60'}`}>
           {movesLeft} moves
         </span>
@@ -448,12 +473,16 @@ export default function Match3Game() {
         {board.map((row, r) =>
           row.map((cl, c) => {
             const isSel = sel?.r === r && sel?.c === c;
+            const cleared = !cl.isBlocker && cl.type < 0;
             return (
               <motion.button
-                key={`${r}-${c}`}
+                key={cl.id}
+                layout
                 onClick={() => handleTap(r, c)}
-                animate={{ scale: isSel ? 1.15 : 1 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                // New tiles drop in from above; cleared spots pop a sparkle
+                initial={cleared ? { scale: 0.3, opacity: 0 } : { y: -28, opacity: 0 }}
+                animate={{ scale: isSel ? 1.15 : 1, opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 className={[
                   'w-11 h-11 flex items-center justify-center text-2xl rounded-lg',
                   'transition-colors duration-100 active:opacity-70',
@@ -476,6 +505,7 @@ export default function Match3Game() {
       </p>
 
       <DadJokeModal isOpen={jokeOpen} onClose={handleJokeClose} />
+      <TutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} title="Garden Match" slides={TUTORIALS.match3} />
     </div>
   );
 }
