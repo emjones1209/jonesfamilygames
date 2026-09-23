@@ -15,6 +15,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { dealTable, playCard, collectTrick } from './trickTable';
 
+/** Cards `seat` may play in table `t` (none unless it's that seat's turn). */
+const legalIn = (t, seat, legalPlays) =>
+  (!t || t.status !== 'playing' || t.turn !== seat ? [] : legalPlays(t, seat));
+
 export function useTrickTable(options) {
   const { aiDelay = 700, collectDelay = 1300 } = options;
   const [table, setTable] = useState(null);
@@ -27,28 +31,28 @@ export function useTrickTable(options) {
   const deal = useCallback((hands, leader) => setTable(dealTable(hands, leader)), []);
   const clear = useCallback(() => setTable(null), []);
 
-  const legalFor = useCallback(seat => {
-    const t = tableRef.current;
-    if (!t || t.status !== 'playing' || t.turn !== seat) return [];
-    return opts.current.legalPlays(t, seat);
-  }, []);
+  // The refs above are synced after each render, so they're right for event
+  // handlers and timers but one render stale *during* render. Render-time code
+  // must use `legalFor`, which reads the current state and options directly.
+  const legalFor = seat => legalIn(table, seat, options.legalPlays);
 
   /** Play a card for `seat` (ignored if it isn't that seat's turn or the card is illegal). */
   const play = useCallback((seat, card) => {
-    if (!legalFor(seat).some(c => c.id === card.id)) return;
+    const legal = legalIn(tableRef.current, seat, opts.current.legalPlays);
+    if (!legal.some(c => c.id === card.id)) return;
     setTable(t => playCard(t, seat, card, { winnerOf: opts.current.winnerOf }));
-  }, [legalFor]);
+  }, []);
 
   // Computer turns
   const turn = table?.turn, status = table?.status;
   useEffect(() => {
     if (status !== 'playing' || !opts.current.isAi(turn, tableRef.current)) return;
     const timer = setTimeout(() => {
-      const legal = legalFor(turn);
+      const legal = legalIn(tableRef.current, turn, opts.current.legalPlays);
       if (legal.length) play(turn, opts.current.chooseAiCard(turn, tableRef.current, legal));
     }, aiDelay);
     return () => clearTimeout(timer);
-  }, [turn, status, table?.trick.length, aiDelay, legalFor, play]);
+  }, [turn, status, table?.trick.length, aiDelay, play]);
 
   // Leave a completed trick on screen, then hand it to the winner
   useEffect(() => {
