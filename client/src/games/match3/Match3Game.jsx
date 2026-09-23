@@ -262,6 +262,12 @@ const getDiff = id => id <= 7 ? 'easy' : id <= 14 ? 'medium' : 'hard';
 const STEP_MS = 260;   // pause between animation stages
 const SWIPE_PX = 18;   // how far a finger must move for a swipe
 
+// Tile size: as big as fits (up to 72px) in both the screen's width and its
+// height — about 14rem goes to the header, goal panel and hint — but never
+// below 44px. 7.4 allows for the 7 tiles plus gaps and padding.
+const TILE_SIZE = 'clamp(2.75rem, min(calc((100vw - 3rem) / 7.4), calc((var(--screen-h) - 14rem) / 7.4)), 4.5rem)';
+const BOARD_WIDTH = `calc(var(--tile) * ${COLS} + ${(COLS - 1) * 3 + 16}px)`;   // tiles + 3px gaps + padding
+
 function goalText(level) {
   const { target: t } = level;
   if (t.type === 'score')   return `Score ${t.value.toLocaleString()} pts`;
@@ -462,10 +468,10 @@ export default function Match3Game() {
   // ── Playing ───────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-game-bg flex flex-col items-center gap-3 p-3"
-      style={{ touchAction: 'manipulation', userSelect: 'none' }}>
+      style={{ touchAction: 'manipulation', userSelect: 'none', '--tile': TILE_SIZE }}>
 
       {/* Header row */}
-      <div className="flex items-center justify-between w-full max-w-sm">
+      <div className="flex items-center justify-between w-full" style={{ maxWidth: BOARD_WIDTH }}>
         <Button variant="ghost" onClick={() => navigate('/')}><ArrowLeft size={20} /></Button>
         <div className="flex items-center gap-1">
           <h1 className="text-game-gold font-bold text-lg">Level {level.id}</h1>
@@ -479,7 +485,7 @@ export default function Match3Game() {
       </div>
 
       {/* Stats card */}
-      <div className="w-full max-w-sm bg-game-card rounded-xl px-4 py-3 flex justify-between items-center gap-2">
+      <div className="w-full bg-game-card rounded-xl px-4 py-3 flex justify-between items-center gap-2" style={{ maxWidth: BOARD_WIDTH }}>
         <div className="text-center">
           <p className="text-white/40 text-xs">Score</p>
           <p className="text-game-gold font-bold tabular-nums">{score.toLocaleString()}</p>
@@ -495,7 +501,7 @@ export default function Match3Game() {
       </div>
 
       {/* Progress bar */}
-      <div className="w-full max-w-sm h-2 bg-white/10 rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden" style={{ maxWidth: BOARD_WIDTH }}>
         <motion.div className="h-full bg-game-gold rounded-full"
           animate={{ width: `${progress * 100}%` }} transition={{ duration: 0.3 }} />
       </div>
@@ -503,7 +509,7 @@ export default function Match3Game() {
       {/* Board */}
       <div className="bg-game-card p-2 rounded-2xl shadow-xl"
         // touch-action: none stops the iPad scrolling the page during a swipe
-        style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, 2.75rem)`, gap: '3px', touchAction: 'none' }}>
+        style={{ display: 'grid', gridTemplateColumns: `repeat(${COLS}, auto)`, gap: '3px', touchAction: 'none' }}>
         {board.map((row, r) =>
           row.map((cl, c) => {
             const isSel = sel?.r === r && sel?.c === c;
@@ -512,6 +518,7 @@ export default function Match3Game() {
               <motion.button
                 key={cl.id}
                 layout
+                style={{ width: 'var(--tile)', height: 'var(--tile)', fontSize: 'calc(var(--tile) * 0.56)' }}
                 onPointerDown={e => onTilePointerDown(e, r, c)}
                 onPointerMove={onTilePointerMove}
                 onClick={() => onTileClick(r, c)}
@@ -520,7 +527,7 @@ export default function Match3Game() {
                 animate={{ scale: isSel ? 1.15 : 1, opacity: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 className={[
-                  'w-11 h-11 flex items-center justify-center text-2xl rounded-lg',
+                    'flex items-center justify-center rounded-lg md:rounded-xl',
                   'transition-colors duration-100 active:opacity-70',
                   cl.isBlocker
                     ? 'bg-amber-900/60 cursor-not-allowed'
