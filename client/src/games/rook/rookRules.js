@@ -2,7 +2,8 @@
  * Rook rules and AI (pure functions).
  *
  * Deck: 1–14 in four colours plus the Rook bird (57 cards). 13 cards each and a
- * 5-card nest. The bird belongs to the trump suit and beats every other card.
+ * 5-card nest. The bird belongs to the trump suit as its LOWEST card: it loses
+ * to every other trump but still beats any card of another colour.
  * Counters: 5s = 5, 10s & 14s = 10, Rook = 20 (120 in the deck); the nest's
  * points go to whoever takes the last trick.
  */
@@ -35,7 +36,7 @@ export const cardPoints = card =>
 
 /** Suit accessor for the shared trick helpers: the bird counts as trump. */
 export const suitWith = trump => card => (card.isRook ? trump : card.colour);
-export const rankOf = card => card.value;
+export const rankOf = card => (card.isRook ? 0 : card.value);   // bird ranks below the 1
 
 export const legalPlays = (hand, trick, trump) =>
   followSuit(hand, trick.length ? suitWith(trump)(trick[0].card) : null, suitWith(trump));
@@ -44,10 +45,11 @@ export const winnerOf = (trick, trump) =>
   trick[winningIndex(trick, { trump, suitOf: suitWith(trump), rankOf })].seat;
 
 export const sortHand = (hand, trump = null) => {
-  // Trump first (bird on top), then the other colours
+  // Trump first (the bird at the end of trump, as its lowest card), then the
+  // other colours; before trump is named the bird goes first
   const order = trump ? [trump, ...COLOURS.filter(c => c !== trump)] : COLOURS;
-  const key = c => (c.isRook ? -1 : order.indexOf(c.colour));
-  return [...hand].sort((a, b) => key(a) - key(b) || b.value - a.value);
+  const key = c => (c.isRook ? (trump ? 0 : -1) : order.indexOf(c.colour));
+  return [...hand].sort((a, b) => key(a) - key(b) || rankOf(b) - rankOf(a));
 };
 
 /**
@@ -75,7 +77,7 @@ export function handStrength(hand) {
   let strength = 60;
   const counts = Object.fromEntries(COLOURS.map(c => [c, 0]));
   for (const c of hand) {
-    if (c.isRook) strength += 15;
+    if (c.isRook) strength += 8;        // 20 points, but the lowest trump can be overtrumped
     else {
       counts[c.colour]++;
       if (c.value === 14) strength += 6;

@@ -41,7 +41,7 @@ export const TUTORIALS = {
     { emoji: '🃏', heading: 'The Deck', body: 'Cards 1–14 in four colours (Black, Green, Red, Yellow) plus the Rook bird.\nCounters: 5s = 5 points, 10s and 14s = 10 points, the Rook = 20 points — 120 in all.' },
     { emoji: '🏆', heading: 'Bidding', body: 'Bid how many points your team will capture, from 70 up to 120 in steps of 5. Pass and you\'re out of the bidding. The highest bidder wins.' },
     { emoji: '💰', heading: 'The Nest', body: 'The bid winner takes the 5-card nest, puts back any 5 cards, and names trump. Points left in the nest go to whoever wins the last trick.' },
-    { emoji: '🎮', heading: 'Playing', body: 'Follow the colour led if you can. Trump beats other colours, and the Rook bird is the highest trump of all.\nMake your bid to score your points — miss it and you lose the whole bid!' },
+    { emoji: '🎮', heading: 'Playing', body: 'Follow the colour led if you can. Trump beats other colours. The Rook bird counts as the lowest trump: any other trump beats it, but it still beats every other colour.\nThe top of the screen shows the points each team has captured so far this hand.\nMake your bid to score your points — miss it and you lose the whole bid!' },
   ],
   bridge: [
     { emoji: '🃏', heading: 'Goal', body: 'As declarer, win at least as many tricks as your contract. As defenders, stop the declarer from making their contract.' },

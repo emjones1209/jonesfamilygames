@@ -65,8 +65,10 @@ export function choosePartnershipCard({
   }
 
   if (winners.length) {
-    // Win as cheaply as possible (lowest trump if trumping in)
-    return winners.reduce((a, b) => (rankOf(b) < rankOf(a) ? b : a));
+    // Win as cheaply as possible (lowest trump if trumping in). Unless we play
+    // last, a later player could still beat it, so don't risk a points card.
+    const risk = c => (lastToPlay ? 0 : pointsOf(c));
+    return winners.reduce((a, b) => (risk(b) !== risk(a) ? (risk(b) < risk(a) ? b : a) : rankOf(b) < rankOf(a) ? b : a));
   }
   return cheapest(losers.length ? losers : legal);
 }

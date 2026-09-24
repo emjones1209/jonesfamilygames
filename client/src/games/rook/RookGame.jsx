@@ -158,6 +158,9 @@ export default function RookGame() {
 
   const myHand = useMemo(() => sortHand(table?.hands[0] ?? deal0?.hands[0] ?? [], trump), [table, deal0, trump]);
   const scoreLine = `Us ${scores[0]} · Them ${scores[1]}`;
+  // Points captured so far this hand (the nest is added after the last trick)
+  const handPoints = [0, 1].map(team => (table?.taken ?? []).reduce((s, cards, seat) =>
+    s + (teamOf(seat) === team ? cards.reduce((a, c) => a + cardPoints(c), 0) : 0), 0));
 
   if (phase === 'setup') {
     return (
@@ -243,7 +246,12 @@ export default function RookGame() {
     <>
       <CardTable
         title={<span>Trump: <b style={{ color: trumpStyle?.color }}>{trumpStyle?.label}</b> · Bid {high.bid} ({NAMES[bidWinner]})</span>}
-        scoreLine={scoreLine}
+        scoreLine={
+          <>
+            <div className="text-white/90 font-semibold">This hand: Us {handPoints[0]} · Them {handPoints[1]}</div>
+            <div className="text-white/50">Game: {scoreLine}</div>
+          </>
+        }
         names={NAMES}
         table={table}
         seatDetail={seat => (seat === bidWinner ? 'bidder' : null)}

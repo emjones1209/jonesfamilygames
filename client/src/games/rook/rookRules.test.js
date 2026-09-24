@@ -28,17 +28,22 @@ describe('Rook tricks', () => {
     expect(legalPlays(rs('ROOK red-3'), trickOf(['red-9', 1]), 'green').map(c => c.id)).toEqual(['red-3']);
   });
 
-  it('the bird beats everything, even the 14 of trump', () => {
-    expect(winnerOf(trickOf(['green-14', 0], ['ROOK', 1], ['green-13', 2]), 'green')).toBe(1);
+  it('the bird is the lowest trump: any other trump beats it', () => {
+    expect(winnerOf(trickOf(['green-14', 0], ['ROOK', 1], ['green-13', 2]), 'green')).toBe(0);
+    expect(winnerOf(trickOf(['green-1', 0], ['ROOK', 1]), 'green')).toBe(0);
+  });
+
+  it('the bird still beats every card of another colour', () => {
+    expect(winnerOf(trickOf(['red-14', 0], ['ROOK', 1], ['red-13', 2]), 'green')).toBe(1);
   });
 
   it('a low trump beats the colour led', () => {
     expect(winnerOf(trickOf(['red-14', 0], ['green-1', 1], ['red-13', 2]), 'green')).toBe(1);
   });
 
-  it('sorts trump (with the bird) first', () => {
+  it('sorts trump first, with the bird as its lowest card', () => {
     expect(sortHand(rs('red-3 green-2 ROOK green-14'), 'green').map(c => c.id))
-      .toEqual(['ROOK', 'green-14', 'green-2', 'red-3']);
+      .toEqual(['green-14', 'green-2', 'ROOK', 'red-3']);
   });
 });
 
