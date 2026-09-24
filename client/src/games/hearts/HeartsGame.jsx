@@ -5,6 +5,7 @@ import { Button } from '../../components/Button';
 import { TUTORIALS } from '../../components/tutorials';
 import { PlayingCard } from '../../components/PlayingCard';
 import { sortHand, trickWinner } from '../cards/tricks';
+import { tableMemory } from '../cards/memory';
 import { useTrickTable } from '../cards/useTrickTable';
 import { CardTable } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
@@ -24,6 +25,7 @@ function dealHands() {
   return [0, 1, 2, 3].map(s => deck.slice(s * 13, s * 13 + 13));
 }
 
+const DECK = buildDeck();
 const playedCards = table => [...table.taken.flat(), ...table.trick.map(p => p.card)];
 
 export default function HeartsGame() {
@@ -46,6 +48,8 @@ export default function HeartsGame() {
     isAi: seat => seat !== 0,
     chooseAiCard: (seat, t, legal) => chooseCard({
       legal, trick: t.trick, seat, difficulty, queenPlayed: playedCards(t).some(isQueenOfSpades),
+      pointsTaken: t.taken.map(cards => cards.reduce((s, c) => s + cardPoints(c), 0)),
+      memory: tableMemory({ history: t.history, trick: t.trick, hand: t.hands[seat], deck: DECK }),
     }),
     onHandDone: t => {
       const result = scoreHand(t.taken);
@@ -85,7 +89,7 @@ export default function HeartsGame() {
 
   const confirmPass = () => {
     const direction = passDirection(handNumber);
-    const passes = dealt.map((h, seat) => (seat === 0 ? passSel : choosePass(h)));
+    const passes = dealt.map((h, seat) => (seat === 0 ? passSel : choosePass(h, difficulty)));
     const after = applyPasses(dealt.map(h => [...h]), passes, direction);
     setReceived(after[0].filter(c => !dealt[0].some(d => d.id === c.id)).map(c => c.id));
     startPlay(after);

@@ -29,14 +29,22 @@ export function applyPasses(hands, passes, direction) {
   return next;
 }
 
-/** AI: pass the three most dangerous cards. */
-export function choosePass(hand) {
+/**
+ * AI: pass the three most dangerous cards. Hard also tries to empty a short
+ * club or diamond suit, so it can throw away hearts and the Q♠ later.
+ */
+export function choosePass(hand, difficulty = 'medium') {
   const spades = hand.filter(c => c.suit === 'spades');
   const lowSpades = spades.filter(c => standardRank(c) < 12).length;
+  const length = suit => hand.filter(c => c.suit === suit).length;
+  const voidable = difficulty === 'hard'
+    ? ['clubs', 'diamonds'].filter(s => length(s) > 0 && length(s) <= 2).sort((a, b) => length(a) - length(b))[0]
+    : null;
   const danger = card => {
     const r = standardRank(card);
     if (isQueenOfSpades(card)) return lowSpades >= 4 ? 5 : 100;   // keep a well-guarded queen
     if (card.suit === 'spades' && r > 12) return lowSpades >= 4 ? 5 : 60; // A♠/K♠ attract the queen
+    if (card.suit === voidable && card.id !== TWO_OF_CLUBS) return 45 + r;
     if (isHeart(card)) return 20 + r;
     return r;
   };
@@ -91,12 +99,48 @@ export const leaders = totals => {
 
 // ── Card-play AI ─────────────────────────────────────────────────────────────
 /**
- * @param queenPlayed true once Q♠ has been played this hand (hard AI uses it)
+ * easy   – any legal card
+ * medium – ducks under the card winning the trick, leads low, dumps the Q♠
+ *          and high hearts when out of a suit
+ * hard   – also remembers the cards (memory from cards/memory.js): leads cards
+ *          that can't win, avoids suits where someone will dump points on it,
+ *          flushes out the Q♠, stops anyone shooting the moon — and shoots the
+ *          moon itself when it has every point so far and control of the hand
+ *
+ * @param queenPlayed  true once Q♠ has been played this hand
+ * @param pointsTaken  points each seat has taken so far this hand (hard)
+ * @param memory       tableMemory() for this seat (hard)
  */
-export function chooseCard({ legal, trick, seat, difficulty, queenPlayed = false }) {
+export function chooseCard({ legal, trick, seat, difficulty, queenPlayed = false, pointsTaken = null, memory = null }) {
   if (legal.length === 1) return legal[0];
   if (difficulty === 'easy') return legal[Math.floor(Math.random() * legal.length)];
-  const hard = difficulty === 'hard';
+  const hard = difficulty === 'hard' && memory != null && pointsTaken != null;
+
+  const trickPoints = trick.reduce((s, p) => s + cardPoints(p.card), 0);
+  const winnerSeat = trick.length ? trick.reduce((best, p) =>
+    (p.card.suit === trick[0].card.suit && standardRank(p.card) > standardRank(best.card) ? p : best)).seat : null;
+
+  if (hard) {
+    const totalSoFar = pointsTaken.reduce((a, b) => a + b, 0);
+    // Shooting the moon: every point so far is ours, and we hold the winning cards
+    const masters = legal.filter(memory.isMaster);
+    if (pointsTaken[seat] === totalSoFar && totalSoFar >= 14 && masters.length >= legal.length - 1) {
+      if (trick.length === 0) return highest(masters);
+      const winners = legal.filter(c => wouldWin(trick, c, seat));
+      if (winners.length) return highest(winners);
+    }
+    // Stop someone else's moon: take a point ourselves if they have them all
+    const shooter = pointsTaken.findIndex((p, s) => s !== seat && p === totalSoFar && p >= 10);
+    if (shooter >= 0 && trick.length) {
+      const winners = legal.filter(c => wouldWin(trick, c, seat));
+      if (winnerSeat === shooter && trickPoints > 0 && winners.length) return lowest(winners);
+      const following = legal.some(c => c.suit === trick[0].card.suit);
+      if (!following && winnerSeat === shooter) {
+        const clean = legal.filter(c => cardPoints(c) === 0);
+        if (clean.length) return highest(clean);   // don't feed them points
+      }
+    }
+  }
 
   // Leading: lead low, and never a card that just hands over points
   if (trick.length === 0) {
@@ -108,12 +152,22 @@ export function chooseCard({ legal, trick, seat, difficulty, queenPlayed = false
       const highSpades = legal.filter(c => c.suit === 'spades' && standardRank(c) > 12);
       if (lowSpades.length && !highSpades.length) return lowest(lowSpades);
     }
+    if (hard) {
+      // Lead the card least likely to win, from a suit nobody is out of
+      const risk = c => {
+        const out = memory.outOf(c.suit);
+        const lower = out.filter(o => standardRank(o) < standardRank(c)).length;
+        const higher = out.length - lower;
+        const someoneVoid = [1, 2, 3].some(d => memory.voids[(seat + d) % 4].has(c.suit));
+        return (higher === 0 ? 100 : 0) + (someoneVoid ? 30 : 0) + lower * 4 - higher;
+      };
+      return pool.reduce((a, b) => (risk(b) < risk(a) ? b : a));
+    }
     return lowest(pool);
   }
 
   const lead = trick[0].card.suit;
   const following = legal.some(c => c.suit === lead);
-  const trickPoints = trick.reduce((s, p) => s + cardPoints(p.card), 0);
   const lastToPlay = trick.length === 3;
 
   if (following) {
@@ -138,5 +192,10 @@ export function chooseCard({ legal, trick, seat, difficulty, queenPlayed = false
   }
   const hearts = legal.filter(isHeart);
   if (hearts.length) return highest(hearts);
+  if (hard) {
+    // The card most likely to win a trick later: most lower cards still out
+    const danger = c => memory.outOf(c.suit).filter(o => standardRank(o) < standardRank(c)).length;
+    return legal.reduce((a, b) => (danger(b) > danger(a) ? b : a));
+  }
   return highest(legal);
 }

@@ -7,17 +7,21 @@ import { CARD_BOX, CARD_TEXT } from '../../components/cardSizes';
 import { TUTORIALS } from '../../components/tutorials';
 import { nextSeat, teamOf } from '../cards/tricks';
 import { useTrickTable } from '../cards/useTrickTable';
+import { tableMemory } from '../cards/memory';
 import { CardTable } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
 import { GameSetup, ResultPanel } from '../cards/GameSetup';
 import {
-  makeDeck, cardPoints, legalPlays, winnerOf, sortHand, scoreHand, gameWinner, chooseBid,
+  makeDeck, suitWith, rankOf, cardPoints, legalPlays, winnerOf, sortHand, scoreHand, gameWinner, chooseBid,
   chooseNestDiscard, chooseCard, COLOURS, COLOUR_STYLE, MIN_BID, MAX_BID, BID_STEP, NEST_SIZE, WINNING_SCORE,
 } from './rookRules';
 import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
 
 const NAMES = ['You', 'Left', 'Partner', 'Right'];
+// Your partner always plays at Medium, so the difficulty only changes the opponents
+const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
+const DECK = makeDeck();
 
 // ── Card face ─────────────────────────────────────────────────────────────────
 
@@ -65,7 +69,13 @@ export default function RookGame() {
     winnerOf: trick => winnerOf(trick, trump),
     legalPlays: (t, seat) => legalPlays(t.hands[seat], t.trick, trump),
     isAi: seat => seat !== 0,
-    chooseAiCard: (seat, t, legal) => chooseCard({ legal, trick: t.trick, seat, difficulty, trump }),
+    chooseAiCard: (seat, t, legal) => chooseCard({
+      legal, trick: t.trick, seat, difficulty: levelFor(seat, difficulty), trump, trumpTeam: teamOf(bidWinner),
+      memory: tableMemory({
+        history: t.history, trick: t.trick, deck: DECK, suitOf: suitWith(trump), rankOf,
+        hand: seat === bidWinner ? [...t.hands[seat], ...nest] : t.hands[seat],   // the bidder knows the nest
+      }),
+    }),
     onHandDone: t => {
       const taken = [0, 1].map(team =>
         t.taken.reduce((s, cards, seat) => s + (teamOf(seat) === team ? cards.reduce((a, c) => a + cardPoints(c), 0) : 0), 0));
@@ -120,7 +130,7 @@ export default function RookGame() {
       setPhase('nest');
       return;
     }
-    const { trump: t, discard } = chooseNestDiscard(merged);
+    const { trump: t, discard } = chooseNestDiscard(merged, levelFor(winner, difficulty));
     const hands = deal0.hands.map((h, s) => (s === winner ? merged.filter(c => !discard.includes(c)) : h));
     beginPlay(hands, t, discard, winner);
   };
@@ -147,7 +157,7 @@ export default function RookGame() {
   // Computer bids
   useEffect(() => {
     if (phase !== 'bidding' || bidTurn === 0) return;
-    const timer = setTimeout(() => placeBid(bidTurn, chooseBid(deal0.hands[bidTurn], high.bid, difficulty)), 700);
+    const timer = setTimeout(() => placeBid(bidTurn, chooseBid(deal0.hands[bidTurn], high.bid, levelFor(bidTurn, difficulty))), 700);
     return () => clearTimeout(timer);
   });
 

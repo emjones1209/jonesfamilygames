@@ -109,21 +109,28 @@ export function chooseTrump(hand) {
 
 /**
  * Bid winner with the nest merged in (18 cards): choose trump, then discard 5.
- * Keeps trump, the bird, high cards and counters; discards low cards from short
- * side suits (never points unless forced).
+ * Medium keeps trump, the bird, high cards and counters, discarding low cards
+ * from short side suits. Hard also empties a short side suit where it can (so
+ * it can trump that suit) and buries counters it would likely lose in the nest,
+ * which usually comes back to the bidder's side with the last trick.
  */
-export function chooseNestDiscard(hand) {
+export function chooseNestDiscard(hand, difficulty = 'medium') {
   const trump = chooseTrump(hand);
+  const length = colour => hand.filter(c => !c.isRook && c.colour === colour).length;
+  const hasTop = colour => hand.some(c => c.colour === colour && c.value === 14);
   const keepValue = c => {
     if (c.isRook || c.colour === trump) return 1000 + c.value;
-    return (c.value >= 13 ? 500 : 0) + cardPoints(c) * 20 + c.value;
+    if (difficulty !== 'hard') return (c.value >= 13 ? 500 : 0) + cardPoints(c) * 20 + c.value;
+    if (c.value === 14) return 800;                                   // a sure winner
+    const lonelyCounter = cardPoints(c) > 0 && !hasTop(c.colour);     // likely captured by a 14
+    return length(c.colour) * 10 + c.value - (lonelyCounter ? 30 : 0);
   };
   const discard = [...hand].sort((a, b) => keepValue(a) - keepValue(b)).slice(0, NEST_SIZE);
   return { trump, discard };
 }
 
-export function chooseCard({ legal, trick, seat, difficulty, trump }) {
+export function chooseCard({ legal, trick, seat, difficulty, trump, memory = null, trumpTeam = null }) {
   return choosePartnershipCard({
-    legal, trick, seat, difficulty, trump, suitOf: suitWith(trump), rankOf, pointsOf: cardPoints,
+    legal, trick, seat, difficulty, trump, suitOf: suitWith(trump), rankOf, pointsOf: cardPoints, memory, trumpTeam,
   });
 }

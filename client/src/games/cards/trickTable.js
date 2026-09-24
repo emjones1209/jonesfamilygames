@@ -24,6 +24,7 @@ export function dealTable(hands, leader) {
     tricksWon: hands.map(() => 0),
     taken: hands.map(() => []), // cards won by each seat (for point counting)
     lastTrick: null,         // most recently collected trick { plays, winner }
+    history: [],             // every collected trick's plays, in order (for card memory)
     trickNumber: 0,
   };
 }
@@ -58,6 +59,7 @@ export function collectTrick(state) {
     tricksWon,
     taken,
     lastTrick: { plays: trick, winner },
+    history: [...state.history, trick],
     trickNumber: state.trickNumber + 1,
     turn: winner,
     leader: winner,

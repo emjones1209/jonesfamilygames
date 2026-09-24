@@ -21,12 +21,14 @@ export const TUTORIALS = {
     { emoji: '🎮', heading: 'Playing Tricks', body: 'Whoever holds the 2♣ leads it. Follow the suit led if you can; otherwise play anything. The highest card of the suit led wins the trick.\nNo hearts or Q♠ may be played on the first trick unless you have nothing else.' },
     { emoji: '🚫', heading: 'Breaking Hearts', body: 'You can\'t lead a heart until a heart has been played on an earlier trick (unless you only have hearts left).' },
     { emoji: '🌙', heading: 'Shoot the Moon', body: 'Take ALL 13 hearts plus the Queen of Spades and you score 0 — everyone else gets 26!' },
+    { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the computer plays any card.\nMedium: it ducks tricks and dumps the Q♠ and high hearts.\nHard: it remembers every card played, leads cards that can\'t win, empties a short suit when passing, flushes out the Q♠ and stops anyone shooting the moon (and may try it itself).' },
   ],
   spades: [
     { emoji: '♠️', heading: 'Goal', body: 'Work with your partner (across the table) to win at least as many tricks as you bid. Spades are always trump. First team to 500 wins.' },
     { emoji: '🤔', heading: 'Bidding', body: 'Before playing, everyone bids how many tricks they expect to win; you and your partner\'s bids are added together. Bid "Nil" to try to win no tricks at all.' },
     { emoji: '🎮', heading: 'Playing', body: 'Follow the suit led if you can. Spades beat every other suit. You can\'t lead spades until one has been played, unless you only have spades.' },
     { emoji: '📊', heading: 'Scoring', body: 'Make your bid: 10 points per trick bid, +1 for each extra trick (a "bag"). Miss it: lose 10 per trick bid.\nEvery 10 bags costs 100 points!\nNil: +100 if you win no tricks, −100 if you win any.' },
+    { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the opponents play any card and bid loosely.\nMedium: they play each trick sensibly.\nHard: they bid carefully, remember every card played, draw out spades, cash sure winners and avoid bags.\nYour partner always plays at Medium, so the level only changes your opponents.' },
   ],
   golf6: [
     { emoji: '⛳', heading: 'Goal', body: 'Get the lowest score! Unlike most card games — in Golf, low score wins.' },
@@ -42,12 +44,14 @@ export const TUTORIALS = {
     { emoji: '🏆', heading: 'Bidding', body: 'Bid how many points your team will capture, from 70 up to 120 in steps of 5. Pass and you\'re out of the bidding. The highest bidder wins.' },
     { emoji: '💰', heading: 'The Nest', body: 'The bid winner takes the 5-card nest, puts back any 5 cards, and names trump. Points left in the nest go to whoever wins the last trick.' },
     { emoji: '🎮', heading: 'Playing', body: 'Follow the colour led if you can. Trump beats other colours. The Rook bird counts as the lowest trump: any other trump beats it, but it still beats every other colour.\nThe top of the screen shows the points each team has captured so far this hand.\nMake your bid to score your points — miss it and you lose the whole bid!' },
+    { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the opponents play any card and bid at random.\nMedium: they play each trick sensibly.\nHard: they remember every card played, draw out trumps, cash sure winners, and use the nest to empty a short suit and bury counters.\nYour partner always plays at Medium, so the level only changes your opponents.' },
   ],
   bridge: [
     { emoji: '🃏', heading: 'Goal', body: 'As declarer, win at least as many tricks as your contract. As defenders, stop the declarer from making their contract.' },
     { emoji: '🗣️', heading: 'Bidding', body: 'The dealer bids first, and the deal rotates each hand. A bid is the number of tricks ABOVE 6 you expect to win, plus a trump suit (or No Trump). Each bid must be higher than the last; three passes in a row end the bidding.' },
     { emoji: '🤝', heading: 'Dummy', body: 'After the opening lead, declarer\'s partner (dummy) lays their hand face-up and declarer plays both hands.\nWhen you declare, tap dummy\'s cards on its turn. When North declares, North plays your cards for you.' },
     { emoji: '📊', heading: 'Scoring', body: 'Making your contract earns points by suit and level, plus bonuses for game (100+ trick points) and slams. Each trick short gives the defenders 50 points.' },
+    { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the opponents bid at random and play any card.\nMedium: they bid a simple natural system and play each trick sensibly.\nHard: they also value long and short suits when bidding, remember every card played, draw trumps and cash sure winners.\nYour partner (North) always plays at Medium, so the level only changes your opponents.' },
   ],
   jigsaw: [
     { emoji: '🧩', heading: 'Goal', body: 'Assemble all the puzzle pieces to recreate the original photo. Choose a photo from your library to get started!' },

@@ -102,14 +102,22 @@ export function chooseBid(hand, difficulty, partnerBid = null) {
       && !spades.some(c => standardRank(c) >= 11)) {
     return NIL;
   }
-  const bid = Math.max(1, Math.round(est));
+  const bid = Math.max(1, difficulty === 'hard' ? Math.floor(est) : Math.round(est));
   // Keep the table's total bid realistic
   return partnerBid ? Math.min(bid, 13 - partnerBid) : bid;
 }
 
 // ── AI card play ─────────────────────────────────────────────────────────────
-export function chooseCard({ legal, trick, seat, difficulty, bids }) {
+export function chooseCard({ legal, trick, seat, difficulty, bids, memory = null, tricksWon = null }) {
   if (bids[seat] === NIL && difficulty !== 'easy') return chooseNilCard(legal, trick, seat);
+  // Hard avoids bags: once both teams have made their bids, extra tricks only cost points
+  if (difficulty === 'hard' && tricksWon && bids.every(b => b !== NIL)) {
+    const made = team => [team, team + 2].reduce((n, s) => n + tricksWon[s], 0) >= bids[team] + bids[team + 2];
+    if (made(seat % 2) && made(1 - seat % 2)) {
+      const losers = trick.length ? legal.filter(c => !wouldWin(trick, c, seat, { trump: TRUMP })) : [];
+      return losers.length ? highest(losers) : lowest(legal);
+    }
+  }
   // Protect a partner who bid Nil: cover their card when they're winning
   if (bids[partnerOf(seat)] === NIL && trick.length && difficulty !== 'easy') {
     const winner = trick[winningIndex(trick, { trump: TRUMP })].seat;
@@ -118,7 +126,7 @@ export function chooseCard({ legal, trick, seat, difficulty, bids }) {
       if (covers.length) return lowest(covers);
     }
   }
-  return choosePartnershipCard({ legal, trick, seat, difficulty, trump: TRUMP });
+  return choosePartnershipCard({ legal, trick, seat, difficulty, trump: TRUMP, memory });
 }
 
 /** Nil bidder: never win a trick if it can be avoided. */

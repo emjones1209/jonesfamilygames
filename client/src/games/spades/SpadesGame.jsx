@@ -6,6 +6,7 @@ import { PlayingCard } from '../../components/PlayingCard';
 import { TUTORIALS } from '../../components/tutorials';
 import { sortHand, trickWinner, nextSeat, teamOf } from '../cards/tricks';
 import { useTrickTable } from '../cards/useTrickTable';
+import { tableMemory } from '../cards/memory';
 import { CardTable } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
 import { GameSetup, ResultPanel } from '../cards/GameSetup';
@@ -16,6 +17,9 @@ import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
 
 const NAMES = ['You', 'Left', 'Partner', 'Right'];
+// Your partner always plays at Medium, so the difficulty only changes the opponents
+const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
+const DECK = buildDeck();
 const bidLabel = b => (b == null ? '…' : b === NIL ? 'Nil' : b);
 
 function dealHands() {
@@ -41,7 +45,10 @@ export default function SpadesGame() {
       spadesBroken: [...t.taken.flat(), ...t.trick.map(p => p.card)].some(c => c.suit === TRUMP),
     }),
     isAi: seat => seat !== 0,
-    chooseAiCard: (seat, t, legal) => chooseCard({ legal, trick: t.trick, seat, difficulty, bids }),
+    chooseAiCard: (seat, t, legal) => chooseCard({
+      legal, trick: t.trick, seat, difficulty: levelFor(seat, difficulty), bids, tricksWon: t.tricksWon,
+      memory: tableMemory({ history: t.history, trick: t.trick, hand: t.hands[seat], deck: DECK }),
+    }),
     onHandDone: t => {
       const result = scoreHand(bids, t.tricksWon, bags);
       const newScores = [scores[0] + result.delta[0], scores[1] + result.delta[1]];
@@ -88,7 +95,7 @@ export default function SpadesGame() {
   useEffect(() => {
     if (phase !== 'bidding' || bidTurn === 0) return;
     const timer = setTimeout(() => {
-      placeBid(bidTurn, chooseBid(hands[bidTurn], difficulty, bids[(bidTurn + 2) % 4]));
+      placeBid(bidTurn, chooseBid(hands[bidTurn], levelFor(bidTurn, difficulty), bids[(bidTurn + 2) % 4]));
     }, 600);
     return () => clearTimeout(timer);
   });

@@ -4,7 +4,8 @@ import { buildDeck, shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
 import { TUTORIALS } from '../../components/tutorials';
-import { sortHand, trickWinner, followSuit, nextSeat } from '../cards/tricks';
+import { sortHand, trickWinner, followSuit, nextSeat, teamOf } from '../cards/tricks';
+import { tableMemory } from '../cards/memory';
 import { useTrickTable } from '../cards/useTrickTable';
 import { CardTable } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
@@ -28,6 +29,10 @@ function dealHands() {
   return [0, 1, 2, 3].map(s => deck.slice(s * 13, s * 13 + 13));
 }
 
+// Your partner always plays at Medium, so the difficulty only changes the opponents
+const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
+const DECK = buildDeck();
+
 const sortBridge = hand => sortHand(hand, { suitOrder: BRIDGE_SUIT_ORDER });
 
 export default function BridgeGame() {
@@ -50,7 +55,11 @@ export default function BridgeGame() {
     legalPlays: (t, seat) => followSuit(t.hands[seat], t.trick[0]?.card.suit),
     isAi: seat => controllerOf(seat) !== 0,
     chooseAiCard: (seat, t, legal) =>
-      choosePartnershipCard({ legal, trick: t.trick, seat, difficulty, trump: contract?.trump }),
+      choosePartnershipCard({
+        legal, trick: t.trick, seat, difficulty: levelFor(controllerOf(seat), difficulty), trump: contract?.trump,
+        trumpTeam: contract ? teamOf(contract.declarer) : null,
+        memory: tableMemory({ history: t.history, trick: t.trick, hand: t.hands[seat], deck: DECK }),
+      }),
     onHandDone: t => {
       const declarerTricks = t.tricksWon[contract.declarer] + t.tricksWon[contract.dummy];
       const res = scoreContract(contract, declarerTricks);
@@ -92,7 +101,7 @@ export default function BridgeGame() {
   // Computer bids
   useEffect(() => {
     if (phase !== 'bidding' || bidTurn === 0) return;
-    const timer = setTimeout(() => placeBid(chooseBid({ hand: hands[bidTurn], auction, seat: bidTurn, difficulty })), 700);
+    const timer = setTimeout(() => placeBid(chooseBid({ hand: hands[bidTurn], auction, seat: bidTurn, difficulty: levelFor(bidTurn, difficulty) })), 700);
     return () => clearTimeout(timer);
   });
 
