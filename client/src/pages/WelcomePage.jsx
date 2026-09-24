@@ -58,7 +58,7 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-game-card p-5 pb-10">
       <div className="max-w-2xl mx-auto space-y-4">
         <header className="text-center pt-4 pb-2">
-          <div className="text-6xl mb-3">🎮</div>
+          <img src="/logo.png" alt="Joneses family games logo" className="w-32 h-32 md:w-40 md:h-40 mx-auto mb-3" />
           <h1 className="text-3xl font-bold text-game-gold font-display">
             Welcome{user?.displayName ? `, ${user.displayName}` : ''}!
           </h1>

@@ -44,7 +44,7 @@ export default function LoginPage() {
       >
         {/* Logo / Title */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-3">🎮</div>
+          <img src="/logo.png" alt="Joneses family games logo" className="w-40 h-40 md:w-48 md:h-48 mx-auto mb-3" />
           <h1 className="text-3xl font-bold text-game-gold font-display">Family Games</h1>
           <p className="text-white/50 mt-1">Welcome to the family game room!</p>
         </div>

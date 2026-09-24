@@ -36,7 +36,7 @@ export default function LandingPage() {
       <header className="sticky top-safe z-20 bg-game-bg/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-4xl mx-auto flex items-center justify-between px-5 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🎮</span>
+            <img src="/logo.png" alt="" className="w-10 h-10" />
             <span className="font-display font-bold text-game-gold text-lg">Family Games</span>
           </div>
           <div className="flex items-center gap-3">
