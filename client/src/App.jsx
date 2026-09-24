@@ -18,6 +18,7 @@ import HeartsGame from "./games/hearts/HeartsGame";
 import SpadesGame from "./games/spades/SpadesGame";
 import RookGame from "./games/rook/RookGame";
 import CanastaGame from "./games/canasta/CanastaGame";
+import MexicanTrainGame from "./games/train/MexicanTrainGame";
 import BridgeGame from "./games/bridge/BridgeGame";
 import Golf6Game from "./games/golf6/Golf6Game";
 import JigsawGame from "./games/jigsaw/JigsawGame";
@@ -57,6 +58,7 @@ function AppRoutes() {
       <Route path="/games/spades" element={<ProtectedRoute><SpadesGame /></ProtectedRoute>} />
       <Route path="/games/rook" element={<ProtectedRoute><RookGame /></ProtectedRoute>} />
       <Route path="/games/canasta" element={<ProtectedRoute><CanastaGame /></ProtectedRoute>} />
+      <Route path="/games/train" element={<ProtectedRoute><MexicanTrainGame /></ProtectedRoute>} />
       <Route path="/games/bridge" element={<ProtectedRoute><BridgeGame /></ProtectedRoute>} />
       <Route path="/games/golf6" element={<ProtectedRoute><Golf6Game /></ProtectedRoute>} />
 

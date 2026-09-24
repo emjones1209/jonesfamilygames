@@ -11,6 +11,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - ♠️ Spades
 - 🐦 Rook
 - ♣️ Canasta (classic partnership)
+- 🚂 Mexican Train dominoes
 - 🌉 Bridge (Full)
 - ⛳ 6-Card Golf
 - 🧩 Jigsaw Puzzle (use your own photos!)

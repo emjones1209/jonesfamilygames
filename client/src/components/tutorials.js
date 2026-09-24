@@ -46,6 +46,16 @@ export const TUTORIALS = {
     { emoji: '🎮', heading: 'Playing', body: 'Follow the colour led if you can. Trump beats other colours. The Rook bird counts as the lowest trump: any other trump beats it, but it still beats every other colour.\nThe top of the screen shows the points each team has captured so far this hand.\nMake your bid to score your points — miss it and you lose the whole bid!' },
     { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the opponents play any card and bid at random.\nMedium: they play each trick sensibly.\nHard: they remember every card played, draw out trumps, cash sure winners, and use the nest to empty a short suit and bury counters.\nYour partner always plays at its best (Hard), so the level only changes your opponents.' },
   ],
+  train: [
+    { emoji: '🚂', heading: 'Goal', body: 'Play all your dominoes before anyone else. The dots left in your hand at the end of a round count against you — lowest total after the last round wins.' },
+    { emoji: '🎯', heading: 'The Engine', body: 'Each round starts from a double in the middle: 12|12 in round 1, then 11|11, and so on down.\nEveryone gets 15 dominoes; the rest stay face down in the boneyard.' },
+    { emoji: '🛤️', heading: 'The Trains', body: 'You each have your own train, starting from the engine. There\'s also the Mexican Train, which anyone can play on.\nA domino must match the number at the open end of the train (it turns round to fit).' },
+    { emoji: '🔄', heading: 'Your Turn', body: 'Play one domino on your own train, the Mexican Train, or any train with a marker 🚩.\nTap a domino, then the highlighted train (or tap the domino again if it only fits one train).' },
+    { emoji: '🚩', heading: 'Can\'t Play?', body: 'Draw one domino from the boneyard. If it still doesn\'t fit, pass — and a marker goes on your train, so anyone may play on it until you play on it yourself again.' },
+    { emoji: '⚠️', heading: 'Doubles', body: 'Play a double and you must cover it straight away with another domino. If you can\'t, draw; if that doesn\'t help, pass — then everyone must cover the double before playing anywhere else.' },
+    { emoji: '🏁', heading: 'End of a Round', body: 'The round ends when someone plays their last domino — or when nobody can play and the boneyard is empty. Everyone adds up the dots in their hand.' },
+    { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the computer plays any domino that fits.\nMedium: it gets rid of its highest dominoes first and keeps its own train going.\nHard: it plans the longest run it can lay on its own train, sheds its other dominoes elsewhere, only plays doubles it can cover, and dumps big dominoes when someone is about to go out.' },
+  ],
   canasta: [
     { emoji: '♣️', heading: 'Goal', body: 'You and your partner (across the table) meld sets of cards and build canastas. First team to 5,000 points wins.\nTwo decks plus four jokers; everyone gets 11 cards.' },
     { emoji: '🃏', heading: 'Cards', body: 'Jokers and 2s are wild. Red 3s are bonus cards: they go face up straight away (100 each, 800 for all four) and you get a replacement.\nCard points: Joker 50 • 2 and Ace 20 • K down to 8: 10 • 7 down to 4 and black 3s: 5.' },
