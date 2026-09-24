@@ -10,6 +10,7 @@ import { Button } from "../../components/Button";
 import { TutorialModal } from "../../components/TutorialModal";
 import { TUTORIALS } from "../../components/tutorials";
 import api from "../../utils/api";
+import { RulesButton } from '../../components/RulesButton';
 
 // Two players: you and the computer
 const NUM_PLAYERS = 2;
@@ -285,7 +286,10 @@ export default function Golf6Game() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-lime-900 p-3 flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <button onClick={()=>navigate("/")} className="text-white/40 p-1"><ArrowLeft size={18}/></button>
+        <div className="flex items-center gap-1">
+          <button onClick={()=>navigate("/")} className="text-white/40 p-1"><ArrowLeft size={18}/></button>
+          <RulesButton game="golf6" title="6-Card Golf" />
+        </div>
         <div className="text-white/60 text-xs">{difficulty} {finalRound?"- Final Round!":""}</div>
         <div className="text-game-gold font-bold text-sm">You: {myScore}</div>
       </div>

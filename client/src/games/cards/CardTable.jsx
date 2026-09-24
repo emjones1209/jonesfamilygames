@@ -6,6 +6,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { TrickArea } from './TrickArea';
+import { RulesButton } from '../../components/RulesButton';
 
 export function HiddenHand({ count, vertical = false }) {
   const shown = Math.min(count, vertical ? 7 : 13);
@@ -32,6 +33,7 @@ function Seat({ name, active, children, detail }) {
 
 export function CardTable({
   title, scoreLine, names, table, seatDetail = () => null,
+  rules,                  // { game, title } for the Rules button
   sides = {},             // optional replacement content for seats 1-3 (e.g. Bridge dummy)
   message, renderTrickCard, bgClass = 'from-game-bg to-green-950', children,
 }) {
@@ -42,10 +44,13 @@ export function CardTable({
   return (
     <div className={`min-h-screen bg-gradient-to-br ${bgClass} p-3 flex flex-col select-none`}>
       <header className="flex items-center justify-between mb-2 gap-2">
-        <button onClick={() => navigate('/')} className="p-2 text-white/50 hover:text-white min-h-[44px] min-w-[44px]"
-          aria-label="Back to games">
-          <ArrowLeft size={20} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => navigate('/')} className="p-2 text-white/50 hover:text-white min-h-[44px] min-w-[44px]"
+            aria-label="Back to games">
+            <ArrowLeft size={20} />
+          </button>
+          {rules && <RulesButton game={rules.game} title={rules.title} />}
+        </div>
         <div className="text-white/80 text-sm font-semibold">{title}</div>
         <div className="text-white/60 text-xs text-right">{scoreLine}</div>
       </header>

@@ -7,6 +7,7 @@ import { DadJokeModal } from '../../components/DadJokeModal';
 import { TutorialModal } from '../../components/TutorialModal';
 import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
+import { RulesButton } from '../../components/RulesButton';
 
 // ── IndexedDB helpers ─────────────────────────────────────────────────────────
 const DB_NAME = 'jigsawPhotoDB', DB_VER = 1, STORE = 'photos';
@@ -455,6 +456,7 @@ export default function JigsawGame() {
         <span className="text-white/60 text-sm font-mono">{mm}:{ss}</span>
         <div className="flex items-center gap-3">
           <span className="text-white/60 text-sm hidden sm:inline">{locked.size} / {pieces.length} placed</span>
+          <RulesButton game="jigsaw" title="Jigsaw Puzzle" className="min-h-[44px]" />
           <button onClick={() => setShowRef(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold min-h-[44px] ${showRef ? 'bg-game-gold text-game-bg' : 'bg-white/10 text-white'}`}>
             <ImageIcon size={16} /> Picture

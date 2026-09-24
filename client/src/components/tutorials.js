@@ -55,6 +55,13 @@ export const TUTORIALS = {
     { emoji: '🖐️', heading: 'Placing Pieces', body: 'Drag pieces up from the tray onto the board (swipe sideways to scroll the tray). Drop a piece close to its correct spot and it locks into place. Tap "Picture" any time to see the finished picture.' },
     { emoji: '🎚️', heading: 'Difficulty', body: 'Easy: 16 pieces • Medium: 30 pieces • Hard: 64 pieces • Expert: 100 pieces.' },
   ],
+  minesweeper: [
+    { emoji: '💣', heading: 'Goal', body: 'Uncover every square that doesn\'t hide a mine. Tap a mine and the game is over!' },
+    { emoji: '🔢', heading: 'The Numbers', body: 'A number tells you how many mines touch that square — including the ones diagonally next to it. A blank square touches no mines, so its neighbours open up automatically.\nYour first tap is always safe.' },
+    { emoji: '🚩', heading: 'Flags', body: 'Hold a square (or switch to Flag mode) to plant a flag where you think a mine is. Flags stop you tapping that square by accident. The counter at the top left shows mines left to find.' },
+    { emoji: '👆', heading: 'Tapping a Number', body: 'When a number has that many flags around it, tap it to open all its other neighbours at once.\nIf the flags don\'t add up yet, tapping it lights up the squares it counts so you can see where to look.' },
+    { emoji: '🎚️', heading: 'Difficulty', body: 'Easy: 9×9 with 10 mines • Medium: 12×12 with 25 mines • Hard: 16×16 with 50 mines.\nTap the face to start a new game.' },
+  ],
   match3: [
     { emoji: '🌸', heading: 'Goal', body: 'Swipe a flower toward a neighbour to swap them (or tap one, then the other) and line up 3 or more of the same kind. Reach the level goal before you run out of moves!' },
     { emoji: '✨', heading: 'Special Tiles', body: '🌟 Match 4 in a line = star (clears its row)\n💧 Match 5 in a line = water drop (clears its column)\n☀️ Match in an L or T shape = sun (clears a 3×3 area)\n\nA special keeps its flower, with a badge in the corner — match it with that flower to set it off. Everything a blast clears scores points, and a blast that hits another special sets it off too!' },

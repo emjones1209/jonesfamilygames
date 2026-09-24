@@ -2,13 +2,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDrag, useDrop } from 'react-dnd';
-import { ArrowLeft, RefreshCw, Undo2, HelpCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Undo2 } from 'lucide-react';
 import { buildDeck, shuffle, SUITS, RANK_VALUES } from '../../utils/cardEngine';
 import { PlayingCard, EmptyCardSlot } from '../../components/PlayingCard';
 import { Button } from '../../components/Button';
-import { TutorialModal } from '../../components/TutorialModal';
-import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
+import { RulesButton } from '../../components/RulesButton';
 
 // Aces are low in Solitaire (the shared table ranks them high for trick-taking games)
 const SOL_RANK = { ...RANK_VALUES, A: 1 };
@@ -109,7 +108,6 @@ export default function SolitaireGame() {
   const [history, setHistory] = useState([]);
   const [won, setWon] = useState(false);
   const [selected, setSelected] = useState(null); // { from, cards }
-  const [showTutorial, setShowTutorial] = useState(false);
   const { size, height: cardH, step } = useCardLayout();
 
   const saveHistory = (g) => setHistory(h => [...h.slice(-20), JSON.stringify(g)]);
@@ -310,9 +308,7 @@ export default function SolitaireGame() {
         </button>
         <div className="text-white font-semibold">Solitaire · {game.moves} moves</div>
         <div className="flex gap-2">
-          <button onClick={() => setShowTutorial(true)} className="p-1 text-white/60 hover:text-white">
-            <HelpCircle size={18} />
-          </button>
+          <RulesButton game="solitaire" title="Solitaire" />
           <button onClick={undo} disabled={!history.length} className="p-1 text-white/60 hover:text-white disabled:opacity-30">
             <Undo2 size={18} />
           </button>
@@ -413,7 +409,6 @@ export default function SolitaireGame() {
         <Button variant="ghost" onClick={autoMove} className="text-sm">Auto-Move to Foundation ✨</Button>
       </div>
 
-      <TutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} title="Solitaire" slides={TUTORIALS.solitaire} />
 
       {/* Win modal */}
       <AnimatePresence>

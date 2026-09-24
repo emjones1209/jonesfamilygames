@@ -15,6 +15,7 @@ import {
   chooseNestDiscard, chooseCard, COLOURS, COLOUR_STYLE, MIN_BID, MAX_BID, BID_STEP, NEST_SIZE, WINNING_SCORE,
 } from './rookRules';
 import api from '../../utils/api';
+import { RulesButton } from '../../components/RulesButton';
 
 const NAMES = ['You', 'Left', 'Partner', 'Right'];
 
@@ -175,6 +176,7 @@ export default function RookGame() {
     const mustBid = high.seat == null && bids.filter(b => b === 'pass').length === 3;
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-orange-900 p-5 flex flex-col items-center gap-4">
+        <RulesButton game="rook" title="Rook" className="self-end" />
         <div className="text-white/60 text-sm">{scoreLine}</div>
         <h2 className="text-2xl font-bold text-white">Bidding</h2>
         <p className="text-white/50 text-sm text-center max-w-sm">
@@ -211,6 +213,7 @@ export default function RookGame() {
       sel.includes(card) ? sel.filter(c => c !== card) : sel.length < NEST_SIZE ? [...sel, card] : sel);
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-orange-900 p-5 flex flex-col items-center gap-4">
+        <RulesButton game="rook" title="Rook" className="self-end" />
         <h2 className="text-2xl font-bold text-game-gold">You won the bid at {high.bid}!</h2>
         <p className="text-white/70 text-sm text-center max-w-sm">
           The nest's 5 cards (outlined) are now in your hand. Choose <b>5 cards to put back</b> in the nest,
@@ -246,6 +249,7 @@ export default function RookGame() {
     <>
       <CardTable
         title={<span>Trump: <b style={{ color: trumpStyle?.color }}>{trumpStyle?.label}</b> · Bid {high.bid} ({NAMES[bidWinner]})</span>}
+        rules={{ game: 'rook', title: 'Rook' }}
         scoreLine={
           <>
             <div className="text-white/90 font-semibold">This hand: Us {handPoints[0]} · Them {handPoints[1]}</div>

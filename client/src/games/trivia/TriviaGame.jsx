@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../../components/LoadingSpinner';
 import { TutorialModal } from '../../components/TutorialModal';
 import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
+import { RulesButton } from '../../components/RulesButton';
 
 const CATEGORY_META = {
   bible:     { name: 'Bible Trivia',    emoji: '✝️',  color: 'from-purple-700 to-purple-900' },
@@ -185,9 +186,12 @@ export default function TriviaGame() {
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-game-card p-5 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
-          <button onClick={() => navigate('/')} className="text-white/40 hover:text-white p-2">
-            <ArrowLeft size={20} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => navigate('/')} className="text-white/40 hover:text-white p-2">
+              <ArrowLeft size={20} />
+            </button>
+            <RulesButton game="trivia" title="Trivia" />
+          </div>
           <div className="flex items-center gap-4">
             {streak >= 3 && (
               <div className="flex items-center gap-1 text-amber-400 text-sm font-bold">

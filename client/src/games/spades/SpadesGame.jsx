@@ -4,7 +4,7 @@ import { buildDeck, shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
 import { TUTORIALS } from '../../components/tutorials';
-import { sortHand, trickWinner, nextSeat } from '../cards/tricks';
+import { sortHand, trickWinner, nextSeat, teamOf } from '../cards/tricks';
 import { useTrickTable } from '../cards/useTrickTable';
 import { CardTable } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
@@ -13,6 +13,7 @@ import {
   TRUMP, NIL, WINNING_SCORE, BAG_LIMIT, legalPlays, scoreHand, winnerOf, chooseBid, chooseCard,
 } from './spadesRules';
 import api from '../../utils/api';
+import { RulesButton } from '../../components/RulesButton';
 
 const NAMES = ['You', 'Left', 'Partner', 'Right'];
 const bidLabel = b => (b == null ? '…' : b === NIL ? 'Nil' : b);
@@ -94,6 +95,9 @@ export default function SpadesGame() {
 
   const myHand = useMemo(() => sortHand(table?.hands[0] ?? hands?.[0] ?? []), [table, hands]);
   const scoreLine = `Us ${scores[0]} · Them ${scores[1]}`;
+  // This hand so far: each team's tricks against its combined bid
+  const teamTricks = [0, 1].map(team => [0, 1, 2, 3].reduce((s, seat) => s + (teamOf(seat) === team ? table?.tricksWon[seat] ?? 0 : 0), 0));
+  const teamBid = [0, 1].map(team => [0, 1, 2, 3].reduce((s, seat) => s + (teamOf(seat) === team ? bids[seat] ?? 0 : 0), 0));
 
   if (phase === 'setup') {
     return (
@@ -107,6 +111,7 @@ export default function SpadesGame() {
     const partnerBid = bids[2];
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-slate-900 p-5 flex flex-col items-center gap-4">
+        <RulesButton game="spades" title="Spades" className="self-end" />
         <div className="text-white/60 text-sm">{scoreLine} · Bags {bags[0]}/{BAG_LIMIT}</div>
         <h2 className="text-2xl font-bold text-white">Bidding</h2>
         <div className="grid grid-cols-4 gap-2 w-full max-w-md">
@@ -152,7 +157,13 @@ export default function SpadesGame() {
     <>
       <CardTable
         title={`Spades · ${difficulty}`}
-        scoreLine={scoreLine}
+        rules={{ game: 'spades', title: 'Spades' }}
+        scoreLine={
+          <>
+            <div className="text-white/90 font-semibold">This hand: Us {teamTricks[0]}/{teamBid[0]} · Them {teamTricks[1]}/{teamBid[1]} tricks</div>
+            <div className="text-white/50">Game: {scoreLine}</div>
+          </>
+        }
         names={NAMES}
         table={table}
         seatDetail={seat => `${table?.tricksWon[seat] ?? 0}/${bidLabel(bids[seat])}`}

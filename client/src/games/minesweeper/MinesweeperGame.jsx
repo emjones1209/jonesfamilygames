@@ -6,6 +6,7 @@ import api from '../../utils/api';
 import {
   emptyBoard, placeMines, floodReveal, chordReveal, revealAllMines, countRevealed,
 } from './minesweeperLogic';
+import { RulesButton } from '../../components/RulesButton';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -204,6 +205,8 @@ export default function MinesweeperGame() {
             <span>Minesweeper</span>
           </div>
 
+          <div className="flex items-center gap-2">
+          <RulesButton game="minesweeper" title="Minesweeper" />
           {/* Face button restarts the game */}
           <button
             onClick={() => startNewGame(difficulty)}
@@ -212,6 +215,7 @@ export default function MinesweeperGame() {
           >
             {faceEmoji}
           </button>
+          </div>
         </div>
       </header>
 

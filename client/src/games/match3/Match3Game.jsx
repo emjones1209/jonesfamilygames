@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, HelpCircle } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../../components/Button';
 import { DadJokeModal } from '../../components/DadJokeModal';
-import { TutorialModal } from '../../components/TutorialModal';
-import { TUTORIALS } from '../../components/tutorials';
 import api from '../../utils/api';
+import { RulesButton } from '../../components/RulesButton';
 
 // ── Theme ─────────────────────────────────────────────────────────────────────
 const ROWS = 7, COLS = 7;
@@ -320,7 +319,6 @@ export default function Match3Game() {
   const [jokeOpen,     setJokeOpen]     = useState(false);
   const [locked,       setLocked]       = useState(false); // prevent input during cascade
   const [notice,       setNotice]       = useState('');
-  const [showTutorial, setShowTutorial] = useState(false);
 
   // Pending animation timers, cancelled when a level (re)loads or we leave
   const timers = useRef([]);
@@ -497,9 +495,7 @@ export default function Match3Game() {
         <Button variant="ghost" onClick={() => navigate('/')}><ArrowLeft size={20} /></Button>
         <div className="flex items-center gap-1">
           <h1 className="text-game-gold font-bold text-lg">Level {level.id}</h1>
-          <button onClick={() => setShowTutorial(true)} className="p-2 text-white/40 hover:text-white/70" aria-label="How to play">
-            <HelpCircle size={16} />
-          </button>
+          <RulesButton game="match3" title="Garden Match" className="ml-1" />
         </div>
         <span className={`font-bold text-sm ${movesLeft <= 5 ? 'text-game-red' : 'text-white/60'}`}>
           {movesLeft} moves
@@ -579,7 +575,6 @@ export default function Match3Game() {
       </p>
 
       <DadJokeModal isOpen={jokeOpen} onClose={handleJokeClose} />
-      <TutorialModal isOpen={showTutorial} onClose={() => setShowTutorial(false)} title="Garden Match" slides={TUTORIALS.match3} />
     </div>
   );
 }

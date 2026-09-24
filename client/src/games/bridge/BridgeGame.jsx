@@ -15,6 +15,7 @@ import {
   chooseBid, BRIDGE_SUIT_ORDER,
 } from './bridgeRules';
 import api from '../../utils/api';
+import { RulesButton } from '../../components/RulesButton';
 
 const NAMES = ['South (You)', 'West', 'North', 'East'];
 const SHORT = ['You', 'West', 'North', 'East'];
@@ -109,6 +110,7 @@ export default function BridgeGame() {
     const high = currentBid(auction);
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-teal-900 p-4 flex flex-col items-center gap-3">
+        <RulesButton game="bridge" title="Bridge" className="self-end" />
         <div className="text-white/60 text-sm">NS {scores.ns} · EW {scores.ew} · {SHORT[dealer]} dealt</div>
         <h2 className="text-2xl font-bold text-white">Bidding</h2>
         <AuctionGrid auction={auction} dealer={dealer} />
@@ -169,6 +171,7 @@ export default function BridgeGame() {
         table={table}
         seatDetail={seat => table?.tricksWon[seat] || null}
         sides={sides}
+        rules={{ game: 'bridge', title: 'Bridge' }}
         message={message}
         bgClass="from-game-bg to-teal-900"
       >

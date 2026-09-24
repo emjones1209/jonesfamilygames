@@ -11,9 +11,10 @@ import { CardHand } from '../cards/CardHand';
 import { GameSetup, ResultPanel } from '../cards/GameSetup';
 import {
   legalPlays, chooseCard, choosePass, applyPasses, passDirection, scoreHand, isGameOver, leaders,
-  isHeart, isQueenOfSpades, TWO_OF_CLUBS,
+  isHeart, isQueenOfSpades, TWO_OF_CLUBS, cardPoints,
 } from './heartsRules';
 import api from '../../utils/api';
+import { RulesButton } from '../../components/RulesButton';
 
 const NAMES = ['You', 'Left', 'Across', 'Right'];
 const PASS_LABEL = { left: 'to Left', right: 'to Right', across: 'Across' };
@@ -105,6 +106,7 @@ export default function HeartsGame() {
       sel.some(c => c.id === card.id) ? sel.filter(c => c.id !== card.id) : sel.length < 3 ? [...sel, card] : sel);
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-red-950 p-5 flex flex-col items-center justify-center gap-4">
+        <RulesButton game="hearts" title="Hearts" className="self-end" />
         <h2 className="text-2xl font-bold text-white">Pass 3 cards {PASS_LABEL[direction]}</h2>
         <p className="text-white/50 text-sm text-center max-w-xs">
           Tip: pass high hearts, and the Queen of Spades if you don't have many low spades to protect it.
@@ -133,10 +135,15 @@ export default function HeartsGame() {
     <>
       <CardTable
         title={`Hearts · ${difficulty}`}
-        scoreLine={`Hand ${handNumber + 1}`}
+        rules={{ game: 'hearts', title: 'Hearts' }}
+        scoreLine={<><div>Hand {handNumber + 1}</div><div className="text-white/40">Totals · +this hand</div></>}
         names={NAMES}
         table={table}
-        seatDetail={seat => `${totals[seat]}`}
+        seatDetail={seat => {
+          // Game total, plus points taken so far this hand
+          const now = (table?.taken[seat] ?? []).reduce((s, c) => s + cardPoints(c), 0);
+          return now ? `${totals[seat]} +${now}` : `${totals[seat]}`;
+        }}
         message={message}
         bgClass="from-game-bg to-red-950"
       >
