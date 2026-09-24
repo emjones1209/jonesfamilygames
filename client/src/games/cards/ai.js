@@ -75,9 +75,10 @@ export function choosePartnershipCard({
 
   if (partnerWinning) {
     const partnerCard = trick.find(p => p.seat === winnerSeat).card;
+    // Medium trusts a high card or a high trump; a low trump (like the Rook bird) can still be overtrumped
     const partnerSafe = hard
       ? safeFrom(partnerCard, laterOpponents)
-      : lastToPlay || suitOf(partnerCard) === trump || rankOf(partnerCard) >= 13;
+      : lastToPlay || rankOf(partnerCard) >= (suitOf(partnerCard) === trump ? 12 : 13);
     if (partnerSafe && losers.length) {
       // Don't overtake partner; give them points if the game has any
       const pointy = losers.filter(c => pointsOf(c) > 0);

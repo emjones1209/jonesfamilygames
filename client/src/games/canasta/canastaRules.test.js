@@ -176,7 +176,7 @@ describe('Canasta computer players', () => {
       const sd = Math.sqrt(samples.reduce((x, y) => x + (y - mean) ** 2, 0) / (deals - 1));
       return { mean, se: sd / Math.sqrt(deals) };
     };
-    const hm = edge('hard', 'medium', 2000), me = edge('medium', 'easy', 300);
+    const hm = edge('hard', 'medium', 5000), me = edge('medium', 'easy', 300);
     console.log(`canasta: hard vs medium ${hm.mean.toFixed(0)} ± ${hm.se.toFixed(0)} · medium vs easy ${me.mean.toFixed(0)} ± ${me.se.toFixed(0)} pts/hand`);
     expect(hm.mean).toBeGreaterThan(2 * hm.se);
     expect(me.mean).toBeGreaterThan(2 * me.se);

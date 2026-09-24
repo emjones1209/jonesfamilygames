@@ -44,7 +44,7 @@ export const TUTORIALS = {
     { emoji: '🏆', heading: 'Bidding', body: 'Bid how many points your team will capture, from 70 up to 120 in steps of 5. Pass and you\'re out of the bidding. The highest bidder wins.' },
     { emoji: '💰', heading: 'The Nest', body: 'The bid winner takes the 5-card nest, puts back any 5 cards, and names trump. Points left in the nest go to whoever wins the last trick.' },
     { emoji: '🎮', heading: 'Playing', body: 'Follow the colour led if you can. Trump beats other colours. The Rook bird counts as the lowest trump: any other trump beats it, but it still beats every other colour.\nThe top of the screen shows the points each team has captured so far this hand.\nMake your bid to score your points — miss it and you lose the whole bid!' },
-    { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the opponents play any card and bid at random.\nMedium: they play each trick sensibly.\nHard: they remember every card played, draw out trumps, cash sure winners, and use the nest to empty a short suit and bury counters.\nYour partner always plays at Medium, so the level only changes your opponents.' },
+    { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the opponents play any card and bid at random.\nMedium: they play each trick sensibly.\nHard: they remember every card played, draw out trumps, cash sure winners, and use the nest to empty a short suit and bury counters.\nYour partner always plays at its best (Hard), so the level only changes your opponents.' },
   ],
   canasta: [
     { emoji: '♣️', heading: 'Goal', body: 'You and your partner (across the table) meld sets of cards and build canastas. First team to 5,000 points wins.\nTwo decks plus four jokers; everyone gets 11 cards.' },

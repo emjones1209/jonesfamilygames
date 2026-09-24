@@ -19,8 +19,8 @@ import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
 
 const NAMES = ['You', 'Left', 'Partner', 'Right'];
-// Your partner always plays at Medium, so the difficulty only changes the opponents
-const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
+// Your partner always plays its best (Hard), so the difficulty only changes the opponents
+const levelFor = (seat, difficulty) => (seat === 2 ? 'hard' : difficulty);
 const DECK = makeDeck();
 
 // ── Card face ─────────────────────────────────────────────────────────────────
