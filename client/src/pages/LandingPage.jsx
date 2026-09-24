@@ -10,6 +10,7 @@ const GAMES = [
   { id: 'hearts',          name: 'Hearts',           emoji: '♥️',  color: 'from-red-700 to-red-900',         path: '/games/hearts',          desc: 'Avoid the queen!' },
   { id: 'spades',          name: 'Spades',           emoji: '♠️',  color: 'from-slate-600 to-slate-900',     path: '/games/spades',          desc: 'Bid and win tricks' },
   { id: 'rook',            name: 'Rook',             emoji: '🐦',  color: 'from-orange-700 to-orange-900',   path: '/games/rook',            desc: 'The classic Rook card game' },
+  { id: 'canasta',         name: 'Canasta',          emoji: '♣️',  color: 'from-emerald-700 to-emerald-900', path: '/games/canasta',         desc: 'Meld, build canastas, go out!' },
   { id: 'bridge',          name: 'Bridge',           emoji: '🌉',  color: 'from-teal-700 to-teal-900',       path: '/games/bridge',          desc: 'Full Bridge with bidding' },
   { id: 'golf6',           name: '6-Card Golf',      emoji: '⛳',  color: 'from-lime-700 to-lime-900',       path: '/games/golf6',           desc: 'Lowest score wins!' },
   { id: 'jigsaw',          name: 'Jigsaw Puzzle',    emoji: '🧩',  color: 'from-pink-700 to-pink-900',       path: '/games/jigsaw',          desc: 'Use your own photos!' },

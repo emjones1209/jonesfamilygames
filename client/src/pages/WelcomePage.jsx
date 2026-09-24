@@ -90,6 +90,7 @@ export default function WelcomePage() {
           <p>Tap any game on the home screen. Every game has a <Key icon={CircleHelp}>How to play</Key> guide if you'd like the rules.</p>
           <ul className="list-disc pl-5 space-y-2">
             <li><b>Card games</b> (Hearts, Spades, Bridge, Rook): tap a card to pick it, then tap it again to play it. Cards you can't play right now are dimmed.</li>
+            <li><b>Canasta</b>: tap cards to select several at once, then tap <b>Meld</b>, the discard pile, or one of your melds.</li>
             <li><b>Solitaire</b>: tap a card, then tap where it should go — or drag it. Tap a card twice to send it up to the piles at the top.</li>
             <li><b>Trivia</b>: Easy, Medium and Hard really are different — Hard is for the experts!</li>
             <li>Turn your iPad sideways for the biggest cards.</li>
