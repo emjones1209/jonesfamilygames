@@ -54,8 +54,12 @@ export function CardTable({
         <Seat name={names[2]} active={turn === 2} detail={seatDetail(2)}>{side(2)}</Seat>
       </div>
 
-      <div className="flex items-center justify-between gap-2 flex-1">
-        <Seat name={names[1]} active={turn === 1} detail={seatDetail(1)}>{side(1)}</Seat>
+      {/* Side seats get equal flexible columns, so the trick stays exactly centred
+          however wide their name tags or hands are */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 flex-1">
+        <div className="justify-self-start min-w-0">
+          <Seat name={names[1]} active={turn === 1} detail={seatDetail(1)}>{side(1)}</Seat>
+        </div>
         <TrickArea
           plays={table?.trick ?? []}
           names={names}
@@ -63,7 +67,9 @@ export function CardTable({
           message={message}
           renderCard={renderTrickCard}
         />
-        <Seat name={names[3]} active={turn === 3} detail={seatDetail(3)}>{side(3)}</Seat>
+        <div className="justify-self-end min-w-0">
+          <Seat name={names[3]} active={turn === 3} detail={seatDetail(3)}>{side(3)}</Seat>
+        </div>
       </div>
 
       <div className="mt-2">
