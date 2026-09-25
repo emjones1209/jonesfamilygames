@@ -47,9 +47,18 @@ export default function TriviaGame() {
   const loadQuestions = async () => {
     setLoading(true);
     try {
+      // Remember which questions this device has asked, so rounds don't repeat
+      // until every question at this level has had a turn
+      const seenKey = `trivia-seen:${category}:${difficulty}`;
+      let seenIds = [];
+      try { seenIds = JSON.parse(localStorage.getItem(seenKey) || '[]'); } catch { /* private mode */ }
       const { data } = await api.get('/trivia', {
-        params: { category, difficulty, limit: config.questionsPerRound }
+        params: { category, difficulty, limit: config.questionsPerRound, exclude: seenIds.join(',') }
       });
+      const ids = data.map(q => q.id);
+      // A repeat means the pool has run out: start the list again from this round
+      const next = ids.some(id => seenIds.includes(id)) ? ids : [...seenIds, ...ids].slice(-500);
+      try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* private mode */ }
       // Top up short rounds from the built-in bank (skipping questions already chosen)
       const seen = new Set(data.map(q => q.question));
       const extra = getSampleQuestions(category, difficulty).filter(q => !seen.has(q.question));

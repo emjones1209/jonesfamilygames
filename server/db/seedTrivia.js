@@ -122,7 +122,6 @@ const HISTORY_QUESTIONS = [
   { category:'history', difficulty:'easy', question:'In what year did World War II end?', correct_answer:'1945', wrong_answers:['1939','1944','1918'] },
   { category:'history', difficulty:'easy', question:'Who was the first President of the United States?', correct_answer:'George Washington', wrong_answers:['Thomas Jefferson','John Adams','Benjamin Franklin'] },
   { category:'history', difficulty:'easy', question:'In what year did America declare independence?', correct_answer:'1776', wrong_answers:['1783','1765','1812'] },
-  { category:'history', difficulty:'easy', question:'Who was known as the "Iron Lady"?', correct_answer:'Margaret Thatcher', wrong_answers:['Queen Elizabeth II','Hillary Clinton','Angela Merkel'] },
   { category:'history', difficulty:'easy', question:'What year did the Titanic sink?', correct_answer:'1912', wrong_answers:['1905','1920','1898'] },
   { category:'history', difficulty:'easy', question:'Who painted the Sistine Chapel ceiling?', correct_answer:'Michelangelo', wrong_answers:['Leonardo da Vinci','Raphael','Botticelli'] },
   { category:'history', difficulty:'easy', question:'In what year did the Berlin Wall fall?', correct_answer:'1989', wrong_answers:['1991','1979','1985'] },
@@ -199,6 +198,115 @@ const HISTORY_QUESTIONS = [
   { category:'history', difficulty:'hard', question:'The Battle of Hattin (1187) opened the way for which leader to capture Jerusalem?', correct_answer:'Saladin', wrong_answers:['Baibars','Nur ad-Din','Zengi'] },
 ];
 
+// More history (added September 2026 to cut down on repeats)
+const HISTORY_MORE = [
+  // Easy
+  { category:'history', difficulty:'easy', question:'What was the name of the ship Christopher Columbus sailed on his first voyage in 1492?', correct_answer:'Santa María', wrong_answers:['Mayflower','Golden Hind','Victoria'] },
+  { category:'history', difficulty:'easy', question:'Who crowned himself the first Emperor of the French in 1804?', correct_answer:'Napoleon Bonaparte', wrong_answers:['Louis XIV','Charlemagne','Louis-Philippe'] },
+  { category:'history', difficulty:'easy', question:'Which U.S. president delivered the Gettysburg Address?', correct_answer:'Abraham Lincoln', wrong_answers:['Ulysses S. Grant','Andrew Johnson','James Buchanan'] },
+  { category:'history', difficulty:'easy', question:'In what year did World War I begin?', correct_answer:'1914', wrong_answers:['1912','1916','1918'] },
+  { category:'history', difficulty:'easy', question:'Which Roman city was buried by the eruption of Mount Vesuvius in AD 79?', correct_answer:'Pompeii', wrong_answers:['Carthage','Ostia','Syracuse'] },
+  { category:'history', difficulty:'easy', question:'Which nurse became known as "The Lady with the Lamp" during the Crimean War?', correct_answer:'Florence Nightingale', wrong_answers:['Clara Barton','Mary Seacole','Edith Cavell'] },
+  { category:'history', difficulty:'easy', question:'What was the Underground Railroad?', correct_answer:'A network that helped enslaved people escape to freedom', wrong_answers:['The first subway in New York City','A railroad built in secret by Union soldiers','Tunnels used to smuggle goods during Prohibition'] },
+  { category:'history', difficulty:'easy', question:'Who gave the "I Have a Dream" speech in 1963?', correct_answer:'Martin Luther King Jr.', wrong_answers:['Malcolm X','John F. Kennedy','Frederick Douglass'] },
+  { category:'history', difficulty:'easy', question:'Which country gave the Statue of Liberty to the United States?', correct_answer:'France', wrong_answers:['Great Britain','Spain','Italy'] },
+  { category:'history', difficulty:'easy', question:'Which brothers made the first powered airplane flight in 1903?', correct_answer:'The Wright brothers', wrong_answers:['The Montgolfier brothers','The Mayo brothers','The Dodge brothers'] },
+  { category:'history', difficulty:'easy', question:'Who was Britain\'s prime minister for most of World War II?', correct_answer:'Winston Churchill', wrong_answers:['Neville Chamberlain','Clement Attlee','Anthony Eden'] },
+  { category:'history', difficulty:'easy', question:'In which city was President John F. Kennedy assassinated?', correct_answer:'Dallas', wrong_answers:['Houston','Chicago','Washington, D.C.'] },
+  { category:'history', difficulty:'easy', question:'Which Greek city-state sent the famous 300 to fight at Thermopylae?', correct_answer:'Sparta', wrong_answers:['Athens','Corinth','Thebes'] },
+  { category:'history', difficulty:'easy', question:'Who discovered penicillin in 1928?', correct_answer:'Alexander Fleming', wrong_answers:['Louis Pasteur','Joseph Lister','Marie Curie'] },
+  { category:'history', difficulty:'easy', question:'What wall did the Romans begin building across northern England in AD 122?', correct_answer:'Hadrian\'s Wall', wrong_answers:['The Antonine Wall','Offa\'s Dyke','The Aurelian Wall'] },
+  { category:'history', difficulty:'easy', question:'Who was the first woman to fly solo across the Atlantic Ocean?', correct_answer:'Amelia Earhart', wrong_answers:['Bessie Coleman','Harriet Quimby','Jacqueline Cochran'] },
+  { category:'history', difficulty:'easy', question:'Which British queen reigned for more than 63 years in the 1800s?', correct_answer:'Queen Victoria', wrong_answers:['Queen Anne','Queen Elizabeth I','Queen Mary II'] },
+  { category:'history', difficulty:'easy', question:'Julius Caesar was a leader of which ancient civilization?', correct_answer:'Rome', wrong_answers:['Greece','Egypt','Persia'] },
+  { category:'history', difficulty:'easy', question:'Which war did the American colonies fight against Great Britain from 1775 to 1783?', correct_answer:'The American Revolutionary War', wrong_answers:['The War of 1812','The French and Indian War','The Civil War'] },
+  { category:'history', difficulty:'easy', question:'Which founding document begins with the words "We the People"?', correct_answer:'The U.S. Constitution', wrong_answers:['The Declaration of Independence','The Articles of Confederation','The Mayflower Compact'] },
+  { category:'history', difficulty:'easy', question:'In what year did Christopher Columbus first reach the Americas?', correct_answer:'1492', wrong_answers:['1488','1500','1519'] },
+  { category:'history', difficulty:'easy', question:'Germany\'s invasion of which country on September 1, 1939 started World War II in Europe?', correct_answer:'Poland', wrong_answers:['France','Czechoslovakia','Belgium'] },
+  { category:'history', difficulty:'easy', question:'What attack on December 7, 1941 brought the United States into World War II?', correct_answer:'The attack on Pearl Harbor', wrong_answers:['The invasion of Poland','The sinking of the Lusitania','The bombing of London'] },
+  { category:'history', difficulty:'easy', question:'Who was the first person to travel into space, in 1961?', correct_answer:'Yuri Gagarin', wrong_answers:['Alan Shepard','John Glenn','Neil Armstrong'] },
+  { category:'history', difficulty:'easy', question:'In which country were the ancient Olympic Games held?', correct_answer:'Greece', wrong_answers:['Italy','Egypt','Turkey'] },
+  { category:'history', difficulty:'easy', question:'Which English queen never married and was called the "Virgin Queen"?', correct_answer:'Elizabeth I', wrong_answers:['Mary I','Victoria','Anne'] },
+  { category:'history', difficulty:'easy', question:'What was the great revival of art and learning that began in 14th-century Italy called?', correct_answer:'The Renaissance', wrong_answers:['The Reformation','The Enlightenment','The Industrial Revolution'] },
+  { category:'history', difficulty:'easy', question:'Who was the first U.S. president to resign from office?', correct_answer:'Richard Nixon', wrong_answers:['Andrew Johnson','Lyndon B. Johnson','Bill Clinton'] },
+  { category:'history', difficulty:'easy', question:'Which inventor developed a practical light bulb and the phonograph?', correct_answer:'Thomas Edison', wrong_answers:['Nikola Tesla','Benjamin Franklin','George Westinghouse'] },
+  { category:'history', difficulty:'easy', question:'Whose expedition was the first to sail all the way around the world?', correct_answer:'Ferdinand Magellan\'s', wrong_answers:['Vasco da Gama\'s','Francis Drake\'s','James Cook\'s'] },
+
+  // Medium
+  { category:'history', difficulty:'medium', question:'Which state became the 50th U.S. state in 1959?', correct_answer:'Hawaii', wrong_answers:['Alaska','Arizona','New Mexico'] },
+  { category:'history', difficulty:'medium', question:'Who led the first expedition to reach the South Pole, in 1911?', correct_answer:'Roald Amundsen', wrong_answers:['Robert Falcon Scott','Ernest Shackleton','Richard Byrd'] },
+  { category:'history', difficulty:'medium', question:'Who was the first U.S. president to live in the White House?', correct_answer:'John Adams', wrong_answers:['George Washington','Thomas Jefferson','James Madison'] },
+  { category:'history', difficulty:'medium', question:'Who posted the Ninety-five Theses in 1517?', correct_answer:'Martin Luther', wrong_answers:['John Calvin','Huldrych Zwingli','John Wycliffe'] },
+  { category:'history', difficulty:'medium', question:'Before World War I, Germany, Austria-Hungary and Italy formed which alliance?', correct_answer:'The Triple Alliance', wrong_answers:['The Triple Entente','The Axis','The Holy Alliance'] },
+  { category:'history', difficulty:'medium', question:'Who was called the "Maid of Orléans"?', correct_answer:'Joan of Arc', wrong_answers:['Eleanor of Aquitaine','Catherine de\' Medici','Anne of Brittany'] },
+  { category:'history', difficulty:'medium', question:'The Hundred Years\' War was fought mainly between which two kingdoms?', correct_answer:'England and France', wrong_answers:['England and Spain','France and Spain','England and Scotland'] },
+  { category:'history', difficulty:'medium', question:'Who became the first chancellor of the unified German Empire in 1871?', correct_answer:'Otto von Bismarck', wrong_answers:['Wilhelm I','Leo von Caprivi','Friedrich Ebert'] },
+  { category:'history', difficulty:'medium', question:'What was the code name for the Allied invasion of Normandy in 1944?', correct_answer:'Operation Overlord', wrong_answers:['Operation Market Garden','Operation Torch','Operation Barbarossa'] },
+  { category:'history', difficulty:'medium', question:'Who founded the Mongol Empire?', correct_answer:'Genghis Khan', wrong_answers:['Kublai Khan','Tamerlane','Ögedei Khan'] },
+  { category:'history', difficulty:'medium', question:'Which ancient Greek writer is called the "Father of History"?', correct_answer:'Herodotus', wrong_answers:['Thucydides','Xenophon','Plutarch'] },
+  { category:'history', difficulty:'medium', question:'Who was president of the Confederate States of America?', correct_answer:'Jefferson Davis', wrong_answers:['Alexander Stephens','Robert E. Lee','John C. Calhoun'] },
+  { category:'history', difficulty:'medium', question:'In which century did the Black Death sweep through Europe?', correct_answer:'The 14th century', wrong_answers:['The 12th century','The 16th century','The 10th century'] },
+  { category:'history', difficulty:'medium', question:'What was the American program to rebuild Western Europe after World War II called?', correct_answer:'The Marshall Plan', wrong_answers:['The New Deal','The Truman Doctrine','Lend-Lease'] },
+  { category:'history', difficulty:'medium', question:'Which 1867 purchase from Russia was mocked as "Seward\'s Folly"?', correct_answer:'Alaska', wrong_answers:['Hawaii','The Oregon Country','The Yukon'] },
+  { category:'history', difficulty:'medium', question:'Which queen was executed in 1587 on the orders of Elizabeth I?', correct_answer:'Mary, Queen of Scots', wrong_answers:['Lady Jane Grey','Anne Boleyn','Catherine Howard'] },
+  { category:'history', difficulty:'medium', question:'Which Chinese dynasty ruled when Marco Polo visited Kublai Khan?', correct_answer:'The Yuan dynasty', wrong_answers:['The Ming dynasty','The Song dynasty','The Tang dynasty'] },
+  { category:'history', difficulty:'medium', question:'Who led the Soviet Union during World War II?', correct_answer:'Joseph Stalin', wrong_answers:['Vladimir Lenin','Nikita Khrushchev','Leon Trotsky'] },
+  { category:'history', difficulty:'medium', question:'Which U.S. president launched the New Deal?', correct_answer:'Franklin D. Roosevelt', wrong_answers:['Herbert Hoover','Harry S. Truman','Woodrow Wilson'] },
+  { category:'history', difficulty:'medium', question:'In what year did the Wall Street Crash begin the Great Depression?', correct_answer:'1929', wrong_answers:['1919','1933','1939'] },
+  { category:'history', difficulty:'medium', question:'The "Charge of the Light Brigade" took place at which 1854 battle?', correct_answer:'The Battle of Balaclava', wrong_answers:['The Battle of Inkerman','The Battle of the Alma','The Siege of Sevastopol'] },
+  { category:'history', difficulty:'medium', question:'Who was the first European to reach India by sea, in 1498?', correct_answer:'Vasco da Gama', wrong_answers:['Bartolomeu Dias','Ferdinand Magellan','Pedro Álvares Cabral'] },
+  { category:'history', difficulty:'medium', question:'The Council of Trent was a key part of which movement?', correct_answer:'The Counter-Reformation', wrong_answers:['The Protestant Reformation','The Great Schism','The Enlightenment'] },
+  { category:'history', difficulty:'medium', question:'Suleiman the Magnificent ruled which empire?', correct_answer:'The Ottoman Empire', wrong_answers:['The Safavid Empire','The Mughal Empire','The Byzantine Empire'] },
+  { category:'history', difficulty:'medium', question:'Which English colony of the 1580s became known as the "Lost Colony"?', correct_answer:'Roanoke', wrong_answers:['Jamestown','Plymouth','St. Augustine'] },
+  { category:'history', difficulty:'medium', question:'Which treaty ended World War I between the Allies and Germany?', correct_answer:'The Treaty of Versailles', wrong_answers:['The Treaty of Paris','The Treaty of Ghent','The Treaty of Brest-Litovsk'] },
+  { category:'history', difficulty:'medium', question:'Who was the Aztec emperor when Hernán Cortés arrived?', correct_answer:'Moctezuma II', wrong_answers:['Cuauhtémoc','Atahualpa','Itzcóatl'] },
+  { category:'history', difficulty:'medium', question:'Which of the Seven Wonders of the Ancient World stood at Olympia?', correct_answer:'The Statue of Zeus', wrong_answers:['The Colossus of Rhodes','The Temple of Artemis','The Mausoleum'] },
+  { category:'history', difficulty:'medium', question:'In what year did the United States enter World War I?', correct_answer:'1917', wrong_answers:['1914','1915','1918'] },
+  { category:'history', difficulty:'medium', question:'Which Russian ruler founded St. Petersburg in 1703?', correct_answer:'Peter the Great', wrong_answers:['Catherine the Great','Ivan the Terrible','Alexander I'] },
+  { category:'history', difficulty:'medium', question:'The sinking of which ocean liner in 1915 turned American opinion against Germany?', correct_answer:'The Lusitania', wrong_answers:['The Titanic','The Britannic','The Maine'] },
+  { category:'history', difficulty:'medium', question:'Who was the first U.S. president to be impeached?', correct_answer:'Andrew Johnson', wrong_answers:['Richard Nixon','Andrew Jackson','Bill Clinton'] },
+  { category:'history', difficulty:'medium', question:'What was the capital of the Byzantine Empire?', correct_answer:'Constantinople', wrong_answers:['Rome','Antioch','Alexandria'] },
+  { category:'history', difficulty:'medium', question:'The Treaty of Ghent (1814) ended which war?', correct_answer:'The War of 1812', wrong_answers:['The Revolutionary War','The Mexican–American War','The French and Indian War'] },
+  { category:'history', difficulty:'medium', question:'The Battle of the Bulge (1944–45) was fought mainly in which forested region?', correct_answer:'The Ardennes', wrong_answers:['Normandy','The Black Forest','Alsace'] },
+
+  // Hard
+  { category:'history', difficulty:'hard', question:'Who is the only person to have served as both U.S. president and Chief Justice?', correct_answer:'William Howard Taft', wrong_answers:['Charles Evans Hughes','John Marshall','Earl Warren'] },
+  { category:'history', difficulty:'hard', question:'Which Frankish king converted to Catholic Christianity and was baptized at Reims?', correct_answer:'Clovis I', wrong_answers:['Pepin the Short','Childeric I','Dagobert I'] },
+  { category:'history', difficulty:'hard', question:'Who was the last Byzantine emperor, killed when Constantinople fell in 1453?', correct_answer:'Constantine XI Palaiologos', wrong_answers:['John VIII Palaiologos','Manuel II Palaiologos','Alexios V Doukas'] },
+  { category:'history', difficulty:'hard', question:'The Battle of Manzikert (1071) was a crushing defeat for which empire?', correct_answer:'The Byzantine Empire', wrong_answers:['The Holy Roman Empire','The Abbasid Caliphate','The Kingdom of Jerusalem'] },
+  { category:'history', difficulty:'hard', question:'Which English king was nicknamed "Lackland"?', correct_answer:'John', wrong_answers:['Henry III','Richard I','Stephen'] },
+  { category:'history', difficulty:'hard', question:'Which mother of Emperor Constantine was credited with finding the True Cross?', correct_answer:'Helena', wrong_answers:['Theodora','Fausta','Livia'] },
+  { category:'history', difficulty:'hard', question:'Which pope convened the Council of Trent in 1545?', correct_answer:'Paul III', wrong_answers:['Pius IV','Julius III','Leo X'] },
+  { category:'history', difficulty:'hard', question:'Which emperor presided over the Diet of Worms in 1521, where Luther refused to recant?', correct_answer:'Charles V', wrong_answers:['Maximilian I','Ferdinand I','Frederick III'] },
+  { category:'history', difficulty:'hard', question:'Who commanded the Union army at the Battle of Gettysburg?', correct_answer:'George G. Meade', wrong_answers:['Joseph Hooker','Ulysses S. Grant','George B. McClellan'] },
+  { category:'history', difficulty:'hard', question:'Which 1848 treaty ended the Mexican–American War?', correct_answer:'The Treaty of Guadalupe Hidalgo', wrong_answers:['The Treaties of Velasco','The Adams–Onís Treaty','The Gadsden Purchase'] },
+  { category:'history', difficulty:'hard', question:'At Canossa in 1077, Emperor Henry IV sought forgiveness from which pope?', correct_answer:'Gregory VII', wrong_answers:['Urban II','Innocent III','Leo IX'] },
+  { category:'history', difficulty:'hard', question:'Which Portuguese prince sponsored the early voyages down the African coast?', correct_answer:'Henry the Navigator', wrong_answers:['John II','Manuel I','Afonso V'] },
+  { category:'history', difficulty:'hard', question:'Who founded the Mughal Empire in India?', correct_answer:'Babur', wrong_answers:['Akbar','Humayun','Aurangzeb'] },
+  { category:'history', difficulty:'hard', question:'At which battle in 1066, weeks before Hastings, did Harold Godwinson defeat Harald Hardrada?', correct_answer:'Stamford Bridge', wrong_answers:['Fulford','Maldon','Brunanburh'] },
+  { category:'history', difficulty:'hard', question:'Wat Tyler led which English uprising in 1381?', correct_answer:'The Peasants\' Revolt', wrong_answers:['Jack Cade\'s Rebellion','The Pilgrimage of Grace','Kett\'s Rebellion'] },
+  { category:'history', difficulty:'hard', question:'Which U.S. president died just 31 days after taking office?', correct_answer:'William Henry Harrison', wrong_answers:['Zachary Taylor','James A. Garfield','Warren G. Harding'] },
+  { category:'history', difficulty:'hard', question:'Which king of Macedon was the father of Alexander the Great?', correct_answer:'Philip II', wrong_answers:['Amyntas III','Perdiccas III','Antipater'] },
+  { category:'history', difficulty:'hard', question:'At which battle in 331 BC did Alexander decisively defeat Darius III?', correct_answer:'Gaugamela', wrong_answers:['Issus','Granicus','Hydaspes'] },
+  { category:'history', difficulty:'hard', question:'Which statesman led Athens at the outbreak of the Peloponnesian War?', correct_answer:'Pericles', wrong_answers:['Themistocles','Alcibiades','Cleon'] },
+  { category:'history', difficulty:'hard', question:'Whose donation of land to the pope in 756 founded the Papal States?', correct_answer:'Pepin the Short', wrong_answers:['Charlemagne','Charles Martel','Louis the Pious'] },
+  { category:'history', difficulty:'hard', question:'Who was Roman emperor when the Temple in Jerusalem was destroyed in AD 70?', correct_answer:'Vespasian', wrong_answers:['Titus','Nero','Domitian'] },
+  { category:'history', difficulty:'hard', question:'Which conquistador led the Spanish conquest of the Inca Empire?', correct_answer:'Francisco Pizarro', wrong_answers:['Diego de Almagro','Hernán Cortés','Hernando de Soto'] },
+  { category:'history', difficulty:'hard', question:'The Glorious Revolution of 1688 brought which monarchs to the English throne?', correct_answer:'William III and Mary II', wrong_answers:['James II and Mary of Modena','Charles II and Catherine of Braganza','George I and Sophia Dorothea'] },
+  { category:'history', difficulty:'hard', question:'Which battle in 1453 effectively ended the Hundred Years\' War?', correct_answer:'The Battle of Castillon', wrong_answers:['The Battle of Agincourt','The Battle of Crécy','The Battle of Poitiers'] },
+  { category:'history', difficulty:'hard', question:'Which Roman general defeated Hannibal at Zama in 202 BC?', correct_answer:'Scipio Africanus', wrong_answers:['Fabius Maximus','Scipio Aemilianus','Claudius Marcellus'] },
+  { category:'history', difficulty:'hard', question:'In what year was the Missouri Compromise passed?', correct_answer:'1820', wrong_answers:['1850','1854','1803'] },
+  { category:'history', difficulty:'hard', question:'Which 1857 Supreme Court decision held that African Americans could not be U.S. citizens?', correct_answer:'Dred Scott v. Sandford', wrong_answers:['Plessy v. Ferguson','McCulloch v. Maryland','Worcester v. Georgia'] },
+  { category:'history', difficulty:'hard', question:'Whose succession to the Habsburg lands set off the War of the Austrian Succession in 1740?', correct_answer:'Maria Theresa', wrong_answers:['Maria Anna','Elisabeth Christine','Marie Antoinette'] },
+  { category:'history', difficulty:'hard', question:'Which Russian tsar emancipated the serfs in 1861?', correct_answer:'Alexander II', wrong_answers:['Nicholas I','Alexander III','Alexander I'] },
+  { category:'history', difficulty:'hard', question:'Which Anglo-Saxon king defeated the Danes at the Battle of Edington in 878?', correct_answer:'Alfred the Great', wrong_answers:['Æthelred the Unready','Edward the Elder','Athelstan'] },
+  { category:'history', difficulty:'hard', question:'Which church father wrote "The City of God" after the sack of Rome in 410?', correct_answer:'Augustine of Hippo', wrong_answers:['Jerome','Ambrose of Milan','John Chrysostom'] },
+  { category:'history', difficulty:'hard', question:'Who translated the Bible into the Latin version known as the Vulgate?', correct_answer:'Jerome', wrong_answers:['Origen','Eusebius','Tertullian'] },
+  { category:'history', difficulty:'hard', question:'Which English Bible translator was executed for heresy in 1536?', correct_answer:'William Tyndale', wrong_answers:['John Wycliffe','Miles Coverdale','Thomas Cranmer'] },
+  { category:'history', difficulty:'hard', question:'Which pope called the Fourth Lateran Council in 1215?', correct_answer:'Innocent III', wrong_answers:['Gregory VII','Boniface VIII','Alexander III'] },
+  { category:'history', difficulty:'hard', question:'Which sitting U.S. vice president killed Alexander Hamilton in an 1804 duel?', correct_answer:'Aaron Burr', wrong_answers:['George Clinton','Elbridge Gerry','John C. Calhoun'] },
+];
+
 const GEOGRAPHY_QUESTIONS = [
   // Easy
   { category:'geography', difficulty:'easy', question:'What is the capital of Australia?', correct_answer:'Canberra', wrong_answers:['Sydney','Melbourne','Brisbane'] },
@@ -249,10 +357,11 @@ const GEOGRAPHY_QUESTIONS = [
   { category:'geography', difficulty:'hard', question:'Mount Ararat, where tradition says Noah\'s Ark came to rest, is in which country?', correct_answer:'Turkey', wrong_answers:['Armenia','Iran','Georgia'] },
 ];
 
-const ALL_QUESTIONS = [...BIBLE_QUESTIONS, ...HISTORY_QUESTIONS, ...GEOGRAPHY_QUESTIONS];
+const ALL_QUESTIONS = [...BIBLE_QUESTIONS, ...HISTORY_QUESTIONS, ...HISTORY_MORE, ...GEOGRAPHY_QUESTIONS];
 
 // Questions removed because they were wrong, ambiguous, reworded, or near-duplicates.
 const RETIRED = [
+  'Who was known as the "Iron Lady"?',                                  // same answer as the first female PM question
   'What were the two cities destroyed along with Sodom?',            // asked for two, answered one
   'What is the longest book in the Bible?',                           // by words it's Jeremiah → reworded
   'How many epistles did Paul write in the New Testament?',           // 13 or 14 (Hebrews) → reworded
