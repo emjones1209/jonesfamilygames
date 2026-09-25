@@ -38,7 +38,7 @@ function JokerCard({ size="md", faceDown=false, selected=false, onClick, disable
   );
 }
 
-function PlayerGrid({grid, onCardClick, interactive, highlight}) {
+function PlayerGrid({grid, onCardClick, interactive, highlight, lit}) {
   if (!grid||!grid[0]) return null;
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -48,13 +48,16 @@ function PlayerGrid({grid, onCardClick, interactive, highlight}) {
             const card=grid[row]?.[col];
             if (!card) return <div key={row} className={`${CARD_BOX.md} rounded-2xl bg-white/5`}/>;
             const clickFn=interactive?()=>onCardClick(row,col):undefined;
+            const isLit=lit&&lit.row===row&&lit.col===col;
             if (card.suit==="joker") return (
-              <JokerCard key={row} size="md" faceDown={!card.faceUp}
-                selected={highlight&&card.faceUp}
-                onClick={clickFn} disabled={!interactive} />
+              <div key={row} className={`rounded-xl ${isLit?"ring-4 ring-game-gold":""}`}>
+                <JokerCard size="md" faceDown={!card.faceUp}
+                  selected={highlight&&card.faceUp}
+                  onClick={clickFn} disabled={!interactive} />
+              </div>
             );
             return (
-              <div key={row} onClick={clickFn} className={interactive?"cursor-pointer":""}>
+              <div key={row} onClick={clickFn} className={`rounded-2xl ${interactive?"cursor-pointer":""} ${isLit?"ring-4 ring-game-gold":""}`}>
                 <PlayingCard card={card} size="md" faceDown={!card.faceUp}
                   className={highlight&&card.faceUp?"ring-2 ring-yellow-400 rounded-2xl":""}/>
               </div>
@@ -83,6 +86,8 @@ export default function Golf6Game() {
   const [msg,setMsg]=useState("");
   const [aiMove,setAiMove]=useState(null);   // { pi, card } while a computer shows what it drew
   const [flash,setFlash]=useState(null);     // { pi, row, col } spot a computer just changed
+  const [lastPlays,setLastPlays]=useState({});   // player -> { row, col } of the last card they placed (shown at game end)
+  const [showResults,setShowResults]=useState(false);
   const [showTutorial,setShowTutorial]=useState(false);
 
   const startGame=diff=>{
@@ -92,7 +97,7 @@ export default function Golf6Game() {
     setTotalScores(Array(NUM_PLAYERS).fill(0));
     setCurrentPlayer(0); setDrawn(null); setPeeksLeft(2);
     setFinalRound(false); setFinalTurnsLeft(0); setWinner(null);
-    setAiMove(null); setFlash(null);
+    setAiMove(null); setFlash(null); setLastPlays({}); setShowResults(false);
     setMsg("Peek at 2 of your face-down cards to start!"); setPhase("peek");
   };
 
@@ -120,6 +125,7 @@ export default function Golf6Game() {
     const minS=Math.min(...nt);
     setWinner(nt[0]===minS?0:nt.findIndex(s=>s===minS));
     setPhase("gameOver");
+    setMsg(`Final hands: You ${rs[0]} · ${PLAYER_NAMES[1]} ${rs[1]}`);
     api.post("/scores",{game:"golf6",score:-nt[0],difficulty}).catch(()=>{});   // negated: low golf scores rank high
   },[difficulty]);
 
@@ -157,7 +163,7 @@ export default function Golf6Game() {
 
   const discardDrawn=()=>{
     if (!drawn||currentPlayer!==0) return;
-    setDiscard(d=>[drawn,...d]); setDrawn(null);
+    setDiscard(d=>[drawn,...d]); setDrawn(null); setLastPlays(p=>({ ...p, 0:null }));
     checkAndAdvance(grids,0);
   };
 
@@ -165,15 +171,22 @@ export default function Golf6Game() {
     if (!drawn||currentPlayer!==0) return;
     const old=grids[0][row][col];
     const ng=grids.map((g,pi)=>pi!==0?g:g.map((r,ri)=>r.map((c,ci)=>ri===row&&ci===col?{...drawn,faceUp:true}:c)));
-    setDiscard(d=>[{...old,faceUp:true},...d]); setDrawn(null); setGrids(ng);
+    setDiscard(d=>[{...old,faceUp:true},...d]); setDrawn(null); setGrids(ng); setLastPlays(p=>({ ...p, 0:{ row, col } }));
     checkAndAdvance(ng,0);
   };
 
   const flipCard=(row,col)=>{
     if (drawn||currentPlayer!==0||grids[0][row][col].faceUp) return;
     const ng=grids.map((g,pi)=>pi!==0?g:g.map((r,ri)=>r.map((c,ci)=>ri===row&&ci===col?{...c,faceUp:true}:c)));
-    setGrids(ng); checkAndAdvance(ng,0);
+    setGrids(ng); setLastPlays(p=>({ ...p, 0:{ row, col } })); checkAndAdvance(ng,0);
   };
+
+  // Leave the finished table on screen for a moment before the results
+  useEffect(()=>{
+    if (phase!=="gameOver") return;
+    const timer=setTimeout(()=>setShowResults(true), 2000);
+    return ()=>clearTimeout(timer);
+  },[phase]);
 
   // Latest state for the computer's turn, which runs over several timed steps
   const latest = useRef({});
@@ -217,6 +230,7 @@ export default function Golf6Game() {
         setAiMove(null);
         setGrids(ng); setDiscard([finalDiscard,...nd]);
         setFlash(bestRow>=0?{ pi, row:bestRow, col:bestCol }:null);
+        setLastPlays(p=>({ ...p, [pi]:bestRow>=0?{ row:bestRow, col:bestCol }:null }));
         setMsg(placedMsg);
         // Step 3: pass to the next player
         later(()=>{ setFlash(null); latest.current.checkAndAdvance(ng,pi); }, AI_AFTER_MS);
@@ -247,27 +261,6 @@ export default function Golf6Game() {
         </button>
       </div>
       <TutorialModal isOpen={showTutorial} onClose={()=>setShowTutorial(false)} title="6-Card Golf" slides={TUTORIALS.golf6}/>
-    </div>
-  );
-
-  if (phase==="gameOver") return (
-    <div className="min-h-screen bg-gradient-to-br from-game-bg to-lime-900 p-5 flex flex-col items-center justify-center">
-      <motion.div className="card-panel text-center max-w-sm w-full" initial={{scale:0.8}} animate={{scale:1}}>
-        <div className="text-5xl mb-3">{winner===0?"🏆":"⛳"}</div>
-        <h2 className="text-2xl font-bold text-game-gold mb-4">{winner===0?"You Win!":PLAYER_NAMES[winner]+" Wins!"}</h2>
-        <div className="space-y-1 mb-6">
-          {PLAYER_NAMES.map((p,i)=>(
-            <div key={i} className="flex justify-between text-white/80 text-sm">
-              <span>{p}</span>
-              <span className={i===winner?"text-game-gold font-bold":""}>{totalScores[i]} pts</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-3">
-          <Button variant="secondary" className="flex-1" onClick={()=>navigate("/")}>Home</Button>
-          <Button variant="primary" className="flex-1" onClick={()=>startGame(difficulty)}>Again</Button>
-        </div>
-      </motion.div>
     </div>
   );
 
@@ -303,7 +296,8 @@ export default function Golf6Game() {
             <div className="grid grid-cols-3 gap-1 justify-items-center w-fit mx-auto">
               {[0,1].flatMap(row=>[0,1,2].map(col=>{
                 const c=grids[pi]?.[row]?.[col];
-                const lit=flash&&flash.pi===pi&&flash.row===row&&flash.col===col;
+                const spot=flash?.pi===pi?flash:phase==="gameOver"?lastPlays[pi]:null;
+                const lit=spot&&spot.row===row&&spot.col===col;
                 const face=!c?null:!c.faceUp
                   ?<div className={`${CARD_BOX.sm} bg-blue-900 border border-blue-700 rounded-xl`}/>
                   :c.suit==="joker"?<JokerCard size="sm"/>:<PlayingCard card={c} size="sm"/>;
@@ -360,13 +354,14 @@ export default function Golf6Game() {
       <div className="flex justify-center">
         <div>
           <p className="text-white/40 text-xs text-center mb-1">
-            Your Grid{currentPlayer===0?" - Your turn":""}
+            Your Grid{phase==="gameOver"?` - ${gridScore(grids[0])} pts`:currentPlayer===0?" - Your turn":""}
           </p>
           <PlayerGrid
             grid={grids[0]}
             onCardClick={drawn?(row,col)=>swapWithGrid(row,col):flipCard}
-            interactive={currentPlayer===0}
+            interactive={currentPlayer===0&&phase==="playing"}
             highlight={!!drawn}
+            lit={phase==="gameOver"?lastPlays[0]:null}
           />
         </div>
       </div>
@@ -374,6 +369,35 @@ export default function Golf6Game() {
       <p className="text-center text-white/40 text-xs mt-2 min-h-[1rem]">
         {currentPlayer===0&&phase==="playing"&&(drawn?"Tap a card in your grid to swap, or discard it":"Draw a card, or tap a face-down card to flip it")}
       </p>
+      {phase==="gameOver"&&!showResults&&(
+        <div className="flex justify-center gap-3 mt-2">
+          <Button variant="gold" onClick={()=>setShowResults(true)}>See results</Button>
+          <Button variant="primary" onClick={()=>startGame(difficulty)}>Play again</Button>
+        </div>
+      )}
+      {phase==="gameOver"&&showResults&&(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-5">
+          <motion.div className="card-panel text-center max-w-sm w-full" initial={{scale:0.8}} animate={{scale:1}}>
+            <div className="text-5xl mb-3">{winner===0?"🏆":"⛳"}</div>
+            <h2 className="text-2xl font-bold text-game-gold mb-4">{winner===0?"You Win!":PLAYER_NAMES[winner]+" Wins!"}</h2>
+            <div className="space-y-1 mb-6">
+              {PLAYER_NAMES.map((p,i)=>(
+                <div key={i} className="flex justify-between text-white/80 text-sm">
+                  <span>{p}</span>
+                  <span className={i===winner?"text-game-gold font-bold":""}>{totalScores[i]} pts</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 mb-3">
+              <Button variant="secondary" className="flex-1" onClick={()=>navigate("/")}>Home</Button>
+              <Button variant="primary" className="flex-1" onClick={()=>startGame(difficulty)}>Again</Button>
+            </div>
+            <button onClick={()=>setShowResults(false)} className="text-white/60 hover:text-white text-sm underline min-h-[44px]">
+              Look at the final cards
+            </button>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
