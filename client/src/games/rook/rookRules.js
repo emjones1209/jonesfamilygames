@@ -7,8 +7,8 @@
  * Counters: 5s = 5, 10s & 14s = 10, Rook = 20 (120 in the deck); the nest's
  * points go to whoever takes the last trick.
  */
-import { followSuit, winningIndex } from '../cards/tricks';
-import { choosePartnershipCard } from '../cards/ai';
+import { followSuit, winningIndex } from '../cards/tricks.js';
+import { choosePartnershipCard } from '../cards/ai.js';
 
 export const COLOURS = ['black', 'green', 'red', 'yellow'];
 export const COLOUR_STYLE = {

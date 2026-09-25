@@ -3,7 +3,7 @@
  * the table could know — which cards have gone, which are still out (in
  * someone else's hand), and who has shown out of a suit.
  */
-import { standardSuit, standardRank } from './tricks';
+import { standardSuit, standardRank } from './tricks.js';
 
 /**
  * @param history  completed tricks, each [{ card, seat }] in play order

@@ -8,7 +8,7 @@
  * utils/cardEngine); Rook cards differ, so the helpers take `suitOf` / `rankOf`
  * functions where the card shape matters.
  */
-import { RANK_VALUES } from '../../utils/cardEngine';
+import { RANK_VALUES } from '../../utils/cardEngine.js';
 
 export const SEATS = 4;
 

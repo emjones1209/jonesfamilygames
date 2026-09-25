@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { LAST_TABLE_KEY } from './PlayTogetherPage';
 
 const GAMES = [
   { id: 'bible-trivia',    name: 'Bible Trivia',    emoji: '✝️',  color: 'from-purple-700 to-purple-900',   path: '/games/trivia/bible',    desc: 'Test your scripture knowledge' },
@@ -22,6 +23,8 @@ const GAMES = [
 export default function LandingPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  let lastTable = null;
+  try { lastTable = localStorage.getItem(LAST_TABLE_KEY); } catch { /* private mode */ }
 
   const container = {
     hidden: {},
@@ -80,6 +83,25 @@ export default function LandingPage() {
             Good to see you, <span className="text-game-gold">{user?.displayName}!</span>
           </h1>
           <p className="text-white/50">Pick a game and let's play 🎉</p>
+        </div>
+
+        {/* Play together: everyone on their own iPad at the same time */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <button onClick={() => navigate('/together')}
+            className="flex-1 bg-gradient-to-br from-indigo-600 to-indigo-900 rounded-3xl p-4 text-left shadow-lg active:scale-95 transition-transform flex items-center gap-4">
+            <span className="text-4xl">👥</span>
+            <span>
+              <span className="block text-white font-bold">Play Together</span>
+              <span className="block text-white/60 text-xs">Rook with the family, each on your own iPad</span>
+            </span>
+          </button>
+          {lastTable && (
+            <button onClick={() => navigate(`/together/${lastTable}`)}
+              className="sm:w-56 bg-game-gold/20 border border-game-gold rounded-3xl p-4 text-left active:scale-95 transition-transform">
+              <span className="block text-game-gold font-bold">Rejoin your table</span>
+              <span className="block text-white/60 text-xs">Code {lastTable}</span>
+            </button>
+          )}
         </div>
 
         <motion.div

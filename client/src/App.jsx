@@ -1,7 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-// Multiplayer is unfinished and hidden: SocketProvider (context/SocketContext) and
-// MultiplayerLobby are kept for later but not mounted, so no socket is opened.
 import { FullPageLoader } from "./components/LoadingSpinner";
 
 // Pages
@@ -10,6 +8,8 @@ import LandingPage from "./pages/LandingPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
 import WelcomePage from "./pages/WelcomePage";
+import PlayTogetherPage from "./pages/PlayTogetherPage";
+import TablePage from "./pages/TablePage";
 
 // Games
 import TriviaGame from "./games/trivia/TriviaGame";
@@ -48,6 +48,8 @@ function AppRoutes() {
       <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
       <Route path="/welcome" element={<ProtectedRoute><WelcomePage /></ProtectedRoute>} />
+      <Route path="/together" element={<ProtectedRoute><PlayTogetherPage /></ProtectedRoute>} />
+      <Route path="/together/:code" element={<ProtectedRoute><TablePage /></ProtectedRoute>} />
 
       {/* Trivia routes */}
       <Route path="/games/trivia/:category" element={<ProtectedRoute><TriviaGame /></ProtectedRoute>} />

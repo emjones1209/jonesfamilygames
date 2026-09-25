@@ -11,7 +11,7 @@
  * actions (wrong seat, card not in hand, playing while collecting) return the
  * state unchanged, so a stray double-tap can't play a card twice.
  */
-import { SEATS, nextSeat, removeCard } from './tricks';
+import { SEATS, nextSeat, removeCard } from './tricks.js';
 
 export function dealTable(hands, leader) {
   return {

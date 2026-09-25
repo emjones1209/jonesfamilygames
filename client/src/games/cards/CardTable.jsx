@@ -33,6 +33,7 @@ function Seat({ name, active, children, detail }) {
 
 export function CardTable({
   title, scoreLine, names, table, seatDetail = () => null,
+  onBack,                 // defaults to going home
   rules,                  // { game, title } for the Rules button
   sides = {},             // optional replacement content for seats 1-3 (e.g. Bridge dummy)
   message, renderTrickCard, bgClass = 'from-game-bg to-green-950', children,
@@ -45,7 +46,7 @@ export function CardTable({
     <div className={`min-h-screen bg-gradient-to-br ${bgClass} p-3 flex flex-col select-none`}>
       <header className="flex items-center justify-between mb-2 gap-2">
         <div className="flex items-center gap-1">
-          <button onClick={() => navigate('/')} className="p-2 text-white/50 hover:text-white min-h-[44px] min-w-[44px]"
+          <button onClick={onBack ?? (() => navigate('/'))} className="p-2 text-white/50 hover:text-white min-h-[44px] min-w-[44px]"
             aria-label="Back to games">
             <ArrowLeft size={20} />
           </button>

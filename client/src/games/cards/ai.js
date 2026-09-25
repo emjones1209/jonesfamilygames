@@ -14,7 +14,7 @@
  */
 import {
   partnerOf, teamOf, winningIndex, wouldWin, highest, standardSuit, standardRank,
-} from './tricks';
+} from './tricks.js';
 
 /**
  * @param legal       cards this seat may play

@@ -133,12 +133,20 @@ games_suite/
 │   ├── db/          # PostgreSQL pool, migrations, seeds
 │   ├── middleware/  # JWT auth middleware
 │   ├── routes/      # API routes
-│   └── socket/      # WebSocket handlers
+│   └── multiplayer/ # Play-together tables (Socket.io)
 └── railway.toml     # Railway deployment config
 ```
 
-## Multiplayer (unfinished)
-The server has room and Socket.io code, and the client has a `MultiplayerLobby`
-component, but no game uses them yet, so multiplayer is hidden. The socket
-layer only relays messages between players; a working version needs the server
-to hold each game's state and to check that players belong to the room.
+## Play Together (multiplayer)
+Family members play at one table from their own devices at the same time.
+One person opens a table from **Play Together** and shares its 4-letter code;
+empty seats can be filled with robots. Rook is the first game supported.
+
+- `server/multiplayer/tables.js` holds the tables in memory (they're for one
+  sitting; a restart ends games in progress), checks every move with the same
+  rules code the browser uses (`client/src/games/rook/rookEngine.js`), runs
+  the robots, and sends each player only their own view of the game.
+- A player whose device disconnects keeps their seat; after 30 seconds a robot
+  plays for them until they come back.
+- Quick reactions (👍 😂 "Nice!" …) are broadcast to the table.
+- Tests: `cd server && npm test` plays whole games with simulated players.

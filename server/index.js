@@ -10,8 +10,8 @@ const userRoutes = require('./routes/users');
 const scoreRoutes = require('./routes/scores');
 const triviaRoutes = require('./routes/trivia');
 const dadJokeRoutes = require('./routes/dadJokes');
-const roomRoutes = require('./routes/rooms');
-const { initSocketHandlers } = require('./socket/handlers');
+const { socketAuth } = require('./middleware/auth');
+const { createTables } = require('./multiplayer/tables');
 const { setup } = require('./db/setup');
 
 const app = express();
@@ -40,7 +40,6 @@ app.use('/api/users',     userRoutes);
 app.use('/api/scores',    scoreRoutes);
 app.use('/api/trivia',    triviaRoutes);
 app.use('/api/dad-jokes', dadJokeRoutes);
-app.use('/api/rooms',     roomRoutes);
 
 // Serve static client in production
 if (process.env.NODE_ENV === 'production') {
@@ -51,8 +50,9 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// Socket.io
-initSocketHandlers(io);
+// Play-together tables (Socket.io): players sign in with their login token
+io.use(socketAuth);
+createTables(io);
 
 const PORT = process.env.PORT || 3001;
 

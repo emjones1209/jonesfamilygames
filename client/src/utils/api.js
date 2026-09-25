@@ -16,7 +16,7 @@ api.interceptors.request.use((config) => {
 // refreshed with the same token in parallel the second would fail and log the
 // user out. Concurrent 401s all wait on the same in-flight refresh instead.
 let refreshing = null;
-function refreshTokens() {
+export function refreshTokens() {
   if (!refreshing) {
     const refreshToken = localStorage.getItem('refreshToken');
     refreshing = (refreshToken
