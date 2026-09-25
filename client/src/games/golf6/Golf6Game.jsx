@@ -184,7 +184,7 @@ export default function Golf6Game() {
   // Leave the finished table on screen for a moment before the results
   useEffect(()=>{
     if (phase!=="gameOver") return;
-    const timer=setTimeout(()=>setShowResults(true), 2000);
+    const timer=setTimeout(()=>setShowResults(true), 3500);
     return ()=>clearTimeout(timer);
   },[phase]);
 
@@ -283,7 +283,12 @@ export default function Golf6Game() {
           <button onClick={()=>navigate("/")} className="text-white/40 p-1"><ArrowLeft size={18}/></button>
           <RulesButton game="golf6" title="6-Card Golf" />
         </div>
-        <div className="text-white/60 text-xs">{difficulty} {finalRound?"- Final Round!":""}</div>
+        {phase==="gameOver"&&!showResults
+          ? <div className="flex gap-2">
+              <button onClick={()=>setShowResults(true)} className="bg-game-gold text-game-bg font-bold text-sm rounded-xl px-3 min-h-[40px]">See results</button>
+              <button onClick={()=>startGame(difficulty)} className="bg-primary-600 text-white font-semibold text-sm rounded-xl px-3 min-h-[40px]">Play again</button>
+            </div>
+          : <div className="text-white/60 text-xs">{difficulty} {finalRound?"- Final Round!":""}</div>}
         <div className="text-game-gold font-bold text-sm">You: {myScore}</div>
       </div>
       {/* Always present (fixed height) so the board doesn't move when it changes */}
@@ -369,12 +374,6 @@ export default function Golf6Game() {
       <p className="text-center text-white/40 text-xs mt-2 min-h-[1rem]">
         {currentPlayer===0&&phase==="playing"&&(drawn?"Tap a card in your grid to swap, or discard it":"Draw a card, or tap a face-down card to flip it")}
       </p>
-      {phase==="gameOver"&&!showResults&&(
-        <div className="flex justify-center gap-3 mt-2">
-          <Button variant="gold" onClick={()=>setShowResults(true)}>See results</Button>
-          <Button variant="primary" onClick={()=>startGame(difficulty)}>Play again</Button>
-        </div>
-      )}
       {phase==="gameOver"&&showResults&&(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-5">
           <motion.div className="card-panel text-center max-w-sm w-full" initial={{scale:0.8}} animate={{scale:1}}>
@@ -392,9 +391,9 @@ export default function Golf6Game() {
               <Button variant="secondary" className="flex-1" onClick={()=>navigate("/")}>Home</Button>
               <Button variant="primary" className="flex-1" onClick={()=>startGame(difficulty)}>Again</Button>
             </div>
-            <button onClick={()=>setShowResults(false)} className="text-white/60 hover:text-white text-sm underline min-h-[44px]">
+            <Button variant="ghost" className="w-full" onClick={()=>setShowResults(false)}>
               Look at the final cards
-            </button>
+            </Button>
           </motion.div>
         </div>
       )}

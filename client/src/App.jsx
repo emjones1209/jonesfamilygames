@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { FullPageLoader } from "./components/LoadingSpinner";
+import { AppUpdater } from "./components/AppUpdater";   // keeps the saved app up to date
 
 // Pages
 import LoginPage from "./pages/LoginPage";
@@ -79,6 +80,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <AppUpdater />
       </AuthProvider>
     </BrowserRouter>
   );
