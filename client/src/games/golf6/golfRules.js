@@ -2,7 +2,8 @@
  * 6-Card Golf rules and computer player (pure functions, no React).
  *
  * A grid is 2 rows × 3 columns of cards { rank, suit, id, faceUp }. Lowest score
- * wins; two cards of the same rank in a column cancel to 0.
+ * wins; two cards of the same rank in a column cancel to 0 — unless they're
+ * minus cards (2s or Jokers), which keep their value: a pair of 2s is still −4.
  */
 import { buildDeck, shuffle } from '../../utils/cardEngine.js';
 
@@ -24,13 +25,20 @@ export function buildGolfDeck() {
   return shuffle(base);
 }
 
+/**
+ * Does this column's face-up pair cancel to 0? Only pairs that would otherwise
+ * cost points do: a pair of 2s or Jokers keeps its minus points (and Kings are 0 anyway).
+ */
+export const cancels = (top, bot) =>
+  !!top && !!bot && top.faceUp && bot.faceUp && top.rank === bot.rank && cardValue(top) > 0;
+
 /** Score of the face-up cards (the true score once every card is revealed). */
 export function gridScore(grid) {
   if (!grid) return 0;
   let total = 0;
   for (let col = 0; col < 3; col++) {
     const top = grid[0][col], bot = grid[1][col];
-    if (top && bot && top.faceUp && bot.faceUp && top.rank === bot.rank) continue;
+    if (cancels(top, bot)) continue;
     if (top && top.faceUp) total += cardValue(top);
     if (bot && bot.faceUp) total += cardValue(bot);
   }
@@ -64,7 +72,7 @@ export function refillStock(stock, discard) {
 //
 // easy   – casual: random choices, ignores pairs, sometimes wastes a good card
 // medium – sensible: swaps out its highest cards for lower ones
-// hard   – plays like a good player: scores the whole grid (pairs count 0,
+// hard   – plays like a good player: scores the whole grid (pairs count 0, minus pairs keep their value,
 //          hidden cards count as an average card), goes for pairs, won't hand
 //          you a card you can pair, and only finishes the round when it's ahead
 
@@ -75,7 +83,7 @@ export function estimateGrid(grid) {
   let total = 0;
   for (let col = 0; col < 3; col++) {
     const top = grid[0][col], bot = grid[1][col];
-    if (top.faceUp && bot.faceUp && top.rank === bot.rank) continue;
+    if (cancels(top, bot)) continue;
     total += top.faceUp ? cardValue(top) : HIDDEN_VALUE;
     total += bot.faceUp ? cardValue(bot) : HIDDEN_VALUE;
   }

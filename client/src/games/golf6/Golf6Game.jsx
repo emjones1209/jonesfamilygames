@@ -206,7 +206,7 @@ export default function Golf6Game() {
       <div className="flex-1 flex flex-col items-center justify-center max-w-sm mx-auto w-full">
         <div className="text-6xl mb-3">&#9971;</div>
         <h1 className="game-title text-3xl mb-2">6-Card Golf</h1>
-        <p className="text-white/50 mb-1 text-center">Lowest score wins! Same-column pairs cancel to 0.</p>
+        <p className="text-white/50 mb-1 text-center">Lowest score wins! Same-column pairs cancel to 0 (pairs of 2s and Jokers keep their minus points).</p>
         <p className="text-white/40 text-sm mb-1 text-center">You against {PLAYER_NAMES[1]}</p>
         <p className="text-white/30 text-xs mb-5 text-center">Joker=-4, 2=-2, K=0, A=1, J=11, Q=12</p>
         <div className="w-full space-y-3">

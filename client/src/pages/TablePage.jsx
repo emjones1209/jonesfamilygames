@@ -16,6 +16,7 @@ import { GolfTable } from '../games/golf6/GolfTable';
 import { rotate as rotateTrain, ROUND_CHOICES } from '../games/train/trainEngine';
 import { TrainTable } from '../games/train/TrainTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
+import { ReactionBursts, ReactionPicker, REACTION_MS } from '../components/Reactions';
 
 const REACTIONS = ['👍', '😂', '😮', '😬', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
 // Each game's screen, how to turn its view round, what the lobby says about seats,
@@ -59,7 +60,7 @@ export default function TablePage() {
     const onReaction = r => {
       const id = Math.random();
       setReactions(list => [...list, { ...r, id }]);
-      setTimeout(() => setReactions(list => list.filter(x => x.id !== id)), 3500);
+      setTimeout(() => setReactions(list => list.filter(x => x.id !== id)), REACTION_MS);
     };
     const onError = e => {
       setError(e.message);
@@ -111,31 +112,14 @@ export default function TablePage() {
     </div>
   );
 
-  // Reactions: a button that opens the choices, and bubbles for the latest ones
+  // Reactions: a button that springs open the choices, and big bursts for everyone's latest ones
   const reactionBar = (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-2">
-      {picker && (
-        <div className="card-panel p-2 grid grid-cols-3 gap-2 w-64">
-          {REACTIONS.map(r => (
-            <button key={r} onClick={() => { send('mp:react', { emoji: r }); setPicker(false); }}
-              className="rounded-xl bg-white/10 hover:bg-white/20 text-white py-2 min-h-[44px] text-lg leading-tight">
-              {r}
-            </button>
-          ))}
-        </div>
-      )}
-      <button onClick={() => setPicker(p => !p)} aria-label="Send a reaction"
-        className="w-14 h-14 rounded-full bg-game-gold text-2xl shadow-lg">{picker ? '✕' : '😊'}</button>
-    </div>
+    <ReactionPicker choices={REACTIONS} open={picker} onToggle={() => setPicker(p => !p)}
+      onPick={r => { send('mp:react', { emoji: r }); setPicker(false); }} />
   );
   const toasts = (
-    <div className="fixed top-16 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-1 pointer-events-none">
-      {reactions.map(r => (
-        <div key={r.id} className="bg-black/70 text-white rounded-full px-4 py-1 text-lg shadow">
-          <span className="text-sm text-white/70 mr-2">{r.seat === you ? 'You' : table.seats[r.seat]?.name ?? ''}</span>{r.emoji}
-        </div>
-      ))}
-    </div>
+    <ReactionBursts reactions={reactions} you={you} players={n}
+      nameOf={seat => table.seats[seat]?.name ?? ''} />
   );
 
   // ── Lobby ────────────────────────────────────────────────────────────────

@@ -24,6 +24,13 @@ describe('golf scoring', () => {
     expect(gridScore(g)).toBe(9);
   });
 
+  it('lets a pair of 2s or Jokers keep its minus points', () => {
+    const joker = () => card('Jo', true, 'joker');
+    const g = grid([card('2'), joker(), card('K')], [card('2', true, 'spades'), joker(), card('K', true, 'clubs')]);
+    expect(gridScore(g)).toBe(-4 - 8 + 0);
+    expect(estimateGrid(g)).toBe(-12);
+  });
+
   it('counts only face-up cards, and estimates hidden ones', () => {
     const g = grid([card('Q'), card('5', false), card('3')], [card('A'), card('4', false), card('K', false)]);
     expect(gridScore(g)).toBe(16);
