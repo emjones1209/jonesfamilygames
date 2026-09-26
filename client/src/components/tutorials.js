@@ -34,7 +34,7 @@ export const TUTORIALS = {
     { emoji: '⛳', heading: 'Goal', body: 'Get the lowest score! Unlike most card games — in Golf, low score wins.' },
     { emoji: '🃏', heading: 'Setup', body: 'You and the computer each get 6 face-down cards in a 2×3 grid. Turn 2 of yours face-up to start.' },
     { emoji: '🔄', heading: 'Your Turn', body: 'Draw from the deck or take the top discard. Swap it with any card in your grid (that card is discarded), or discard it. Or, without drawing, just flip one face-down card.' },
-    { emoji: '🏁', heading: 'Ending', body: 'When a player has all 6 cards face-up, the other player gets one last turn. If the deck runs out, the discard pile is shuffled back in.' },
+    { emoji: '🏁', heading: 'Ending', body: 'When a player has all 6 cards face-up, everyone else gets one last turn. If the deck runs out, the discard pile is shuffled back in.' },
     { emoji: '🔢', heading: 'Scoring', body: 'Joker = −4 • 2 = −2 • King = 0 • Ace = 1 • 3–10 = face value • Jack = 11 • Queen = 12\nTwo matching cards in the same column score 0!' },
     { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the computer plays casually.\nMedium: it swaps out its high cards.\nHard: it goes for pairs, won\'t throw away cards you could pair, and only ends the round when it\'s ahead.' },
   ],

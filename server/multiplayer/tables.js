@@ -15,17 +15,35 @@
  *   mp:stand                                      give up your seat (before the game starts)
  *   mp:robot  { seat, on }                        put a robot in an empty seat, or take it out
  *   mp:level  { level }                           robots' skill (host only)
- *   mp:start                                      deal (host only, every seat filled)
+ *   mp:option { key, value }                      a game setting, e.g. Golf's number of holes (host only)
+ *   mp:start                                      deal (host only, every seat filled — or, for games
+ *                                                 with a minimum, enough of them; empty seats are dropped)
  *   mp:action { action }                          a move in the game
  *   mp:react  { emoji }                           a quick reaction everyone sees
  *   mp:leave                                      leave the table
  * To each player:
- *   mp:table  { code, game, status, hostId, level, you, seats, view }
+ *   mp:table  { code, game, status, hostId, level, options, you, seats, view }
  *   mp:reaction { seat, emoji }
  */
+// seats: the table's size; minSeats: fewest players a game can start with (else every seat)
+// moves: a player's own moves; tableMoves: moves anyone at the table can make (e.g. deal again)
 const GAMES = {
-  rook: { name: 'Rook', seats: 4, engine: require('../../client/src/games/rook/rookEngine.js') },
+  rook: {
+    name: 'Rook', seats: 4, engine: require('../../client/src/games/rook/rookEngine.js'),
+    moves: ['bid', 'nest', 'play'], tableMoves: ['nextHand', 'newGame'],
+  },
+  golf: {
+    name: '6-Card Golf', seats: 4, minSeats: 2, engine: require('../../client/src/games/golf6/golfEngine.js'),
+    moves: ['peek', 'draw', 'place', 'discard', 'flip'], tableMoves: ['nextHole', 'newGame'],
+    options: { holes: { values: [1, 3, 9], default: 9 } },
+  },
 };
+
+const defaultOptions = game => Object.fromEntries(
+  Object.entries(GAMES[game].options ?? {}).map(([key, o]) => [key, o.default]));
+
+/** Seats that must move now: several at once in some games (everyone turning over cards in Golf). */
+const waitingOn = (engine, s) => (engine.waitingOn ? engine.waitingOn(s) : [engine.waitingFor(s)].filter(x => x != null));
 
 const REACTIONS = ['👍', '😂', '😮', '😬', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
 const LEVELS = ['easy', 'medium', 'hard'];
@@ -62,6 +80,7 @@ function createTables(io, {
         status: table.status,
         hostId: table.hostId,
         level: table.level,
+        options: table.options,
         you: you >= 0 ? you : null,
         seats: table.seats.map(seat => seat && {
           type: seat.type,
@@ -81,14 +100,13 @@ function createTables(io, {
     if (table.status !== 'playing') return;
     const { engine } = GAMES[table.game];
     const s = table.state;
-    const seat = engine.waitingFor(s);
-    const robotTurn = seat != null && (table.seats[seat].type === 'robot' || table.seats[seat].away);
-    if (robotTurn) {
+    const seat = waitingOn(engine, s).find(x => table.seats[x].type === 'robot' || table.seats[x].away);
+    if (seat != null) {
       table.timer = setTimeout(() => {
-        if (engine.waitingFor(table.state) !== seat) return;
+        if (!waitingOn(engine, table.state).includes(seat)) return;
         apply(table, engine.robotAction(table.state, seat, table.level));
       }, robotMs);
-    } else if (s.phase === 'playing' && s.table.status === 'collecting') {
+    } else if (s.phase === 'playing' && s.table?.status === 'collecting') {
       table.timer = setTimeout(() => apply(table, { type: 'collect' }), collectMs);
     }
   }
@@ -110,7 +128,7 @@ function createTables(io, {
       if (!GAMES[game]) return fail(ack, 'That game can\'t be played together yet.');
       const code = newCode();
       const table = {
-        code, game, hostId: user.id, status: 'lobby', level: 'hard', state: null, timer: null,
+        code, game, hostId: user.id, status: 'lobby', level: 'hard', options: defaultOptions(game), state: null, timer: null,
         seats: Array(GAMES[game].seats).fill(null), lastActive: Date.now(), lastReaction: new Map(),
       };
       table.seats[0] = { type: 'human', userId: user.id, name: user.displayName, connected: true };
@@ -183,12 +201,25 @@ function createTables(io, {
       broadcast(table);
     });
 
+    socket.on('mp:option', ({ key, value } = {}) => {
+      const table = current();
+      const option = table && GAMES[table.game].options?.[key];
+      if (!option || !inLobby(table) || table.hostId !== user.id || !option.values.includes(value)) return;
+      table.options = { ...table.options, [key]: value };
+      broadcast(table);
+    });
+
     socket.on('mp:start', () => {
       const table = current();
       if (!table || !inLobby(table) || table.hostId !== user.id) return;
-      if (table.seats.some(s => s === null)) return fail(null, 'Fill every seat (with people or robots) first.');
+      const { minSeats, engine } = GAMES[table.game];
+      const filled = table.seats.filter(Boolean).length;
+      if (minSeats ? filled < minSeats : filled < table.seats.length) {
+        return fail(null, minSeats ? `You need at least ${minSeats} players (people or robots).` : 'Fill every seat (with people or robots) first.');
+      }
+      table.seats = table.seats.filter(Boolean);        // play with just the seats that are filled
       table.status = 'playing';
-      table.state = GAMES[table.game].engine.newGame();
+      table.state = engine.newGame({ players: table.seats.length, ...table.options });
       broadcast(table);
       schedule(table);
     });
@@ -199,8 +230,9 @@ function createTables(io, {
       const seat = seatOf(table, user.id);
       if (seat < 0) return fail(null, 'You\'re watching — take a seat to play.');
       try {
-        if (action.type === 'nextHand' || action.type === 'newGame') apply(table, { type: action.type });
-        else if (['bid', 'nest', 'play'].includes(action.type)) apply(table, { ...action, seat });
+        const { moves, tableMoves } = GAMES[table.game];
+        if (tableMoves.includes(action.type)) apply(table, { type: action.type });
+        else if (moves.includes(action.type)) apply(table, { ...action, seat });
       } catch (e) {
         fail(null, e.message);
       }

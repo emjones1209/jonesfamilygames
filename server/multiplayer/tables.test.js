@@ -41,7 +41,7 @@ function player(id, name) {
   socket.on('mp:table', t => {
     p.table = t;
     // Privacy: another player's hand must never arrive
-    if (t.view) {
+    if (t.view && t.game === 'rook') {
       const hands = t.view.table ? t.view.table.hands : t.view.hands;
       hands.forEach((h, seat) => { if (seat !== t.you && h.some(c => c !== null)) p.sawOthersCards = true; });
       if (t.view.nest.some(c => c !== null)) p.sawOthersCards = true;
@@ -153,4 +153,53 @@ test('moves are checked: only on your turn, only legal cards', async () => {
   // An unknown table code
   const res = await b.emit('mp:join', { code: 'ZZZZ' });
   assert.match(res.error, /No table/);
+});
+
+const golf = require('../../client/src/games/golf6/golfEngine.js');
+
+test('two people and a robot play 6-Card Golf (empty seats are left out)', async () => {
+  const gran = player(20, 'Gran'), kid = player(21, 'Kid');
+  await until(() => gran.socket.connected && kid.socket.connected);
+  const { code } = await gran.emit('mp:create', { game: 'golf' });
+  await kid.emit('mp:join', { code });
+  await until(() => gran.table?.seats.filter(Boolean).length === 2);
+  assert.equal(gran.table.options.holes, 9);
+  gran.socket.emit('mp:option', { key: 'holes', value: 2 });       // not one of the choices: ignored
+  kid.socket.emit('mp:option', { key: 'holes', value: 1 });        // not the host: ignored
+  gran.socket.emit('mp:option', { key: 'holes', value: 3 });
+  await until(() => gran.table.options.holes === 3);
+  gran.socket.emit('mp:robot', { seat: 3, on: true });
+  await until(() => gran.table.seats[3]?.type === 'robot');
+
+  // Each person plays simply: turn over the first face-down cards, then take the discard and swap it in
+  const faceDown = g => [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]].find(([r, c]) => !g[r][c].faceUp);
+  let peeked = null;
+  for (const p of [gran, kid]) {
+    p.socket.on('mp:table', t => setTimeout(() => {
+      const v = t.view;
+      if (!v || t.you == null) return;
+      // Privacy: face-down cards and the deck never arrive
+      if (v.grids.flat(2).some(c => !c.faceUp && c.id) || v.stock.some(Boolean)) p.sawOthersCards = true;
+      if (v.phase === 'holeOver' && t.you === 0) return p.socket.emit('mp:action', { action: { type: 'nextHole' } });
+      if (!golf.waitingOn(v).includes(t.you)) return;
+      const grid = v.grids[t.you];
+      let action;
+      if (v.phase === 'peek') { const [row, col] = faceDown(grid); action = { type: 'peek', row, col }; peeked = t.you; }
+      else if (!v.drawn) action = { type: 'draw', from: 'discard' };
+      else { const [row, col] = faceDown(grid) ?? [0, 0]; action = { type: 'place', row, col }; }
+      p.socket.emit('mp:action', { action });
+    }, 1));
+  }
+  gran.socket.emit('mp:start');
+  await until(() => gran.table.status === 'playing');
+  assert.deepEqual(gran.table.seats.map(s => s.name), ['Gran', 'Kid', 'Robot']);
+  assert.equal(gran.table.view.players, 3);
+  assert.ok(peeked != null);
+
+  await until(() => gran.table.view.phase === 'gameOver', 20000);
+  const v = gran.table.view;
+  assert.equal(v.history.length, 3);
+  assert.deepEqual(kid.table.view.totals, v.totals);
+  assert.ok(v.winners.length >= 1);
+  for (const p of [gran, kid]) assert.equal(p.sawOthersCards, false, `${p.name} saw a face-down card`);
 });

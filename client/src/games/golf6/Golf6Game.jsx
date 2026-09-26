@@ -5,6 +5,7 @@ import { ArrowLeft, HelpCircle } from "lucide-react";
 import { shuffle } from "../../utils/cardEngine";
 import { gridScore, allFaceUp, dealGame, refillStock, chooseSource, choosePlacement } from "./golfRules";
 import { PlayingCard } from "../../components/PlayingCard";
+import { JokerCard, PlayerGrid, MiniGrid } from "./GolfCards";
 import { CARD_BOX } from "../../components/cardSizes";
 import { Button } from "../../components/Button";
 import { TutorialModal } from "../../components/TutorialModal";
@@ -20,54 +21,6 @@ const PLAYER_NAMES = ["You","Computer"];
 const AI_THINK_MS = 700, AI_SHOW_MS = 1300, AI_AFTER_MS = 1000;
 const SUIT_SYMBOL = { spades:"♠", hearts:"♥", diamonds:"♦", clubs:"♣" };
 const cardLabel = c => (c.suit==="joker" ? "Joker" : `${c.rank}${SUIT_SYMBOL[c.suit]}`);
-
-function JokerCard({ size="md", faceDown=false, selected=false, onClick, disabled=false }) {
-  const sz = CARD_BOX[size];
-  if (faceDown) return (
-    <div className={`${sz} bg-blue-900 border-2 border-blue-700 rounded-xl flex items-center justify-center ${disabled?"opacity-50":""} ${onClick?"cursor-pointer":""}`}
-      onClick={disabled?undefined:onClick}>
-      <span className="text-blue-400">&#x1F0A0;</span>
-    </div>
-  );
-  return (
-    <motion.div className={`${sz} bg-purple-700 border-2 rounded-xl flex flex-col items-center justify-center ${selected?"border-yellow-400 -translate-y-1":"border-purple-400"} ${onClick&&!disabled?"cursor-pointer":"cursor-default"} ${disabled?"opacity-50":""}`}
-      whileTap={onClick&&!disabled?{scale:0.95}:{}} onClick={disabled?undefined:onClick}>
-      <span className="text-xl">&#x1F0CF;</span>
-      <span className="text-white text-xs font-bold">-4</span>
-    </motion.div>
-  );
-}
-
-function PlayerGrid({grid, onCardClick, interactive, highlight, lit}) {
-  if (!grid||!grid[0]) return null;
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      {[0,1,2].map(col=>(
-        <div key={col} className="flex flex-col gap-2">
-          {[0,1].map(row=>{
-            const card=grid[row]?.[col];
-            if (!card) return <div key={row} className={`${CARD_BOX.md} rounded-2xl bg-white/5`}/>;
-            const clickFn=interactive?()=>onCardClick(row,col):undefined;
-            const isLit=lit&&lit.row===row&&lit.col===col;
-            if (card.suit==="joker") return (
-              <div key={row} className={`rounded-xl ${isLit?"ring-4 ring-game-gold":""}`}>
-                <JokerCard size="md" faceDown={!card.faceUp}
-                  selected={highlight&&card.faceUp}
-                  onClick={clickFn} disabled={!interactive} />
-              </div>
-            );
-            return (
-              <div key={row} onClick={clickFn} className={`rounded-2xl ${interactive?"cursor-pointer":""} ${isLit?"ring-4 ring-game-gold":""}`}>
-                <PlayingCard card={card} size="md" faceDown={!card.faceUp}
-                  className={highlight&&card.faceUp?"ring-2 ring-yellow-400 rounded-2xl":""}/>
-              </div>
-            );
-          })}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function Golf6Game() {
   const navigate=useNavigate();
@@ -298,17 +251,7 @@ export default function Golf6Game() {
           <div key={pi} className={`card-panel p-2 text-center transition-shadow ${currentPlayer===pi?"ring-2 ring-game-gold":""}`}>
             <div className={`text-xs mb-1 ${currentPlayer===pi?"text-game-gold font-bold":"text-white/50"}`}>{PLAYER_NAMES[pi]}</div>
             {/* 2 rows × 3 columns, laid out like your own grid */}
-            <div className="grid grid-cols-3 gap-1 justify-items-center w-fit mx-auto">
-              {[0,1].flatMap(row=>[0,1,2].map(col=>{
-                const c=grids[pi]?.[row]?.[col];
-                const spot=flash?.pi===pi?flash:phase==="gameOver"?lastPlays[pi]:null;
-                const lit=spot&&spot.row===row&&spot.col===col;
-                const face=!c?null:!c.faceUp
-                  ?<div className={`${CARD_BOX.sm} bg-blue-900 border border-blue-700 rounded-xl`}/>
-                  :c.suit==="joker"?<JokerCard size="sm"/>:<PlayingCard card={c} size="sm"/>;
-                return <div key={`${row}-${col}`} className={`rounded-xl transition-shadow ${lit?"ring-4 ring-game-gold":""}`}>{face}</div>;
-              }))}
-            </div>
+            <MiniGrid grid={grids[pi]} lit={flash?.pi===pi?flash:phase==="gameOver"?lastPlays[pi]:null}/>
             <div className="text-white/40 text-xs mt-1">{grids[pi]?gridScore(grids[pi]):"?"}</div>
           </div>
         ))}

@@ -7,6 +7,7 @@ import { request } from '../utils/socket';
 // Games that can be played together so far (more to come)
 const GAMES = [
   { id: 'rook', name: 'Rook', emoji: '🐦', note: '4 players · partners' },
+  { id: 'golf', name: '6-Card Golf', emoji: '⛳', note: '2–4 players' },
 ];
 const SOON = ['Spades', 'Hearts', 'Bridge', 'Canasta', 'Mexican Train'];
 

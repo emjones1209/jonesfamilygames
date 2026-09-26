@@ -9,12 +9,21 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 import { getSocket, request } from '../utils/socket';
-import { rotate } from '../games/rook/rookEngine';
+import { rotate as rotateRook } from '../games/rook/rookEngine';
 import { RookTable } from '../games/rook/RookTable';
+import { rotate as rotateGolf, HOLE_CHOICES } from '../games/golf6/golfEngine';
+import { GolfTable } from '../games/golf6/GolfTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
 
 const REACTIONS = ['👍', '😂', '😮', '😬', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
-const GAME_NAMES = { rook: 'Rook' };
+// Each game's screen, how to turn its view round, and what the lobby says about seats
+const GAMES = {
+  rook: { name: 'Rook', Table: RookTable, rotate: rotateRook, seatNote: 'Seats 1 & 3 are partners, and so are seats 2 & 4.' },
+  golf: {
+    name: '6-Card Golf', Table: GolfTable, rotate: rotateGolf, minSeats: 2,
+    seatNote: '2 to 4 players. Empty seats are left out when the game starts.',
+  },
+};
 const LEVELS = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
 const remember = code => { try { localStorage.setItem(LAST_TABLE_KEY, code); } catch { /* private mode */ } };
 const forget = () => { try { localStorage.removeItem(LAST_TABLE_KEY); } catch { /* private mode */ } };
@@ -82,6 +91,7 @@ export default function TablePage() {
     return <div className="min-h-screen bg-game-bg flex items-center justify-center text-white/60">Joining table {code}…</div>;
   }
 
+  const game = GAMES[table.game];
   const n = table.seats.length;
   const you = table.you;
   const isHost = table.hostId === user?.id;
@@ -122,7 +132,9 @@ export default function TablePage() {
   // ── Lobby ────────────────────────────────────────────────────────────────
   if (table.status === 'lobby') {
     const host = table.seats.find(s => s?.userId === table.hostId)?.name ?? 'the host';
-    const full = table.seats.every(Boolean);
+    const filled = table.seats.filter(Boolean).length;
+    const needed = (game.minSeats ?? n) - filled;
+    const holes = table.options?.holes;
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-indigo-950 p-5">
         {banner}
@@ -131,14 +143,14 @@ export default function TablePage() {
             <ArrowLeft size={18} /> Leave table
           </button>
           <div className="text-center">
-            <h1 className="game-title text-3xl">{GAME_NAMES[table.game]} table</h1>
+            <h1 className="game-title text-3xl">{game.name} table</h1>
             <p className="text-white/60 text-sm mt-2">Tell the others this code:</p>
             <div className="text-5xl font-black tracking-[0.3em] text-game-gold my-2">{table.code}</div>
             <p className="text-white/40 text-xs">They open Play Together and type it in.</p>
           </div>
 
           <div className="card-panel flex flex-col gap-2">
-            <p className="text-white/50 text-xs">Seats 1 &amp; 3 are partners, and so are seats 2 &amp; 4.</p>
+            <p className="text-white/50 text-xs">{game.seatNote}</p>
             {table.seats.map((seat, i) => (
               <div key={i} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${i === you ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/5'}`}>
                 <span className="text-white/40 text-sm w-6">{i + 1}</span>
@@ -161,12 +173,26 @@ export default function TablePage() {
                   ))}
                 </div>
               </div>
-              <Button variant="gold" disabled={!full} onClick={() => send('mp:start')}>
-                {full ? 'Start the game' : `Waiting for ${n - table.seats.filter(Boolean).length} more (or add robots)`}
+              {holes != null && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-white/70 text-sm">Holes to play</span>
+                  <div className="flex gap-1">
+                    {HOLE_CHOICES.map(h => (
+                      <button key={h} onClick={() => send('mp:option', { key: 'holes', value: h })}
+                        className={`rounded-lg px-4 min-h-[40px] text-sm ${holes === h ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white'}`}>{h}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Button variant="gold" disabled={needed > 0} onClick={() => send('mp:start')}>
+                {needed > 0 ? `Waiting for ${needed} more (or add robots)`
+                  : filled < n ? `Start with ${filled} players` : 'Start the game'}
               </Button>
             </div>
           ) : (
-            <p className="text-white/60 text-center">Waiting for {host} to start the game… (robots play at {table.level})</p>
+            <p className="text-white/60 text-center">
+              Waiting for {host} to start the game… (robots play at {table.level}{holes != null ? `; ${holes} hole${holes === 1 ? '' : 's'}` : ''})
+            </p>
           )}
           {error && <p className="text-red-300 text-center">{error}</p>}
         </div>
@@ -195,7 +221,7 @@ export default function TablePage() {
   }
 
   // ── Playing: turn the table so you're at the bottom ──────────────────────
-  const view = rotate(table.view, you);
+  const view = game.rotate(table.view, you);
   const names = Array.from({ length: n }, (_, i) => {
     const seat = table.seats[(i + you) % n];
     if (i === 0) return 'You';
@@ -205,7 +231,7 @@ export default function TablePage() {
   for (const r of reactions) shown[(r.seat - you + n) % n] = r.emoji;
 
   return (
-    <RookTable view={view} names={names} error={error} reactions={shown}
+    <game.Table view={view} names={names} error={error} reactions={shown}
       onAction={action => send('mp:action', { action })}   // the server fills in your real seat
       onExit={() => navigate('/')}
       overlay={<>{banner}{toasts}{reactionBar}</>}

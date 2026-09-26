@@ -4,7 +4,7 @@
  * A grid is 2 rows × 3 columns of cards { rank, suit, id, faceUp }. Lowest score
  * wins; two cards of the same rank in a column cancel to 0.
  */
-import { buildDeck, shuffle } from '../../utils/cardEngine';
+import { buildDeck, shuffle } from '../../utils/cardEngine.js';
 
 export function cardValue(card) {
   if (!card) return 0;
