@@ -194,7 +194,7 @@ test('two people and a robot play 6-Card Golf (empty seats are left out)', async
   await until(() => gran.table.status === 'playing');
   assert.deepEqual(gran.table.seats.map(s => s.name), ['Gran', 'Kid', 'Robot']);
   assert.equal(gran.table.view.players, 3);
-  assert.ok(peeked != null);
+  await until(() => peeked != null);
 
   await until(() => gran.table.view.phase === 'gameOver', 20000);
   const v = gran.table.view;
@@ -202,4 +202,40 @@ test('two people and a robot play 6-Card Golf (empty seats are left out)', async
   assert.deepEqual(kid.table.view.totals, v.totals);
   assert.ok(v.winners.length >= 1);
   for (const p of [gran, kid]) assert.equal(p.sawOthersCards, false, `${p.name} saw a face-down card`);
+});
+
+const train = require('../../client/src/games/train/trainEngine.js');
+const trainRules = require('../../client/src/games/train/trainRules.js');
+
+test('a person and two robots play Mexican Train', async () => {
+  const grandpa = player(30, 'Grandpa');
+  await until(() => grandpa.socket.connected);
+  const { code } = await grandpa.emit('mp:create', { game: 'train' });
+  await until(() => grandpa.table);
+  assert.equal(grandpa.table.options.rounds, 13);
+  grandpa.socket.emit('mp:option', { key: 'rounds', value: 3 });
+  await until(() => grandpa.table.options.rounds === 3);
+  for (const seat of [2, 3]) grandpa.socket.emit('mp:robot', { seat, on: true });
+  await until(() => grandpa.table.seats.filter(Boolean).length === 3);
+
+  // Grandpa plays the first tile that fits, else draws, else passes
+  grandpa.socket.on('mp:table', t => setTimeout(() => {
+    const v = t.view;
+    if (!v) return;
+    if (v.hands.some((h, seat) => seat !== t.you && h.some(Boolean)) || v.boneyard.some(Boolean)) grandpa.sawOthersCards = true;
+    if (v.phase === 'roundOver') return grandpa.socket.emit('mp:action', { action: { type: 'nextRound' } });
+    if (train.waitingFor(v) !== t.you) return;
+    const move = trainRules.legalMoves(v, t.you)[0];
+    const action = move ? { type: 'play', ...move } : v.drew || !v.boneyard.length ? { type: 'pass' } : { type: 'draw' };
+    grandpa.socket.emit('mp:action', { action });
+  }, 1));
+  grandpa.socket.emit('mp:start');
+  await until(() => grandpa.table.status === 'playing');
+  assert.deepEqual(grandpa.table.seats.map(s => s.name), ['Grandpa', 'Robot', 'Robot']);
+  assert.equal(grandpa.table.view.players, 3);
+
+  await until(() => grandpa.table.view.phase === 'gameOver', 30000);
+  assert.equal(grandpa.table.view.history.length, 3);
+  assert.equal(grandpa.sawOthersCards, false, 'Grandpa saw someone else\'s tiles');
+  assert.deepEqual(code.length, 4);
 });

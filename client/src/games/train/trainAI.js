@@ -11,7 +11,7 @@
  *          its marker off as soon as it can, and dumps its biggest tiles when
  *          someone is about to go out
  */
-import { legalMoves, openEnd, isDouble, pips, matches, MEXICAN } from './trainRules';
+import { legalMoves, openEnd, isDouble, pips, matches, MEXICAN } from './trainRules.js';
 
 export function chooseAction(s, level) {
   const seat = s.turn;

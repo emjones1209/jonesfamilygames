@@ -93,7 +93,7 @@ export default function LandingPage() {
             <span className="text-4xl">👥</span>
             <span>
               <span className="block text-white font-bold">Play Together</span>
-              <span className="block text-white/60 text-xs">Rook or Golf with the family, each on your own iPad</span>
+              <span className="block text-white/60 text-xs">Rook, Golf or Mexican Train with the family, each on your own iPad</span>
             </span>
           </button>
           {lastTable && (

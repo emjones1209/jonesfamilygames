@@ -13,15 +13,24 @@ import { rotate as rotateRook } from '../games/rook/rookEngine';
 import { RookTable } from '../games/rook/RookTable';
 import { rotate as rotateGolf, HOLE_CHOICES } from '../games/golf6/golfEngine';
 import { GolfTable } from '../games/golf6/GolfTable';
+import { rotate as rotateTrain, ROUND_CHOICES } from '../games/train/trainEngine';
+import { TrainTable } from '../games/train/TrainTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
 
 const REACTIONS = ['👍', '😂', '😮', '😬', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
-// Each game's screen, how to turn its view round, and what the lobby says about seats
+// Each game's screen, how to turn its view round, what the lobby says about seats,
+// and the setting the host picks (if any)
 const GAMES = {
   rook: { name: 'Rook', Table: RookTable, rotate: rotateRook, seatNote: 'Seats 1 & 3 are partners, and so are seats 2 & 4.' },
   golf: {
     name: '6-Card Golf', Table: GolfTable, rotate: rotateGolf, minSeats: 2,
     seatNote: '2 to 4 players. Empty seats are left out when the game starts.',
+    option: { key: 'holes', label: 'Holes to play', values: HOLE_CHOICES, unit: 'hole' },
+  },
+  train: {
+    name: 'Mexican Train', Table: TrainTable, rotate: rotateTrain, minSeats: 2,
+    seatNote: '2 to 4 players. Empty seats are left out when the game starts.',
+    option: { key: 'rounds', label: 'Rounds', values: ROUND_CHOICES, unit: 'round' },
   },
 };
 const LEVELS = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
@@ -134,7 +143,9 @@ export default function TablePage() {
     const host = table.seats.find(s => s?.userId === table.hostId)?.name ?? 'the host';
     const filled = table.seats.filter(Boolean).length;
     const needed = (game.minSeats ?? n) - filled;
-    const holes = table.options?.holes;
+    const option = game.option;
+    const chosen = option && table.options?.[option.key];
+    const chosenText = option ? `${chosen} ${option.unit}${chosen === 1 ? '' : 's'}` : '';
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-indigo-950 p-5">
         {banner}
@@ -173,13 +184,13 @@ export default function TablePage() {
                   ))}
                 </div>
               </div>
-              {holes != null && (
+              {option && (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-white/70 text-sm">Holes to play</span>
+                  <span className="text-white/70 text-sm">{option.label}</span>
                   <div className="flex gap-1">
-                    {HOLE_CHOICES.map(h => (
-                      <button key={h} onClick={() => send('mp:option', { key: 'holes', value: h })}
-                        className={`rounded-lg px-4 min-h-[40px] text-sm ${holes === h ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white'}`}>{h}</button>
+                    {option.values.map(v => (
+                      <button key={v} onClick={() => send('mp:option', { key: option.key, value: v })}
+                        className={`rounded-lg px-4 min-h-[40px] text-sm ${chosen === v ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white'}`}>{v}</button>
                     ))}
                   </div>
                 </div>
@@ -191,7 +202,7 @@ export default function TablePage() {
             </div>
           ) : (
             <p className="text-white/60 text-center">
-              Waiting for {host} to start the game… (robots play at {table.level}{holes != null ? `; ${holes} hole${holes === 1 ? '' : 's'}` : ''})
+              Waiting for {host} to start the game… (robots play at {table.level}{option ? `; ${chosenText}` : ''})
             </p>
           )}
           {error && <p className="text-red-300 text-center">{error}</p>}

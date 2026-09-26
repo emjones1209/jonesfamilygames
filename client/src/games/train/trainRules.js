@@ -21,7 +21,7 @@
  *   { type: 'draw' }
  *   { type: 'pass' }
  */
-import { shuffle } from '../../utils/cardEngine';
+import { shuffle } from '../../utils/cardEngine.js';
 
 export const MAX_PIP = 12;
 export const MEXICAN = 'mexican';

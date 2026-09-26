@@ -8,8 +8,9 @@ import { request } from '../utils/socket';
 const GAMES = [
   { id: 'rook', name: 'Rook', emoji: '🐦', note: '4 players · partners' },
   { id: 'golf', name: '6-Card Golf', emoji: '⛳', note: '2–4 players' },
+  { id: 'train', name: 'Mexican Train', emoji: '🚂', note: '2–4 players' },
 ];
-const SOON = ['Spades', 'Hearts', 'Bridge', 'Canasta', 'Mexican Train'];
+const SOON = ['Spades', 'Hearts', 'Bridge', 'Canasta'];
 
 export const LAST_TABLE_KEY = 'lastTable';
 

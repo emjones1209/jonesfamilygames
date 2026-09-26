@@ -15,7 +15,7 @@
  *   mp:stand                                      give up your seat (before the game starts)
  *   mp:robot  { seat, on }                        put a robot in an empty seat, or take it out
  *   mp:level  { level }                           robots' skill (host only)
- *   mp:option { key, value }                      a game setting, e.g. Golf's number of holes (host only)
+ *   mp:option { key, value }                      a game setting, e.g. Golf's holes or Mexican Train's rounds (host only)
  *   mp:start                                      deal (host only, every seat filled — or, for games
  *                                                 with a minimum, enough of them; empty seats are dropped)
  *   mp:action { action }                          a move in the game
@@ -36,6 +36,11 @@ const GAMES = {
     name: '6-Card Golf', seats: 4, minSeats: 2, engine: require('../../client/src/games/golf6/golfEngine.js'),
     moves: ['peek', 'draw', 'place', 'discard', 'flip'], tableMoves: ['nextHole', 'newGame'],
     options: { holes: { values: [1, 3, 9], default: 9 } },
+  },
+  train: {
+    name: 'Mexican Train', seats: 4, minSeats: 2, engine: require('../../client/src/games/train/trainEngine.js'),
+    moves: ['play', 'draw', 'pass'], tableMoves: ['nextRound', 'newGame'],
+    options: { rounds: { values: [3, 7, 13], default: 13 } },
   },
 };
 

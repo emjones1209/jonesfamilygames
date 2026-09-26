@@ -91,8 +91,8 @@ export default function WelcomePage() {
           <ul className="list-disc pl-5 space-y-2">
             <li><b>Card games</b> (Hearts, Spades, Bridge, Rook): tap a card to pick it, then tap it again to play it. Cards you can't play right now are dimmed.</li>
             <li><b>Five Dice</b>: tap Roll, tap dice to hold them, then tap a box on the scorecard (twice, to be sure) to score.</li>
-            <li><b>Mexican Train</b>: drag a domino onto a lit-up train to play it. Tap a domino to turn it round, and drag them around your hand to plan your train.</li>
-            <li><b>Play Together</b> (on the home page): play Rook or 6-Card Golf with the family, each on your own iPad at the same time. One person opens a table and reads out its 4-letter code; the others type it in. Robots can fill empty seats, and the 😊 button sends a quick reaction.</li>
+            <li><b>Mexican Train</b>: tap a domino, then the lit-up train to play it (or drag it there). Drag dominoes around your hand to plan your train; tap one and press ↻ to turn it round.</li>
+            <li><b>Play Together</b> (on the home page): play Rook, 6-Card Golf or Mexican Train with the family, each on your own iPad at the same time. One person opens a table and reads out its 4-letter code; the others type it in. Robots can fill empty seats, and the 😊 button sends a quick reaction.</li>
             <li><b>Canasta</b>: tap cards to select several at once, then tap <b>Meld</b>, the discard pile, or one of your melds.</li>
             <li><b>Solitaire</b>: tap a card, then tap where it should go — or drag it. Tap a card twice to send it up to the piles at the top.</li>
             <li><b>Trivia</b>: Easy, Medium and Hard really are different — Hard is for the experts!</li>
