@@ -17,7 +17,8 @@ import api from '../../utils/api';
 const NAMES = ['You', 'Left', 'Partner', 'Right'];
 // Your partner always plays at Medium, so the difficulty only changes the opponents
 const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
-const THINK_MS = 700, STEP_MS = 900;
+// Computer turns go slowly enough to read: a pause before drawing, then each meld or discard in turn
+const THINK_MS = 1500, STEP_MS = 2200;
 const SUIT = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
 const label = c => (c.rank === 'JK' ? 'Joker' : `${c.rank}${SUIT[c.suit]}`);
 const cardCount = n => `${n} card${n === 1 ? '' : 's'}`;
@@ -38,7 +39,7 @@ function CanastaCard({ card, size = 'sm', selected, onClick }) {
 }
 
 /** One meld: its rank, how many cards (and wild cards), gold when it's a canasta. */
-function MeldTile({ meld, onClick, highlight }) {
+function MeldTile({ meld, onClick, highlight, fresh }) {
   const wild = meld.cards.filter(isWild).length;
   const canasta = isCanasta(meld);
   const natural = canasta && isNaturalMeld(meld);
@@ -46,7 +47,7 @@ function MeldTile({ meld, onClick, highlight }) {
     <button onClick={onClick} disabled={!onClick}
       className={`relative w-14 h-[4.5rem] md:w-16 md:h-20 rounded-xl flex flex-col items-center justify-center shrink-0 font-bold
         ${canasta ? (natural ? 'bg-red-50 border-4 border-red-500 text-red-700' : 'bg-gray-100 border-4 border-gray-800 text-gray-900') : 'bg-white border-2 border-gray-300 text-gray-900'}
-        ${highlight ? 'ring-4 ring-game-gold' : ''} ${onClick ? 'cursor-pointer' : 'cursor-default'}`}>
+        ${highlight ? 'ring-4 ring-game-gold' : fresh ? 'ring-4 ring-game-gold scale-110' : ''} transition-transform ${onClick ? 'cursor-pointer' : 'cursor-default'}`}>
       <span className="text-xl md:text-2xl leading-none">{meld.rank}</span>
       <span className="text-xs md:text-sm">×{meld.cards.length}</span>
       {wild > 0 && <span className="text-[9px] md:text-[10px] text-purple-700">{wild} wild</span>}
@@ -55,7 +56,7 @@ function MeldTile({ meld, onClick, highlight }) {
   );
 }
 
-function MeldArea({ title, melds, redThrees, onMeldClick, extra }) {
+function MeldArea({ title, melds, redThrees, onMeldClick, extra, freshRank }) {
   return (
     <div className="card-panel p-2">
       <div className="flex items-center justify-between text-xs text-white/60 mb-1">
@@ -64,7 +65,7 @@ function MeldArea({ title, melds, redThrees, onMeldClick, extra }) {
       </div>
       <div className="flex flex-wrap gap-2 min-h-[4.5rem] md:min-h-[5rem] items-center">
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
-        {melds.map(m => <MeldTile key={m.rank} meld={m} onClick={onMeldClick ? () => onMeldClick(m) : undefined} highlight={!!onMeldClick} />)}
+        {melds.map(m => <MeldTile key={m.rank} meld={m} onClick={onMeldClick ? () => onMeldClick(m) : undefined} highlight={!!onMeldClick} fresh={m.rank === freshRank} />)}
       </div>
     </div>
   );
@@ -78,6 +79,8 @@ export default function CanastaGame() {
   const [game, setGame] = useState(null);         // hand state (see canastaRules)
   const [selected, setSelected] = useState([]);   // ids of your selected cards
   const [msg, setMsg] = useState({ text: '', error: false });
+  const [lastMsg, setLastMsg] = useState('');      // the move before, so a missed one can still be read
+  const [fresh, setFresh] = useState(null);        // what the last move changed: { team, rank } or 'pile'
   const [result, setResult] = useState(null);     // scoreHand() once the hand is over
   const [handNo, setHandNo] = useState(0);        // restarts the computer-turn effect each hand
   const latest = useRef(null);
@@ -87,7 +90,7 @@ export default function CanastaGame() {
     setDealer(newDealer);
     setGame(dealHand({ dealer: newDealer, scores: currentScores }));
     setSelected([]); setResult(null); setHandNo(n => n + 1);
-    setMsg({ text: '', error: false });
+    setMsg({ text: '', error: false }); setLastMsg(''); setFresh(null);
   };
   const startGame = diff => { setDifficulty(diff); setScores([0, 0]); startHand(3, [0, 0]); };
 
@@ -97,7 +100,10 @@ export default function CanastaGame() {
       const next = act(latest.current, action);
       latest.current = next;
       setGame(next);
-      if (describe) setMsg({ text: describe(next), error: false });
+      const text = describe ? describe(next) : '';
+      if (text) {
+        setMsg(m => { if (m.text && !m.error) setLastMsg(m.text); return { text, error: false }; });
+      }
       if (next.phase === 'over') finishHand(next);
       return next;
     } catch (e) {
@@ -138,17 +144,19 @@ export default function CanastaGame() {
         const redNote = reds ? ` (and a red 3 — +100)` : '';
         return draw.type === 'takePile' ? `${name} takes the pile (${cardCount(pileSize)}) with the ${pileTop.rank}s!` : `${name} draws a card${redNote}.`;
       });
+      setFresh(draw.type === 'takePile' ? { team: teamOf(seat), rank: pileTop.rank } : null);
       if (!s || s.phase === 'over') return;
       const steps = choosePlay(s, level);
       steps.forEach((step, i) => later(() => {
         const cur = latest.current;
         apply(step, next => {
           if (next.phase === 'over') return `${name} goes out!`;
-          if (step.type === 'discard') return `${name} discards the ${label(cur.hands[seat].find(c => c.id === step.id))}.`;
+          if (step.type === 'discard') { setFresh('pile'); return `${name} discards the ${label(cur.hands[seat].find(c => c.id === step.id))}.`; }
           if (step.type === 'meld') {
             const cards = step.ids.map(id => cur.hands[seat].find(c => c.id === id));
             const rank = cards.find(c => !isWild(c))?.rank ?? step.rank;
             const had = cur.melds[teamOf(seat)].some(m => m.rank === rank);
+            setFresh({ team: teamOf(seat), rank });
             return had ? `${name} adds ${cards.length} to the ${rank}s.` : `${name} melds ${plural(cards.length, rank)}.`;
           }
           return '';
@@ -161,6 +169,7 @@ export default function CanastaGame() {
 
   // ── Your moves ───────────────────────────────────────────────────────────
   const yourTurn = game?.turn === 0 && game.phase !== 'over';
+  useEffect(() => { if (yourTurn && game.phase === 'play') setFresh(null); }, [yourTurn, game?.phase]);
   const toggle = id => setSelected(sel => (sel.includes(id) ? sel.filter(x => x !== id) : [...sel, id]));
   const drawCard = () => {
     if (!yourTurn || game.phase !== 'draw') return;
@@ -227,7 +236,8 @@ export default function CanastaGame() {
         ))}
       </div>
 
-      <MeldArea title="Their melds" melds={game.melds[1]} redThrees={game.redThrees[1].length} />
+      <MeldArea title="Their melds" melds={game.melds[1]} redThrees={game.redThrees[1].length}
+        freshRank={fresh?.team === 1 ? fresh.rank : null} />
 
       {/* Stock and discard pile */}
       <div className="flex justify-center items-end gap-6">
@@ -242,17 +252,22 @@ export default function CanastaGame() {
             Pile ({game.discard.length}){frozen && <span className="text-sky-300"> · ❄ frozen</span>}
             {top && isBlackThree(top) && <span className="text-amber-300"> · blocked</span>}
           </p>
-          <div onClick={takePile} className={`rounded-xl ${frozen ? 'ring-2 ring-sky-300' : ''} ${yourTurn && game.phase === 'draw' ? 'cursor-pointer' : ''}`}>
+          <div onClick={takePile} className={`rounded-xl ${fresh === 'pile' ? 'ring-4 ring-game-gold' : frozen ? 'ring-2 ring-sky-300' : ''} ${yourTurn && game.phase === 'draw' ? 'cursor-pointer' : ''}`}>
             {top ? <CanastaCard card={top} /> : <div className={`${CARD_BOX.sm} rounded-xl border-2 border-dashed border-white/20`} />}
           </div>
         </div>
       </div>
 
       <MeldArea title="Our melds" melds={game.melds[0]} redThrees={game.redThrees[0].length}
+        freshRank={fresh?.team === 0 ? fresh.rank : null}
         extra={!game.initialDone[0] && game.melds[0].length ? `(${meldedValue(game, 0)} of ${ourNeed})` : ''}
         onMeldClick={yourTurn && game.phase === 'play' && selected.length ? m => meld(m.rank) : undefined} />
 
-      <p className={`text-center text-sm min-h-[1.25rem] ${msg.error ? 'text-red-300' : 'text-amber-300'}`}>{msg.text}</p>
+      {/* The latest move, with the one before it underneath (fixed height, so nothing jumps) */}
+      <div className="text-center min-h-[2.5rem]">
+        <p className={`text-sm md:text-base font-semibold ${msg.error ? 'text-red-300' : 'text-amber-300'}`}>{msg.text}</p>
+        <p className="text-xs md:text-sm text-white/40">{lastMsg}</p>
+      </div>
 
       {/* Your hand: tap cards to select several */}
       <div className="flex flex-wrap justify-center gap-y-3 pt-2 pl-6 md:pl-8">
