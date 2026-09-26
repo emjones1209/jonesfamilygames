@@ -43,7 +43,11 @@ export default function MexicanTrainGame() {
   const [round, setRound] = useState(0);
   const [totals, setTotals] = useState([]);
   const [game, setGame] = useState(null);
-  const [selected, setSelected] = useState(null);         // tile id
+  // Your hand is yours to arrange: tiles in the order you've dragged them, and which ones you've turned round
+  const [order, setOrder] = useState([]);                 // tile ids (tiles not in it go at the end, sorted)
+  const [flipped, setFlipped] = useState(() => new Set());
+  const [drag, setDrag] = useState(null);                 // { id, x, y, train } while a tile is being dragged
+  const press = useRef(null);                             // the tile under your finger, and whether it has moved
   const [msg, setMsg] = useState({ text: '', error: false });
   const [result, setResult] = useState(null);
   const [moveNo, setMoveNo] = useState(0);                // restarts the computer-turn timer after every move
@@ -56,7 +60,7 @@ export default function MexicanTrainGame() {
   const startRound = (r, players) => {
     setRound(r);
     setGame(dealRound({ players, round: r }));
-    setSelected(null); setResult(null);
+    setOrder([]); setFlipped(new Set()); setDrag(null); setResult(null);
     setMsg({ text: '', error: false });
     setMoveNo(n => n + 1);
   };
@@ -167,32 +171,75 @@ export default function MexicanTrainGame() {
   const yourTurn = game.turn === 0 && game.phase === 'play';
   const moves = yourTurn ? legalMoves(game, 0) : [];
   const playableIds = new Set(moves.map(m => m.tileId));
-  const targets = new Set(moves.filter(m => m.tileId === selected).map(m => m.train));
-  const hand = [...game.hands[0]].sort((x, y) => x.a - y.a || x.b - y.b);
+  const targets = new Set(drag ? moves.filter(m => m.tileId === drag.id).map(m => m.train) : []);
+  const inHand = new Map(game.hands[0].map(t => [t.id, t]));
+  const hand = [
+    ...order.filter(id => inHand.has(id)).map(id => inHand.get(id)),
+    ...game.hands[0].filter(t => !order.includes(t.id)).sort((x, y) => x.a - y.a || x.b - y.b),   // e.g. a tile just drawn
+  ];
   const canDraw = yourTurn && !moves.length && !game.drew && game.boneyard.length > 0;
   const canPass = yourTurn && !moves.length && (game.drew || !game.boneyard.length);
 
-  const tapTile = id => {
-    if (!yourTurn) return;
-    const options = moves.filter(m => m.tileId === id);
-    // Tapping a selected tile that fits only one train plays it there
-    if (selected === id && options.length === 1) { playOn(options[0].train); return; }
-    setSelected(id === selected ? null : id);
-    if (id !== selected && !options.length) setMsg({ text: 'That tile doesn\'t fit anywhere you can play right now.', error: true });
-    else if (id !== selected) setMsg({ text: options.length === 1 ? 'Tap it again (or the highlighted train) to play it.' : 'Now tap the train to play it on.', error: false });
+  const playOn = (tileId, train) => {
+    if (!yourTurn) { setMsg({ text: 'Wait for your turn to play a tile.', error: true }); return; }
+    if (!moves.some(m => m.tileId === tileId && m.train === train)) {
+      setMsg({ text: `That tile can't go on ${trainLabel(game, train)} right now.`, error: true });
+      return;
+    }
+    apply({ type: 'play', tileId, train }, describe(0));
   };
-  const playOn = train => {
-    if (!yourTurn || !selected) return;
-    if (apply({ type: 'play', tileId: selected, train }, describe(0))) setSelected(null);
+
+  // Tiles in your hand: a tap turns one round; drag to move it within your hand, or onto a train to play it
+  const dropTarget = (x, y) => {
+    for (const el of document.elementsFromPoint(x, y)) {
+      if (el.dataset.train !== undefined) return { train: Number(el.dataset.train) };
+      if (el.dataset.tile !== undefined) return { tile: el.dataset.tile };
+    }
+    return {};
   };
+  const onTileDown = (e, id) => {
+    if (e.button > 0) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    press.current = { id, sx: e.clientX, sy: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onTileMove = e => {
+    const p = press.current;
+    if (!p || (!p.moved && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 8)) return;
+    p.moved = true;
+    const over = dropTarget(e.clientX, e.clientY);
+    if (over.tile !== undefined && over.tile !== p.id) {
+      // Slide the tile into the place of the one it's over
+      const ids = hand.map(t => t.id);
+      ids.splice(ids.indexOf(p.id), 1);
+      ids.splice(hand.findIndex(t => t.id === over.tile), 0, p.id);
+      setOrder(ids);
+    }
+    setDrag({ id: p.id, x: e.clientX - p.dx, y: e.clientY - p.dy, train: over.train ?? null });
+  };
+  const onTileUp = e => {
+    const p = press.current;
+    press.current = null;
+    setDrag(null);
+    if (!p) return;
+    if (!p.moved) {
+      setFlipped(f => { const n = new Set(f); if (n.has(p.id)) n.delete(p.id); else n.add(p.id); return n; });
+      return;
+    }
+    const { train } = dropTarget(e.clientX, e.clientY);
+    if (train !== undefined) playOn(p.id, train);
+  };
+  const onTileCancel = () => { press.current = null; setDrag(null); };
+  const dragged = drag && inHand.get(drag.id);
+  const face = t => (flipped.has(t.id) ? { a: t.b, b: t.a } : { a: t.a, b: t.b });
 
   let hint = '';
   if (yourTurn) {
     if (game.pendingDouble != null) hint = `Cover the double on ${trainLabel(game, game.pendingDouble)}.`;
-    else if (moves.length) hint = 'Tap a tile, then the train to play it on.';
+    else if (moves.length) hint = 'Drag a tile onto a lit-up train to play it. Tap a tile to turn it round.';
     else if (canDraw) hint = 'Nothing fits — draw a tile.';
     else hint = 'Still nothing fits — pass. Your train will be open to everyone until you play on it.';
-  } else if (game.phase === 'play') hint = `${names[game.turn]} is playing…`;
+  } else if (game.phase === 'play') hint = `${names[game.turn]} is playing… Drag your tiles to plan, and tap to turn them round.`;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-sky-900 p-3 flex flex-col gap-2 select-none">
@@ -225,13 +272,14 @@ export default function MexicanTrainGame() {
         </div>
         {game.trains.map((train, i) => {
           const canTarget = targets.has(i);
+          const hovered = canTarget && drag?.train === i;
           const pending = game.pendingDouble === i;
           const shown = train.tiles.slice(-5);
           const hidden = train.tiles.length - shown.length;
           return (
-            <button key={i} onClick={() => playOn(i)} disabled={!canTarget}
-              className={`flex items-center gap-2 rounded-xl px-2 py-1 text-left min-h-[3rem]
-                ${canTarget ? 'bg-game-gold/20 ring-2 ring-game-gold cursor-pointer' : 'bg-white/5 cursor-default'}
+            <div key={i} data-train={i}
+              className={`flex items-center gap-2 rounded-xl px-2 py-1 text-left min-h-[3rem] transition-colors
+                ${hovered ? 'bg-game-gold/40 ring-4 ring-game-gold' : canTarget ? 'bg-game-gold/20 ring-2 ring-game-gold' : 'bg-white/5'}
                 ${pending ? 'ring-2 ring-red-400' : ''}`}>
               <span className="w-28 md:w-36 shrink-0 text-xs md:text-sm text-white/80">
                 {train.owner === MEXICAN ? '🚂 Mexican Train' : train.owner === 0 ? 'Your train' : `${names[train.owner]}'s train`}
@@ -244,7 +292,7 @@ export default function MexicanTrainGame() {
               <span className={`shrink-0 text-xs md:text-sm rounded-full px-2 py-0.5 ${pending ? 'bg-red-500 text-white' : 'bg-white/10 text-white/70'}`}>
                 {pending ? `cover ${openEnd(game, i)}` : `needs ${openEnd(game, i)}`}
               </span>
-            </button>
+            </div>
           );
         })}
       </div>
@@ -254,10 +302,18 @@ export default function MexicanTrainGame() {
       {/* Your tiles */}
       <div className="flex flex-wrap justify-center gap-2 pt-2">
         {hand.map(t => (
-          <Domino key={t.id} a={t.a} b={t.b} selected={selected === t.id}
-            dim={yourTurn && !playableIds.has(t.id)} onClick={yourTurn ? () => tapTile(t.id) : undefined} />
+          <div key={t.id} data-tile={t.id} className={`touch-none cursor-grab ${drag?.id === t.id ? 'opacity-25' : ''}`}
+            onPointerDown={e => onTileDown(e, t.id)} onPointerMove={onTileMove} onPointerUp={onTileUp} onPointerCancel={onTileCancel}>
+            <Domino {...face(t)} dim={yourTurn && !playableIds.has(t.id)} />
+          </div>
         ))}
       </div>
+      {/* The tile following your finger */}
+      {dragged && (
+        <div className="fixed z-50 pointer-events-none scale-110 drop-shadow-2xl" style={{ left: drag.x, top: drag.y }}>
+          <Domino {...face(dragged)} selected />
+        </div>
+      )}
 
       <div className="flex justify-center gap-2">
         <Button variant="primary" disabled={!canDraw} onClick={() => apply({ type: 'draw' }, describe(0))}>Draw</Button>
