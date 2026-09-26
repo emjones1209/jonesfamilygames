@@ -1,5 +1,6 @@
 ﻿import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { tableNames } from "../players";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, HelpCircle } from "lucide-react";
 import { shuffle } from "../../utils/cardEngine";
@@ -15,7 +16,7 @@ import { RulesButton } from '../../components/RulesButton';
 
 // Two players: you and the computer
 const NUM_PLAYERS = 2;
-const PLAYER_NAMES = ["You","Computer"];
+const PLAYER_NAMES = tableNames(NUM_PLAYERS);
 // Pacing of a computer turn (ms): pause before drawing, time showing the drawn
 // card, and time showing where it went before the next player's turn
 const AI_THINK_MS = 700, AI_SHOW_MS = 1300, AI_AFTER_MS = 1000;
@@ -42,6 +43,8 @@ export default function Golf6Game() {
   const [lastPlays,setLastPlays]=useState({});   // player -> { row, col } of the last card they placed (shown at game end)
   const [showResults,setShowResults]=useState(false);
   const [showTutorial,setShowTutorial]=useState(false);
+  // Turning a card over without drawing ends your turn, so it takes two taps: one to choose, one to confirm
+  const [armed,setArmed]=useState(null);   // { row, col }
 
   const startGame=diff=>{
     setDifficulty(diff);
@@ -106,12 +109,12 @@ export default function Golf6Game() {
     if (phase!=="playing"||currentPlayer!==0||drawn) return;
     const {stock:s,discard:d}=refillStock(stock,discard);
     if (!s.length) return;
-    setDrawn({...s[0],faceUp:true}); setStock(s.slice(1)); setDiscard(d);
+    setDrawn({...s[0],faceUp:true}); setStock(s.slice(1)); setDiscard(d); setArmed(null);
   };
 
   const takeDiscard=()=>{
     if (phase!=="playing"||currentPlayer!==0||drawn||!discard.length) return;
-    setDrawn({...discard[0],faceUp:true}); setDiscard(d=>d.slice(1));
+    setDrawn({...discard[0],faceUp:true}); setDiscard(d=>d.slice(1)); setArmed(null);
   };
 
   const discardDrawn=()=>{
@@ -130,6 +133,8 @@ export default function Golf6Game() {
 
   const flipCard=(row,col)=>{
     if (drawn||currentPlayer!==0||grids[0][row][col].faceUp) return;
+    if (armed?.row!==row||armed?.col!==col) { setArmed({ row, col }); return; }
+    setArmed(null);
     const ng=grids.map((g,pi)=>pi!==0?g:g.map((r,ri)=>r.map((c,ci)=>ri===row&&ci===col?{...c,faceUp:true}:c)));
     setGrids(ng); setLastPlays(p=>({ ...p, 0:{ row, col } })); checkAndAdvance(ng,0);
   };
@@ -202,7 +207,7 @@ export default function Golf6Game() {
         <div className="text-6xl mb-3">&#9971;</div>
         <h1 className="game-title text-3xl mb-2">6-Card Golf</h1>
         <p className="text-white/50 mb-1 text-center">Lowest score wins! Same-column pairs cancel to 0.</p>
-        <p className="text-white/40 text-sm mb-1 text-center">You against the computer</p>
+        <p className="text-white/40 text-sm mb-1 text-center">You against {PLAYER_NAMES[1]}</p>
         <p className="text-white/30 text-xs mb-5 text-center">Joker=-4, 2=-2, K=0, A=1, J=11, Q=12</p>
         <div className="w-full space-y-3">
           {[["easy","😊 Easy"],["medium","🤔 Medium"],["hard","🔥 Hard"]].map(([d,l])=>(
@@ -309,13 +314,13 @@ export default function Golf6Game() {
             onCardClick={drawn?(row,col)=>swapWithGrid(row,col):flipCard}
             interactive={currentPlayer===0&&phase==="playing"}
             highlight={!!drawn}
-            lit={phase==="gameOver"?lastPlays[0]:null}
+            lit={phase==="gameOver"?lastPlays[0]:armed}
           />
         </div>
       </div>
       </div>
       <p className="text-center text-white/40 text-xs mt-2 min-h-[1rem]">
-        {currentPlayer===0&&phase==="playing"&&(drawn?"Tap a card in your grid to swap, or discard it":"Draw a card, or tap a face-down card to flip it")}
+        {currentPlayer===0&&phase==="playing"&&(drawn?"Tap a card in your grid to swap, or discard it":armed?"Tap the outlined card again to turn it over instead of drawing — that ends your turn. Or draw a card.":"Draw a card from the deck or the discard pile (or turn over a face-down card instead)")}
       </p>
       {phase==="gameOver"&&showResults&&(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-5">

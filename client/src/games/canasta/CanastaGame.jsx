@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { tableNames } from '../players';
 import { ArrowLeft } from 'lucide-react';
 import { PlayingCard } from '../../components/PlayingCard';
 import { CARD_BOX } from '../../components/cardSizes';
@@ -14,7 +15,7 @@ import {
 import { chooseDraw, choosePlay } from './canastaAI';
 import api from '../../utils/api';
 
-const NAMES = ['You', 'Left', 'Partner', 'Right'];
+const NAMES = tableNames(4);
 // Your partner always plays at Medium, so the difficulty only changes the opponents
 const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
 // Computer turns go slowly enough to read: a pause before drawing, then each meld or discard in turn
@@ -196,7 +197,7 @@ export default function CanastaGame() {
   if (!difficulty) {
     return (
       <GameSetup emoji="♣️" title="Canasta" subtitle="Meld sets, build canastas and go out first!"
-        note={`You and Partner vs Left and Right · first team to ${WINNING_SCORE}`}
+        note={`You and Xavier (your partner) vs Phoebe and Heraldo · first team to ${WINNING_SCORE}`}
         bgClass="from-game-bg to-emerald-900" tutorial={TUTORIALS.canasta} onStart={startGame} />
     );
   }

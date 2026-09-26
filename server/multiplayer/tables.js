@@ -50,6 +50,10 @@ const defaultOptions = game => Object.fromEntries(
 /** Seats that must move now: several at once in some games (everyone turning over cards in Golf). */
 const waitingOn = (engine, s) => (engine.waitingOn ? engine.waitingOn(s) : [engine.waitingFor(s)].filter(x => x != null));
 
+// Robots take the computer players' names from the single-player games (Phoebe, Xavier, Heraldo)
+const { COMPUTER_NAMES } = require('../../client/src/games/players.js');
+const robotName = table => COMPUTER_NAMES.find(n => !table.seats.some(s => s?.type === 'robot' && s.name === n)) ?? 'Robot';
+
 const REACTIONS = ['👍', '😂', '😮', '😬', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
 const LEVELS = ['easy', 'medium', 'hard'];
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';        // no I, L or O (easily confused)
@@ -89,7 +93,7 @@ function createTables(io, {
         you: you >= 0 ? you : null,
         seats: table.seats.map(seat => seat && {
           type: seat.type,
-          name: seat.type === 'robot' ? 'Robot' : seat.name,
+          name: seat.name,
           userId: seat.userId ?? null,
           connected: seat.type === 'robot' || seat.connected,
           away: !!seat.away,
@@ -194,7 +198,7 @@ function createTables(io, {
       const table = current();
       if (!table || !inLobby(table) || seatOf(table, user.id) < 0) return;
       if (!Number.isInteger(seat) || seat < 0 || seat >= table.seats.length) return;
-      if (on && table.seats[seat] === null) table.seats[seat] = { type: 'robot' };
+      if (on && table.seats[seat] === null) table.seats[seat] = { type: 'robot', name: robotName(table) };
       if (!on && table.seats[seat]?.type === 'robot') table.seats[seat] = null;
       broadcast(table);
     });

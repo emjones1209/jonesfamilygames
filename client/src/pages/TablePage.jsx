@@ -104,7 +104,7 @@ export default function TablePage() {
   const n = table.seats.length;
   const you = table.you;
   const isHost = table.hostId === user?.id;
-  const seatName = seat => (!seat ? 'Empty seat' : seat.type === 'robot' ? '🤖 Robot' : seat.name + (seat.away ? ' (robot playing)' : !seat.connected ? ' (reconnecting…)' : ''));
+  const seatName = seat => (!seat ? 'Empty seat' : seat.type === 'robot' ? `🤖 ${seat.name}` : seat.name + (seat.away ? ' (robot playing)' : !seat.connected ? ' (reconnecting…)' : ''));
   const banner = !connected && (
     <div className="fixed top-safe left-0 right-0 z-50 bg-amber-500 text-game-bg text-center text-sm font-semibold py-1">
       Reconnecting…
@@ -132,7 +132,7 @@ export default function TablePage() {
     <div className="fixed top-16 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-1 pointer-events-none">
       {reactions.map(r => (
         <div key={r.id} className="bg-black/70 text-white rounded-full px-4 py-1 text-lg shadow">
-          <span className="text-sm text-white/70 mr-2">{r.seat === you ? 'You' : table.seats[r.seat]?.name ?? 'Robot'}</span>{r.emoji}
+          <span className="text-sm text-white/70 mr-2">{r.seat === you ? 'You' : table.seats[r.seat]?.name ?? ''}</span>{r.emoji}
         </div>
       ))}
     </div>
@@ -223,7 +223,7 @@ export default function TablePage() {
         {robots.length ? (
           <>
             <p className="text-white/60 text-sm">You can take over from a robot:</p>
-            {robots.map(i => <Button key={i} variant="gold" onClick={() => send('mp:sit', { seat: i })}>Take seat {i + 1}</Button>)}
+            {robots.map(i => <Button key={i} variant="gold" onClick={() => send('mp:sit', { seat: i })}>Take over from {table.seats[i].name}</Button>)}
           </>
         ) : <p className="text-white/60 text-sm">Every seat is taken by a person.</p>}
         <Button variant="ghost" onClick={() => { forget(); navigate('/'); }}>Home</Button>
@@ -236,7 +236,7 @@ export default function TablePage() {
   const names = Array.from({ length: n }, (_, i) => {
     const seat = table.seats[(i + you) % n];
     if (i === 0) return 'You';
-    return seat.type === 'robot' ? 'Robot' : seat.away ? `${seat.name} 🤖` : seat.name;
+    return seat.away ? `${seat.name} 🤖` : seat.name;
   });
   const shown = {};
   for (const r of reactions) shown[(r.seat - you + n) % n] = r.emoji;

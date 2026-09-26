@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { COMPUTER_NAMES } from '../players';
 import { ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../../components/Button';
@@ -12,6 +13,8 @@ import {
 } from './diceRules';
 import { robotStep } from './diceAI';
 import api from '../../utils/api';
+
+const RIVAL = COMPUTER_NAMES[0];   // the computer player you're up against
 
 const ROBOT_MS = 1600;       // a computer step (roll, keep, score) — slow enough to follow
 
@@ -71,7 +74,7 @@ export default function DiceGame() {
     setTurn(newTurn());
     setPlayer(1 - who);
     const pts = next[who][box];
-    setMsg(`${who === 0 ? 'You score' : 'Computer scores'} ${pts} in ${LABELS[box]}.${next[who].bonus > cards[who].bonus ? ' Bonus Five of a Kind: +100!' : ''}`);
+    setMsg(`${who === 0 ? 'You score' : `${RIVAL} scores`} ${pts} in ${LABELS[box]}.${next[who].bonus > cards[who].bonus ? ' Bonus Five of a Kind: +100!' : ''}`);
   };
 
   // ── Computer turns, one visible step at a time ──────────────────────────
@@ -82,8 +85,8 @@ export default function DiceGame() {
       if (move.type === 'roll') {
         const keeping = turn.dice.filter((_, i) => move.held[i]);
         if (turn.rollsLeft < ROLLS_PER_TURN) {
-          setMsg(keeping.length ? `Computer keeps ${keeping.sort((a, b) => a - b).join(', ')} and rolls again…` : 'Computer rolls all five again…');
-        } else setMsg('Computer rolls…');
+          setMsg(keeping.length ? `${RIVAL} keeps ${keeping.sort((a, b) => a - b).join(', ')} and rolls again…` : `${RIVAL} rolls all five again…`);
+        } else setMsg(`${RIVAL} rolls…`);
         doRoll({ ...turn, held: move.held });
       } else {
         finishTurn(1, move.box);
@@ -101,7 +104,7 @@ export default function DiceGame() {
 
   if (!difficulty) {
     return (
-      <GameSetup emoji="🎲" title="Five Dice" subtitle="Roll, hold and fill your scorecard — beat the computer!"
+      <GameSetup emoji="🎲" title="Five Dice" subtitle="Roll, hold and fill your scorecard — beat Phoebe!"
         note="Three rolls a turn · 13 turns each" bgClass="from-game-bg to-rose-900" tutorial={TUTORIALS.dice} onStart={startGame} />
     );
   }
@@ -167,14 +170,14 @@ export default function DiceGame() {
           <RulesButton game="dice" title="Five Dice" />
         </div>
         <div className="text-white/70 text-sm">Five Dice · {difficulty}</div>
-        <div className="text-right text-xs text-white/60">You {total(cards[0])} · Computer {total(cards[1])}</div>
+        <div className="text-right text-xs text-white/60">You {total(cards[0])} · {RIVAL} {total(cards[1])}</div>
       </header>
 
       <div className="max-w-5xl mx-auto flex flex-col lg:flex-row gap-4 items-center lg:items-start">
         {/* Dice and controls */}
         <div className="flex-1 flex flex-col items-center gap-3 w-full lg:pt-10">
           <div className={`text-sm font-semibold px-3 py-1 rounded-full ${yourTurn ? 'bg-game-gold text-game-bg' : 'bg-white/10 text-white/70'}`}>
-            {over ? 'Game over' : yourTurn ? 'Your turn' : 'Computer\'s turn'}
+            {over ? 'Game over' : yourTurn ? 'Your turn' : `${RIVAL}'s turn`}
           </div>
           <div className="flex gap-2 md:gap-3 mt-2">
             {turn.dice.map((d, i) => (
@@ -194,7 +197,7 @@ export default function DiceGame() {
           <table className="w-full">
             <thead>
               <tr className="text-white/50 text-xs">
-                <th className="text-left font-normal">Box</th><th className="font-normal">You</th><th className="font-normal">Computer</th>
+                <th className="text-left font-normal">Box</th><th className="font-normal">You</th><th className="font-normal">{RIVAL}</th>
               </tr>
             </thead>
             <tbody>
@@ -213,9 +216,9 @@ export default function DiceGame() {
         <ResultPanel>
           <div className="text-5xl mb-2">{winner === 0 ? '🏆' : winner === 1 ? '🎲' : '🤝'}</div>
           <h2 className="text-2xl font-bold text-game-gold mb-2">
-            {winner === 0 ? 'You win!' : winner === 1 ? 'The computer wins' : 'It\'s a tie!'}
+            {winner === 0 ? 'You win!' : winner === 1 ? `${RIVAL} wins` : 'It\'s a tie!'}
           </h2>
-          <div className="text-white/80 mb-4">You {total(cards[0])} · Computer {total(cards[1])}</div>
+          <div className="text-white/80 mb-4">You {total(cards[0])} · {RIVAL} {total(cards[1])}</div>
           <div className="flex gap-3">
             <Button variant="ghost" className="flex-1" onClick={() => navigate('/')}>Home</Button>
             <Button variant="gold" className="flex-1" onClick={() => startGame(difficulty)}>Play Again</Button>

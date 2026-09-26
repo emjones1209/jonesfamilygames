@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { tableNames } from '../players';
 import { buildDeck, shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
@@ -16,7 +17,7 @@ import {
 import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
 
-const NAMES = ['You', 'Left', 'Partner', 'Right'];
+const NAMES = tableNames(4);
 // Your partner always plays at Medium, so the difficulty only changes the opponents
 const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
 const DECK = buildDeck();
@@ -109,7 +110,7 @@ export default function SpadesGame() {
   if (phase === 'setup') {
     return (
       <GameSetup emoji="♠️" title="Spades" subtitle="Bid carefully — spades are always trump!"
-        note={`You and Partner vs Left and Right · first team to ${WINNING_SCORE}`}
+        note={`You and Xavier (your partner) vs Phoebe and Heraldo · first team to ${WINNING_SCORE}`}
         bgClass="from-game-bg to-slate-900" tutorial={TUTORIALS.spades} onStart={startGame} />
     );
   }
@@ -136,7 +137,7 @@ export default function SpadesGame() {
           <>
             <p className="text-white/60 text-sm text-center max-w-sm">
               How many tricks will you win?
-              {partnerBid != null && <> Partner bid <b className="text-game-gold">{bidLabel(partnerBid)}</b>.</>}
+              {partnerBid != null && <> Xavier (your partner) bid <b className="text-game-gold">{bidLabel(partnerBid)}</b>.</>}
             </p>
             <div className="grid grid-cols-7 gap-2 max-w-md">
               {Array.from({ length: 14 }, (_, n) => (

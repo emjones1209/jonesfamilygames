@@ -192,7 +192,7 @@ test('two people and a robot play 6-Card Golf (empty seats are left out)', async
   }
   gran.socket.emit('mp:start');
   await until(() => gran.table.status === 'playing');
-  assert.deepEqual(gran.table.seats.map(s => s.name), ['Gran', 'Kid', 'Robot']);
+  assert.deepEqual(gran.table.seats.map(s => s.name), ['Gran', 'Kid', 'Phoebe']);
   assert.equal(gran.table.view.players, 3);
   await until(() => peeked != null);
 
@@ -231,7 +231,7 @@ test('a person and two robots play Mexican Train', async () => {
   }, 1));
   grandpa.socket.emit('mp:start');
   await until(() => grandpa.table.status === 'playing');
-  assert.deepEqual(grandpa.table.seats.map(s => s.name), ['Grandpa', 'Robot', 'Robot']);
+  assert.deepEqual(grandpa.table.seats.map(s => s.name), ['Grandpa', 'Phoebe', 'Xavier']);
   assert.equal(grandpa.table.view.players, 3);
 
   await until(() => grandpa.table.view.phase === 'gameOver', 30000);

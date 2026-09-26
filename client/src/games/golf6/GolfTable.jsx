@@ -37,6 +37,41 @@ function describeMove(m, names) {
   }
 }
 
+/**
+ * The scorecard so far: a row per player, a column per hole, and the total.
+ * `current` = the hole being played (or just finished), shown in gold.
+ */
+function Scorecard({ view, names, current }) {
+  const holes = Array.from({ length: view.holes }, (_, h) => h);
+  const seats = Array.from({ length: view.players }, (_, s) => s);
+  return (
+    <div className="overflow-x-auto max-w-full">
+      <table className="text-xs text-white/80 mx-auto border-separate border-spacing-x-1">
+        <thead>
+          <tr className="text-white/40">
+            <th className="text-left font-normal pr-1">Hole</th>
+            {holes.map(h => <th key={h} className={`font-normal w-6 ${h === current ? 'text-game-gold' : ''}`}>{h + 1}</th>)}
+            <th className="font-normal pl-1">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {seats.map(seat => (
+            <tr key={seat} className={seat === 0 ? 'text-game-gold font-semibold' : ''}>
+              <td className="text-left pr-1 truncate max-w-[6rem]">{names[seat]}</td>
+              {holes.map(h => (
+                <td key={h} className={`text-center ${h === current ? 'bg-white/10 rounded' : ''}`}>
+                  {view.history[h]?.[seat] ?? <span className="text-white/20">·</span>}
+                </td>
+              ))}
+              <td className="text-center font-bold pl-1">{view.totals[seat]}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 const listNames = list => (list.length < 2 ? list.join('') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`);
 
 /**
@@ -62,6 +97,10 @@ export function GolfTable({ view, names, onAction, onExit, error, reactions = {}
     return () => clearTimeout(timer);
   }, [holeKey]);
 
+  // Turning a card over without drawing ends your turn, so it takes two taps: one to choose, one to confirm
+  const [arming, setArming] = useState(null);             // { row, col, move } the card chosen to turn over
+  const armed = arming && arming.move === view.lastMove && view.phase === 'playing' && !view.drawn ? arming : null;
+
   const peeking = view.phase === 'peek' && view.peeks[0] < PEEKS;
   const myTurn = view.phase === 'playing' && view.turn === 0;
   const drawn = view.drawn;
@@ -74,7 +113,10 @@ export function GolfTable({ view, names, onAction, onExit, error, reactions = {}
     const card = view.grids[0][row][col];
     if (peeking) { if (!card.faceUp) act({ type: 'peek', row, col }); }
     else if (myTurn && drawn) act({ type: 'place', row, col });
-    else if (myTurn && !card.faceUp) act({ type: 'flip', row, col });
+    else if (myTurn && !card.faceUp) {
+      if (armed && armed.row === row && armed.col === col) { setArming(null); act({ type: 'flip', row, col }); }
+      else setArming({ row, col, move: view.lastMove });
+    }
   };
 
   // What's happening, in words
@@ -91,7 +133,8 @@ export function GolfTable({ view, names, onAction, onExit, error, reactions = {}
   }
   const hint = peeking ? 'Tap two face-down cards'
     : myTurn ? (drawn ? (drawn.fromDiscard ? 'Tap a card in your grid to swap it' : 'Tap a card in your grid to swap, or discard it')
-      : 'Draw a card, or tap a face-down card to flip it') : '';
+      : armed ? 'Tap the outlined card again to turn it over instead of drawing — that ends your turn. Or draw a card.'
+        : 'Draw a card from the deck or the discard pile (or turn over a face-down card instead)') : '';
 
   const opponents = Array.from({ length: n - 1 }, (_, i) => i + 1);
   const small = n >= 4 ? 'xs' : 'sm';
@@ -112,7 +155,9 @@ export function GolfTable({ view, names, onAction, onExit, error, reactions = {}
 
       {/* Fixed-height message lines, so the board doesn't jump about */}
       <p className="text-center text-amber-400 text-sm min-h-[1.25rem]">{error || describeMove(move, names)}</p>
-      <p className="text-center text-white/70 text-xs mb-2 min-h-[1rem]">{status}</p>
+      <p className={`text-center mb-2 min-h-[1rem] ${peeking ? 'text-game-gold font-bold text-base' : 'text-white/70 text-xs'}`}>
+        {peeking && view.holeNo > 0 ? `Hole ${view.holeNo + 1}! ` : ''}{status}
+      </p>
 
       <div className="flex flex-wrap justify-center gap-2 mb-3">
         {opponents.map(seat => {
@@ -171,11 +216,16 @@ export function GolfTable({ view, names, onAction, onExit, error, reactions = {}
               Your cards · showing {gridScore(view.grids[0])}{view.finisher === 0 ? ' 🏁' : ''}{reactions[0] ? ` ${reactions[0]}` : ''}
             </p>
             <PlayerGrid grid={view.grids[0]} onCardClick={tapMine} interactive={peeking || myTurn}
-              highlight={myTurn && !!drawn} lit={litFor(0)} />
+              highlight={myTurn && !!drawn} lit={armed ?? litFor(0)} />
           </div>
         </div>
       </div>
-      <p className="text-center text-white/40 text-xs mt-2 min-h-[1rem]">{hint}</p>
+      <p className={`text-center text-xs mt-2 min-h-[1rem] ${armed ? 'text-game-gold font-semibold' : 'text-white/40'}`}>{hint}</p>
+      {view.holes > 1 && (
+        <div className="mt-3 flex justify-center">
+          <Scorecard view={view} names={names} current={view.holeNo} />
+        </div>
+      )}
       {overlay}
 
       {over && showResults && view.lastHole && (
@@ -191,26 +241,25 @@ export function GolfTable({ view, names, onAction, onExit, error, reactions = {}
           ) : (
             <h2 className="text-xl font-bold text-game-gold mb-3">Hole {view.holeNo + 1} of {view.holes}</h2>
           )}
-          <table className="w-full text-sm text-white/80 mb-4">
-            <thead>
-              <tr className="text-white/40 text-xs">
-                <th className="text-left font-normal">Player</th>
-                <th className="text-right font-normal">{view.holes > 1 ? 'This hole' : 'Score'}</th>
-                {view.holes > 1 && <th className="text-right font-normal">Total</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from({ length: n }, (_, seat) => seat)
-                .sort((a, b) => view.totals[a] - view.totals[b])
-                .map(seat => (
-                  <tr key={seat} className={seat === 0 ? 'text-game-gold font-semibold' : ''}>
-                    <td className="text-left py-0.5 truncate max-w-[10rem]">{names[seat]}{seat === view.lastHole.finisher ? ' 🏁' : ''}</td>
-                    <td className="text-right">{view.lastHole.scores[seat]}</td>
-                    {view.holes > 1 && <td className="text-right font-bold">{view.totals[seat]}</td>}
-                  </tr>
-                ))}
-            </tbody>
-          </table>
+          {view.holes > 1 ? (
+            <div className="mb-4 flex justify-center"><Scorecard view={view} names={names} current={view.holeNo} /></div>
+          ) : (
+            <table className="w-full text-sm text-white/80 mb-4">
+              <tbody>
+                {Array.from({ length: n }, (_, seat) => seat)
+                  .sort((a, b) => view.totals[a] - view.totals[b])
+                  .map(seat => (
+                    <tr key={seat} className={seat === 0 ? 'text-game-gold font-semibold' : ''}>
+                      <td className="text-left py-0.5 truncate max-w-[10rem]">{names[seat]}{seat === view.lastHole.finisher ? ' 🏁' : ''}</td>
+                      <td className="text-right font-bold">{view.totals[seat]}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+          {view.lastHole.finisher != null && view.holes > 1 && (
+            <p className="text-white/50 text-xs -mt-2 mb-3">🏁 {names[view.lastHole.finisher]} finished the hole first</p>
+          )}
           {view.phase === 'holeOver'
             ? <Button variant="gold" className="w-full mb-2" onClick={() => onAction({ type: 'nextHole' })}>Next hole</Button>
             : gameOverActions}

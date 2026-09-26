@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { tableNames } from '../players';
 import { Button } from '../../components/Button';
 import { TUTORIALS } from '../../components/tutorials';
 import { GameSetup } from '../cards/GameSetup';
@@ -8,7 +9,7 @@ import { newGame, act, waitingFor, robotAction } from './rookEngine';
 import { RookTable } from './RookTable';
 import api from '../../utils/api';
 
-const NAMES = ['You', 'Left', 'Partner', 'Right'];
+const NAMES = tableNames(4);
 // Your partner always plays its best (Hard), so the difficulty only changes the opponents
 const levelFor = (seat, difficulty) => (seat === 2 ? 'hard' : difficulty);
 const ROBOT_MS = 700, COLLECT_MS = 1300;
@@ -54,7 +55,7 @@ export default function RookGame() {
   if (!game) {
     return (
       <GameSetup emoji="🐦" title="Rook" subtitle="Bid, name trump, and capture the counters!"
-        note={`You and Partner vs Left and Right · first team to ${WINNING_SCORE}`}
+        note={`You and Xavier (your partner) vs Phoebe and Heraldo · first team to ${WINNING_SCORE}`}
         bgClass="from-game-bg to-orange-900" tutorial={TUTORIALS.rook} onStart={startGame} />
     );
   }

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { tableNames } from '../players';
 import { buildDeck, shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
 import { TUTORIALS } from '../../components/tutorials';
@@ -17,8 +18,8 @@ import {
 import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
 
-const NAMES = ['You', 'Left', 'Across', 'Right'];
-const PASS_LABEL = { left: 'to Left', right: 'to Right', across: 'Across' };
+const NAMES = tableNames(4);
+const PASS_LABEL = { left: `to ${NAMES[1]} (left)`, right: `to ${NAMES[3]} (right)`, across: `to ${NAMES[2]} (across)` };
 
 function dealHands() {
   const deck = shuffle(buildDeck());

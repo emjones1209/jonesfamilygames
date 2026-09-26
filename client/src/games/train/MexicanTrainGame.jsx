@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { tableNames } from '../players';
 import { ArrowLeft, HelpCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { TutorialModal } from '../../components/TutorialModal';
@@ -8,7 +9,6 @@ import { newGame, act, waitingFor, robotAction } from './trainEngine';
 import { TrainTable } from './TrainTable';
 import api from '../../utils/api';
 
-const NAMES_FOR = { 2: ['You', 'Computer'], 3: ['You', 'Left', 'Right'], 4: ['You', 'Left', 'Across', 'Right'] };
 const LENGTHS = [[13, 'Full game (13 rounds)'], [7, 'Half game (7 rounds)'], [3, 'Quick game (3 rounds)']];
 const AI_MS = 900;
 
@@ -20,7 +20,7 @@ export default function MexicanTrainGame() {
   const [error, setError] = useState('');
   const [showTutorial, setShowTutorial] = useState(false);
 
-  const names = NAMES_FOR[settings.players];
+  const names = tableNames(settings.players);
 
   const startGame = diff => {
     setDifficulty(diff);

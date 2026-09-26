@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { tableNames } from '../players';
 import { buildDeck, shuffle } from '../../utils/cardEngine';
 import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
@@ -18,8 +19,8 @@ import {
 import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
 
-const NAMES = ['South (You)', 'West', 'North', 'East'];
-const SHORT = ['You', 'West', 'North', 'East'];
+const SHORT = tableNames(4);                                  // You are South; Phoebe West, Xavier North, Heraldo East
+const NAMES = ['South (You)', `West (${SHORT[1]})`, `North (${SHORT[2]})`, `East (${SHORT[3]})`];
 const DENOM_SYMBOL = { C: '♣', D: '♦', H: '♥', S: '♠', NT: 'NT' };
 const DENOM_COLOR = { C: 'text-white', D: 'text-red-400', H: 'text-red-400', S: 'text-white', NT: 'text-game-gold' };
 const bidText = bid => (bid === PASS ? 'Pass' : `${bidLevel(bid)}${DENOM_SYMBOL[bidDenom(bid)]}`);
