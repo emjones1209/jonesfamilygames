@@ -90,6 +90,7 @@ export default function WelcomePage() {
           <p>Tap any game on the home screen. Every game has a <Key icon={CircleHelp}>How to play</Key> guide if you'd like the rules.</p>
           <ul className="list-disc pl-5 space-y-2">
             <li><b>Card games</b> (Hearts, Spades, Bridge, Rook): tap a card to pick it, then tap it again to play it. Cards you can't play right now are dimmed.</li>
+            <li><b>Five Dice</b>: tap Roll, tap dice to hold them, then tap a box on the scorecard (twice, to be sure) to score.</li>
             <li><b>Mexican Train</b>: tap a domino, then the highlighted train to play it on.</li>
             <li><b>Play Together</b> (on the home page): play Rook with the family, each on your own iPad at the same time. One person opens a table and reads out its 4-letter code; the others type it in. Robots can fill empty seats, and the 😊 button sends a quick reaction.</li>
             <li><b>Canasta</b>: tap cards to select several at once, then tap <b>Meld</b>, the discard pile, or one of your melds.</li>

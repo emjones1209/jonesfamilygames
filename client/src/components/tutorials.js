@@ -46,6 +46,15 @@ export const TUTORIALS = {
     { emoji: '🎮', heading: 'Playing', body: 'Follow the colour led if you can. Trump beats other colours. The Rook bird counts as the lowest trump: any other trump beats it, but it still beats every other colour.\nThe top of the screen shows the points each team has captured so far this hand.\nMake your bid to score your points — miss it and you lose the whole bid!' },
     { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the opponents play any card and bid at random.\nMedium: they play each trick sensibly.\nHard: they remember every card played, draw out trumps, cash sure winners, and use the nest to empty a short suit and bury counters.\nYour partner always plays at its best (Hard), so the level only changes your opponents.' },
   ],
+  dice: [
+    { emoji: '🎲', heading: 'Goal', body: 'Fill all 13 boxes on your scorecard and finish with a higher total than the computer. You take turns: 13 turns each.' },
+    { emoji: '🔄', heading: 'Your Turn', body: 'Tap Roll to roll all five dice. Tap any dice you want to keep — they lift up and say HELD — then roll the rest again. You get up to three rolls.\nWhenever you like, tap a box on your scorecard to score (tap it again to confirm). That ends your turn.' },
+    { emoji: '🔢', heading: 'Upper Section', body: 'Ones to Sixes: add up the dice showing that number (three 4s in Fours = 12).\nScore 63 or more across the six boxes — three of each number — for a 35-point bonus.' },
+    { emoji: '🎯', heading: 'Lower Section', body: '3 of a Kind / 4 of a Kind: add up all five dice.\nFull House (three and a pair): 25 · Small Straight (four in a row): 30 · Large Straight (five in a row): 40\nFive of a Kind: 50 · Chance: any dice, add them all up.' },
+    { emoji: '🤔', heading: 'Zeros', body: 'Every turn you must fill a box, even if it scores 0. Sometimes it\'s wise to take a zero in a box you\'re unlikely to fill anyway.' },
+    { emoji: '🎉', heading: 'Extra Five of a Kind', body: 'Roll another Five of a Kind after scoring 50 for one and you get a 100-point bonus. It must go in the matching number box if that\'s empty; otherwise it can fill any lower box at full value (even Full House or a Straight).' },
+    { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the computer keeps its most common number and grabs the biggest score.\nMedium: it also chases straights and full houses, and aims for the upper bonus.\nHard: it works out exactly which dice to keep for the best chances, and plans its whole scorecard.' },
+  ],
   train: [
     { emoji: '🚂', heading: 'Goal', body: 'Play all your dominoes before anyone else. The dots left in your hand at the end of a round count against you — lowest total after the last round wins.' },
     { emoji: '🎯', heading: 'The Engine', body: 'Each round starts from a double in the middle: 12|12 in round 1, then 11|11, and so on down.\nEveryone gets 15 dominoes; the rest stay face down in the boneyard.' },
