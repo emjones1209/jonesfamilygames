@@ -12,11 +12,12 @@
  * beats medium by 1,100 to 1,800.)
  */
 import {
-  act, topOfPile, openMeld, teamOf, minimumFor, bookCount, canGoOut, meldedValue,
-  isWild, isNatural, isBlackThree, isBook, valueOf, cardValue, BOOK, MAX_WILD,
+  act, topOfPile, openMeld, teamOf, minimumFor, booksToGo, canGoOut, meldedValue,
+  isWild, isNatural, isBlackThree, isRedThree, isBook, valueOf, cardValue, BOOK, MAX_WILD,
 } from './handFootRules.js';
 
 const attempt = (s, action) => { try { return act(s, action); } catch { return null; } };
+const WILD_TAKE_PILE = 3;   // spend a wild card to take the pile only when it has at least this many cards
 
 /** Natural cards grouped by rank (3s left out), plus the wild cards (2s before jokers). */
 function groupHand(hand) {
@@ -27,10 +28,15 @@ function groupHand(hand) {
 }
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
-/** Take the pile (with a pair matching its top card) or draw two from the stock. */
+/**
+ * Take the pile (with a pair matching its top card, or — Medium and Hard, for
+ * a pile worth it — one and a wild card) or draw two from the stock.
+ */
 export function chooseDraw(s, level) {
   const seat = s.turn, top = topOfPile(s);
-  const pair = top ? (groupHand(s.hands[seat]).byRank[top.rank] ?? []).slice(0, 2) : [];
+  const { byRank, wilds } = groupHand(s.hands[seat]);
+  let pair = top ? (byRank[top.rank] ?? []).slice(0, 2) : [];
+  if (pair.length === 1 && wilds.length && level !== 'easy' && s.discard.length >= WILD_TAKE_PILE) pair = [pair[0], wilds[0]];
   const ids = pair.map(c => c.id);
   const taken = pair.length === 2 && attempt(s, { type: 'takePile', ids });
   if (!taken || (level === 'easy' && Math.random() >= 0.4)) return { type: 'draw' };
@@ -98,7 +104,7 @@ export function choosePlay(s, level) {
         if (cur.phase === 'play' && g.length >= 3) run({ type: 'meld', ids: g.slice(0, BOOK).map(c => c.id) });
       }
       // Pairs plus a wild card: to start the dirty book we need, or to empty the foot and go out
-      if (cur.phase === 'play' && level !== 'easy' && (goingOut() || racing() || bookCount(cur, team).dirty === 0)) {
+      if (cur.phase === 'play' && level !== 'easy' && (goingOut() || racing() || booksToGo(cur, team).dirty > 0)) {
         for (const g of Object.values(groupHand(hand()).byRank)) {
           const wild = hand().find(isWild);
           if (cur.phase === 'play' && wild && g.length === 2 && !openMeld(cur, team, g[0].rank)) {
@@ -143,7 +149,7 @@ export function choosePlay(s, level) {
       const target = targets[0];
       if (!target) return;
       const room = Math.min(BOOK - target.cards.length, MAX_WILD - target.cards.filter(isWild).length,
-        target.cards.filter(c => !isWild(c)).length - target.cards.filter(isWild).length);
+        target.cards.filter(c => !isWild(c)).length - target.cards.filter(isWild).length - 1);   // wild cards must stay fewer
       const need = Math.min(BOOK - target.cards.length, MAX_WILD - target.cards.filter(isWild).length);
       if (room <= 0) return;
       // Medium and hard only spend wild cards when it finishes the book (or when going out)
@@ -160,6 +166,7 @@ function discardOrder(s, level) {
   if (level === 'easy') return [...hand].sort(() => Math.random() - 0.5);
   const { byRank } = groupHand(hand);
   const keep = c => {
+    if (isRedThree(c)) return -2000;                            // costs 300 if we're caught with it
     if (isBlackThree(c)) return -1000;                          // useless to us, and blocks the pile
     if (isWild(c)) return 1000;
     let score = 0;

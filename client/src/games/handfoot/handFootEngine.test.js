@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { newGame, act, waitingFor, robotAction, viewFor, rotate } from './handFootEngine';
-import { act as rulesAct, dealRound, makeDeck, isBook, isClean, scoreHand, MINIMUMS } from './handFootRules';
+import { act as rulesAct, dealRound, makeDeck, isBook, isClean, scoreHand, canGoOut, booksToGo, MINIMUMS } from './handFootRules';
 
 function autoplay(s, levels = ['hard', 'medium', 'medium', 'easy'], until = () => false) {
   for (let step = 0; step < 100000 && !until(s); step++) {
@@ -13,7 +13,7 @@ function autoplay(s, levels = ['hard', 'medium', 'medium', 'easy'], until = () =
 }
 
 const count = x => x.hands.flat().length + x.feet.flat().length + x.stock.length + x.discard.length
-  + x.redThrees.flat().length + x.melds.flat().reduce((n, m) => n + m.cards.length, 0);
+  + x.melds.flat().reduce((n, m) => n + m.cards.length, 0);
 
 const card = (rank, suit = 'hearts', n = 1) => ({ id: `${rank}-${suit}-${n}`, rank, suit });
 
@@ -26,7 +26,6 @@ describe('Hand and Foot rules', () => {
       expect(s.hands[seat]).toHaveLength(11);
       expect(s.feet[seat]).toHaveLength(11);
     }
-    expect(s.hands.flat().some(c => c.rank === '3' && ['hearts', 'diamonds'].includes(c.suit))).toBe(false);
   });
 
   it('draws two cards, and checks melds', () => {
@@ -37,7 +36,9 @@ describe('Hand and Foot rules', () => {
     const nines = s.hands[0].filter(c => c.rank === '9').slice(0, 2).map(c => c.id);
     expect(() => rulesAct(s, { type: 'meld', ids: nines })).toThrow(/at least 3/);
     const wilds = ['JK-joker-1', '2-clubs-1', '2-hearts-1'];
-    expect(() => rulesAct(s, { type: 'meld', ids: [...nines, ...wilds] })).toThrow(/more wild cards than natural/);
+    expect(() => rulesAct(s, { type: 'meld', ids: [...nines, ...wilds] })).toThrow(/more natural cards than wild/);
+    // Jones family rules: as many wild cards as natural ones isn't allowed either
+    expect(() => rulesAct(s, { type: 'meld', ids: [...nines, 'JK-joker-1', '2-clubs-1'] })).toThrow(/more natural cards than wild/);
     s = rulesAct(s, { type: 'meld', ids: [...nines, 'JK-joker-1'] });
     expect(s.melds[0]).toHaveLength(1);
     // 9s + joker = 70, enough for round 1's 50, so the turn can end
@@ -125,18 +126,113 @@ describe('Hand and Foot rules', () => {
     expect(s.inFoot[0]).toBe(true);
     expect(s.feet[0]).toHaveLength(0);
     expect(s.hands[0]).toHaveLength(11);
-    expect(s.hands[0].filter(c => foot.includes(c)).length).toBe(foot.filter(c => !(c.rank === '3' && ['hearts', 'diamonds'].includes(c.suit))).length);
-    // In the foot with only a clean book: can't go out
+    expect(s.hands[0].filter(c => foot.includes(c)).length).toBe(foot.length);     // red 3s and all
+    // In the foot with 2 clean books and 2 dirty ones: can't go out (Jones family rules: 2 clean + 3 dirty)
+    const dirty = (rank, n = 1) => ({ rank, cards: [...Array.from({ length: 5 }, (_, i) => card(rank, 'clubs', 10 * n + i)), card('2', 'clubs', 10 * n), card('JK', 'joker', 10 * n)] });
+    s.melds[0].push({ rank: 'J', cards: Array.from({ length: 7 }, (_, i) => card('J', 'spades', i + 1)) }, dirty('A'), dirty('Q'));
     s = { ...s, turn: 0, phase: 'play', hands: s.hands.map((h, i) => (i === 0 ? [card('7')] : h)) };
-    expect(() => rulesAct(s, { type: 'discard', id: '7-hearts-1' })).toThrow(/clean book and a dirty book/);
-    // With a dirty book too, discarding the last card goes out
-    s.melds[0].push({ rank: 'A', cards: [...Array.from({ length: 5 }, (_, i) => card('A', 'clubs', i + 1)), card('2'), card('JK', 'joker')] });
+    expect(booksToGo(s, 0)).toEqual({ clean: 0, dirty: 1 });
+    expect(() => rulesAct(s, { type: 'discard', id: '7-hearts-1' })).toThrow(/2 clean books and 3 dirty books/);
+    // With a third dirty book, discarding the last card goes out
+    s.melds[0].push(dirty('10'));
     const out = rulesAct(s, { type: 'discard', id: '7-hearts-1' });
     expect(out.phase).toBe('over');
     expect(out.outBy).toBe(0);
-    expect(out.melds[0].filter(isBook).map(isClean)).toEqual([true, false]);
+    expect(out.melds[0].filter(isBook).map(isClean)).toEqual([true, true, false, false, false]);
     const [us] = scoreHand(out);
-    expect(us).toMatchObject({ clean: 1, dirty: 1, goingOut: 100 });
+    expect(us).toMatchObject({ clean: 2, dirty: 3, goingOut: 100 });
+  });
+});
+
+describe('Jones family rules', () => {
+  const clean = (rank, n = 1) => ({ rank, cards: Array.from({ length: 7 }, (_, i) => card(rank, 'spades', 10 * n + i)) });
+  const dirty = (rank, n = 1) => ({ rank, cards: [...Array.from({ length: 5 }, (_, i) => card(rank, 'clubs', 10 * n + i)), card('2', 'clubs', 10 * n), card('JK', 'joker', 10 * n)] });
+
+  it('an extra clean book counts as a dirty one for going out', () => {
+    const s = dealRound();
+    s.melds[0] = [clean('K'), clean('Q'), clean('J'), dirty('A'), dirty('10')];
+    expect(canGoOut(s, 0)).toBe(true);
+    s.melds[0] = [clean('K'), dirty('Q'), dirty('J'), dirty('A'), dirty('10')];
+    expect(canGoOut(s, 0)).toBe(false);                          // only one clean book
+    expect(booksToGo(s, 0)).toEqual({ clean: 1, dirty: 0 });
+  });
+
+  it('red 3s stay in your hand: they can\'t be melded, but can be discarded (and block the pile)', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.hands[0] = [card('K'), card('5')];
+    s.stock.push(card('3', 'diamonds', 2), card('3', 'hearts', 2));
+    s = rulesAct(s, { type: 'draw' });
+    expect(s.hands[0].filter(c => c.rank === '3' && c.suit !== 'spades' && c.suit !== 'clubs')).toHaveLength(2);
+    expect(() => rulesAct(s, { type: 'meld', ids: ['3-hearts-2', '3-diamonds-2', 'JK-joker-9'] })).toThrow(/3s can't be melded/);
+    s = rulesAct(s, { type: 'discard', id: '3-hearts-2' });
+    expect(s.discard.at(-1).id).toBe('3-hearts-2');
+    s.hands[1] = [card('3', 'spades'), card('3', 'clubs')];
+    expect(() => rulesAct(s, { type: 'takePile', ids: ['3-spades-1', '3-clubs-1'] })).toThrow(/a 3 is on top/);
+  });
+
+  it('each red 3 left in a hand or foot costs 300', () => {
+    let s = dealRound();
+    s.hands = [[card('3', 'hearts'), card('5')], [], [], []];
+    s.feet = [[], [], [card('3', 'diamonds')], []];
+    s.melds = [[], []];
+    const [us, them] = scoreHand({ ...s, outBy: 1 });
+    expect(us.redThrees).toBe(-600);
+    expect(us.left).toBe(5);
+    expect(us.total).toBe(-605);
+    expect(them.redThrees).toBe(-0);
+  });
+
+  it('takes only the top 5 cards of the pile', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    const pile = ['4', '5', '6', '7', '8', 'K', 'Q', '9'].map((r, i) => card(r, 'clubs', 20 + i));
+    s.discard = [...pile];
+    s.hands[0] = [card('9'), card('9', 'spades'), card('A')];
+    s = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '9-spades-1'] });
+    expect(s.discard.map(c => c.id)).toEqual(pile.slice(0, 3).map(c => c.id));
+    expect(s.hands[0].map(c => c.rank).sort()).toEqual(['7', '8', 'A', 'K', 'Q'].sort());
+  });
+
+  it('takes the pile with one matching card and a wild card', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.discard = [card('5', 'clubs'), card('9', 'spades')];
+    s.hands[0] = [card('9'), card('2', 'clubs'), card('K'), card('K', 'clubs')];
+    expect(() => rulesAct(s, { type: 'takePile', ids: ['K-hearts-1', '2-clubs-1'] })).toThrow(/one 9 and a wild card/);
+    expect(() => rulesAct(s, { type: 'takePile', ids: ['9-hearts-1'] })).toThrow(/two 9s/);
+    s = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '2-clubs-1'] });
+    expect(s.melds[0][0].cards.map(c => c.rank).sort()).toEqual(['2', '9', '9']);
+    expect(s.hands[0].map(c => c.id)).toContain('5-clubs-1');
+  });
+
+  it('starts a new meld when the wild card can\'t join the open one', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = [{ rank: '9', cards: [card('9', 'clubs', 5), card('9', 'clubs', 6), card('JK', 'joker', 5)] }];
+    s.discard = [card('9', 'spades')];
+    s.hands[0] = [card('9'), card('2', 'clubs'), card('K')];
+    // 9s so far: 2 natural + 1 wild; adding 9, 9, 2 would make 4 + 2 — fine, so they join it
+    let t = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '2-clubs-1'] });
+    expect(t.melds[0]).toHaveLength(1);
+    expect(t.melds[0][0].cards).toHaveLength(6);
+    // But a meld already at its wild-card limit (3 natural, 2 wild) can't take another: a new meld starts
+    s.melds[0] = [{ rank: '9', cards: [card('9', 'clubs', 5), card('9', 'clubs', 6), card('9', 'clubs', 7), card('JK', 'joker', 5), card('2', 'hearts', 5)] }];
+    s.hands[0] = [card('9'), card('2', 'clubs'), card('JK', 'joker', 6), card('K')];
+    t = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '2-clubs-1'] });
+    expect(t.melds[0].map(m => m.cards.length)).toEqual([5, 3]);
+  });
+
+  it('won\'t let wild cards catch up with the natural ones on a meld', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = [{ rank: '8', cards: [card('8', 'clubs', 5), card('8', 'clubs', 6), card('8', 'clubs', 7)] }];
+    s = rulesAct(s, { type: 'draw' });
+    s.hands[0] = [card('2', 'clubs'), card('2', 'spades'), card('JK', 'joker'), card('5')];
+    expect(() => rulesAct(s, { type: 'meld', ids: ['2-clubs-1', '2-spades-1', 'JK-joker-1'], target: 0 })).toThrow(/more natural cards than wild/);
+    s = rulesAct(s, { type: 'meld', ids: ['2-clubs-1', '2-spades-1'], target: 0 });
+    expect(s.melds[0][0].cards).toHaveLength(5);
+    expect(() => rulesAct(s, { type: 'meld', ids: ['JK-joker-1'], target: 0 })).toThrow(/more natural cards than wild/);
   });
 });
 

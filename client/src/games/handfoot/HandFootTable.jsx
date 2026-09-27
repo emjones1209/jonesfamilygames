@@ -12,8 +12,8 @@ import { Button } from '../../components/Button';
 import { RulesButton } from '../../components/RulesButton';
 import { ResultPanel } from '../cards/GameSetup';
 import {
-  sortHand, topOfPile, teamOf, minimumFor, meldedValue, bookCount, isWild, isBlackThree, isBook, isClean,
-  ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK,
+  act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, bookCount, booksToGo, canGoOut,
+  isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE,
 } from './handFootRules';
 import { waitingFor } from './handFootEngine';
 
@@ -54,20 +54,21 @@ function MeldTile({ meld, onClick, fresh }) {
   );
 }
 
-function MeldArea({ title, melds, redThrees, books, onMeldClick, extra, freshRank }) {
+/** `canTake(i)`: whether the selected cards may go on meld i (only those light up to be tapped). */
+function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, extra, freshRank }) {
   return (
     <div className="card-panel p-2">
       <div className="flex items-center justify-between text-xs text-white/60 mb-1 gap-2">
         <span className="font-semibold text-white/80">{title}</span>
         <span className="text-right">
-          Books: {books.clean} clean · {books.dirty} dirty{redThrees > 0 && ` · Red 3s: ${'🔴'.repeat(redThrees)}`} {extra}
+          Books: {books.clean} clean · {books.dirty} dirty {extra}
         </span>
       </div>
       <div className="flex flex-wrap gap-1.5 min-h-16 md:min-h-[4.5rem] items-center">
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
         {melds.map((m, i) => (
           <MeldTile key={`${m.rank}-${i}`} meld={m} fresh={!isBook(m) && m.rank === freshRank}
-            onClick={onMeldClick ? () => onMeldClick(m, i) : undefined} />
+            onClick={onMeldClick && canTake(i) ? () => onMeldClick(m, i) : undefined} />
         ))}
       </div>
     </div>
@@ -81,7 +82,7 @@ function describe(m, names) {
   const v = (they, yours) => `${who} ${you ? yours : they}`;
   const foot = m.foot ? ` ${you ? 'You pick up your foot' : `${who} picks up their foot`}!` : '';
   switch (m.kind) {
-    case 'draw': return `${v('draws', 'draw')} 2 cards${m.reds ? ` (and ${m.reds > 1 ? `${m.reds} red 3s` : 'a red 3'} — +${m.reds * 100})` : ''}.`;
+    case 'draw': return `${v('draws', 'draw')} 2 cards.`;
     case 'takePile': return `${v('takes', 'take')} the pile (${cardCount(m.count)}) with the ${m.rank}s!`;
     case 'meld': return `${m.book ? `${v('finishes', 'finish')} a book of ${m.rank}s!`
       : m.onBook ? `${v('adds', 'add')} ${plural(m.count, m.rank)} to the book of ${m.rank}s.`
@@ -133,11 +134,18 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const top = topOfPile(view);
   const need = view.initialDone[0] ? null : minimumFor(view);
   const ourBooks = bookCount(view, 0);
-  const canOut = ourBooks.clean >= 1 && ourBooks.dirty >= 1;
+  const canOut = canGoOut(view, 0);
+  const toGo = booksToGo(view, 0);
+  const booksLeft = [toGo.clean && `${toGo.clean} clean`, toGo.dirty && `${toGo.dirty} dirty`].filter(Boolean).join(' + ');
+  const redThrees = hand.filter(isRedThree).length;
   const hint = !playing ? '' : !yourTurn ? `${names[view.turn]} is playing…`
     : view.phase === 'draw'
-      ? 'Tap the stock to draw 2 — or select two cards matching the top of the pile, then tap the pile to take it.'
+      ? 'Tap the stock to draw 2 — or select two cards matching the top of the pile (or one and a wild card), then tap the pile to take its top 5.'
       : 'Select cards and tap Meld (or tap one of your melds to add to it). Finish by discarding one card.';
+  // Which of our melds the selected cards could go on (the rules decide, so wild cards never break the limit)
+  const canTake = i => {
+    try { rulesAct(view, { type: 'meld', ids: selected, target: i }); return true; } catch { return false; }
+  };
   const localNote = note && note.move === view.moves[0] ? note.text : null;
   const result = view.result;
 
@@ -155,7 +163,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         </div>
         <div className="text-right text-xs">
           <div className="text-white/90 font-semibold">{view.scores.map((sc, side) => `${sideName(side)} ${sc}`).join(' · ')}</div>
-          <div className="text-white/50">{need ? `First meld needs ${need}` : canOut ? 'You can go out from your foot' : 'Go out needs a clean + a dirty book'}</div>
+          <div className="text-white/50">{need ? `First meld needs ${need}` : canOut ? 'You can go out from your foot' : `To go out: ${booksLeft} more book${toGo.clean + toGo.dirty === 1 ? '' : 's'}`}</div>
         </div>
       </header>
 
@@ -170,7 +178,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
 
       {opponents.map(side => (
         <MeldArea key={side} title={partners ? 'Their melds' : `${names[side]}'s melds`}
-          melds={view.melds[side]} redThrees={view.redThrees[side].length} books={bookCount(view, side)}
+          melds={view.melds[side]} books={bookCount(view, side)}
           freshRank={fresh?.team === side ? fresh.rank : null} />
       ))}
 
@@ -192,10 +200,11 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         </div>
       </div>
 
-      <MeldArea title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} redThrees={view.redThrees[0].length} books={ourBooks}
+      <MeldArea title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} books={ourBooks}
         freshRank={fresh?.team === 0 ? fresh.rank : null}
         extra={!view.initialDone[0] && view.melds[0].length ? `(${meldedValue(view, 0)} of ${need})` : ''}
-        onMeldClick={yourTurn && view.phase === 'play' && selected.length ? (m, i) => meld(m.rank, i) : undefined} />
+        onMeldClick={yourTurn && view.phase === 'play' && selected.length ? (m, i) => meld(m.rank, i) : undefined}
+        canTake={canTake} />
 
       {/* The latest move, with the one before it underneath (fixed height, so nothing jumps) */}
       <div className="text-center min-h-[2.5rem]">
@@ -208,13 +217,20 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
       {/* Your hand (or foot): tap cards to select several */}
       <p className="text-center text-white/50 text-xs">
         {view.inFoot[0] ? '🦶 Playing your foot' : `✋ Playing your hand · your foot of ${view.feet[0].length} cards is waiting`}
+        {redThrees > 0 && <span className="text-red-300"> · 🔴 {redThrees === 1 ? 'a red 3' : `${redThrees} red 3s`}: −{RED_THREE * redThrees} if you&apos;re caught with {redThrees === 1 ? 'it' : 'them'} — discard {redThrees === 1 ? 'it' : 'them'}!</span>}
       </p>
-      <div className="flex flex-wrap justify-center gap-y-3 pt-1 pl-6 md:pl-8">
-        {hand.map(c => (
-          <div key={c.id} className="-ml-6 md:-ml-8">
-            <HFCard card={c} selected={selected.includes(c.id)} onClick={yourTurn ? () => toggle(c.id) : undefined} />
-          </div>
-        ))}
+      {/* Selected cards rise well clear of the row, so they're easy to see — and their whole
+          top edge shows, a bigger place to tap them again (the cards still overlap as before,
+          so the card next to one stays easy to tap too) */}
+      <div className="flex flex-wrap justify-center gap-y-3 pt-5 pl-6 md:pl-8">
+        {hand.map(c => {
+          const isSelected = selected.includes(c.id);
+          return (
+            <div key={c.id} className={`-ml-6 md:-ml-8 transition-transform ${isSelected ? '-translate-y-4' : ''}`}>
+              <HFCard card={c} selected={isSelected} onClick={yourTurn ? () => toggle(c.id) : undefined} />
+            </div>
+          );
+        })}
       </div>
 
       <div className="flex justify-center gap-2 flex-wrap">
@@ -229,6 +245,9 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
             <Button variant="gold" disabled={selected.length !== 1} onClick={discard}>Discard</Button>
             <Button variant="ghost" onClick={undo}>Undo</Button>
           </>
+        )}
+        {yourTurn && selected.length > 0 && (
+          <Button variant="ghost" onClick={() => setSelected([])}>✕ Unselect {selected.length === 1 ? 'card' : `all ${selected.length}`}</Button>
         )}
       </div>
       <p className="text-center text-white/50 text-xs">{hint}</p>
@@ -255,7 +274,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
               {[
                 ['Clean books', r => r.clean * CLEAN_BOOK],
                 ['Dirty books', r => r.dirty * DIRTY_BOOK],
-                ['Red 3s', r => r.redThrees],
+                ['Red 3s caught', r => r.redThrees],
                 ['Going out', r => r.goingOut],
                 ['Cards melded', r => r.cards],
                 ['Left in hands & feet', r => -r.left],

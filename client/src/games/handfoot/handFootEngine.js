@@ -16,7 +16,7 @@
  * A computer player plans its whole turn at once but plays it a step at a
  * time: the rest of the plan waits in `robotPlan`, which nobody is ever sent.
  */
-import { dealRound, act as rulesAct, scoreHand, teamOf, nextSeat, topOfPile, isNatural, ROUNDS } from './handFootRules.js';
+import { dealRound, act as rulesAct, scoreHand, teamOf, nextSeat, topOfPile, isNatural, ROUNDS, TAKE } from './handFootRules.js';
 import { chooseDraw, choosePlay } from './handFootAI.js';
 
 const MOVES = ['draw', 'takePile', 'meld', 'undo', 'discard'];
@@ -38,8 +38,8 @@ function describe(before, after, seat, a) {
   const team = teamOf(before, seat);
   const foot = !before.inFoot[seat] && after.inFoot[seat];
   switch (a.type) {
-    case 'draw': return { seat, kind: 'draw', reds: after.redThrees[team].length - before.redThrees[team].length };
-    case 'takePile': return { seat, kind: 'takePile', count: Math.min(before.discard.length, 7), rank: topOfPile(before).rank };
+    case 'draw': return { seat, kind: 'draw' };
+    case 'takePile': return { seat, kind: 'takePile', count: Math.min(before.discard.length, TAKE), rank: topOfPile(before).rank };
     case 'meld': {
       const cards = a.ids.map(id => before.hands[seat].find(c => c.id === id)).filter(Boolean);
       const rank = cards.find(isNatural)?.rank ?? a.rank;
@@ -135,7 +135,7 @@ export function rotate(s, seat) {
     ...s,
     turn: r(s.turn), dealer: r(s.dealer), outBy: r(s.outBy),
     hands: arr(s.hands), feet: arr(s.feet), inFoot: arr(s.inFoot),
-    redThrees: teams(s.redThrees), melds: teams(s.melds), initialDone: teams(s.initialDone), scores: teams(s.scores),
+    melds: teams(s.melds), initialDone: teams(s.initialDone), scores: teams(s.scores),
     history: s.history.map(teams),
     discardLog: s.discardLog.map(d => ({ ...d, seat: r(d.seat) })),
     moves: s.moves.map(m => ({ ...m, seat: r(m.seat) })),

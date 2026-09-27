@@ -37,11 +37,14 @@ export function PlayingCard({
     <motion.div
       className={`
         ${cardClasses(size)} bg-white border-2 flex flex-col justify-between p-1 select-none isolate
-        ${selected ? 'border-primary-500 shadow-lg shadow-primary-500/50 -translate-y-2' : 'border-gray-300'}
+        ${selected ? 'border-primary-500 shadow-lg shadow-primary-500/50' : 'border-gray-300'}
         ${onClick && !disabled ? 'cursor-pointer hover:border-primary-400' : 'cursor-default'}
         ${disabled ? 'opacity-60' : ''}
         ${className}
       `}
+      // A selected card lifts. (Done by the animation, not a translate class: the layout
+      // animation below sets the transform itself, so a class would be overridden.)
+      animate={{ y: selected ? -8 : 0 }}
       whileTap={onClick && !disabled ? { scale: 0.95 } : {}}
       onClick={disabled ? undefined : onClick}
       layout
