@@ -112,6 +112,14 @@ export const TUTORIALS = {
     { emoji: '💡', heading: 'Tips', body: 'Keep your biggest tile in a corner and build the row next to it in order (e.g. 256, 128, 64, 32).\nTry to use just two or three directions — only swipe away from your corner when you have to.' },
     { emoji: '↩️', heading: 'Undo & Game Over', body: 'You get one Undo each game to take back a move (before the game ends).\nThe game ends when the board is full and no tiles can join. Make 2048 to win — then keep going for an even bigger score if you like!' },
   ],
+  euchre: [
+    { emoji: '♦️', heading: 'Goal', body: 'You and your partner (sitting across from you) play against the other two. Win points by taking tricks — the first team to 10 points wins.\nEach player gets 5 cards from a small deck: just the 9, 10, J, Q, K and A of each suit.' },
+    { emoji: '🙋', heading: 'Choosing Trump', body: 'One card is turned face up. Going round the table, each player can "order it up" to make that suit trump (the dealer then picks up the card and throws one away) — or pass.\nIf everyone passes, the card is turned down and each player may name any other suit instead. If it comes back to the dealer, the dealer has to choose ("stick the dealer").' },
+    { emoji: '🃏', heading: 'The Bowers', body: 'Trump cards beat all other cards. The highest trump is the jack of trump (the right bower). Next is the other jack of the same colour (the left bower) — it counts as a trump card, not as its own suit! Then A, K, Q, 10, 9 of trump.\nExample: hearts are trump → J♥, then J♦, then A♥, K♥, Q♥, 10♥, 9♥.' },
+    { emoji: '🎯', heading: 'Playing', body: 'The player on the dealer\'s left leads. Everyone must follow the suit that was led if they can; if you can\'t, play any card — a trump will win the trick.\nThe highest trump wins; if no trump was played, the highest card of the suit led wins. The winner leads next.' },
+    { emoji: '🏆', heading: 'Scoring', body: 'The team that chose trump needs at least 3 of the 5 tricks:\n3 or 4 tricks = 1 point\nAll 5 tricks (a "march") = 2 points\nFewer than 3 = "euchred": the other team gets 2 points!' },
+    { emoji: '🦸', heading: 'Going Alone', body: 'With a really strong hand, the player who chooses trump can go alone: their partner puts their cards down and sits the hand out.\nTake all 5 tricks alone for 4 points (3 or 4 tricks still score 1).' },
+  ],
   wordsearch: [
     { emoji: '🔍', heading: 'Goal', body: 'Find every word in the list hidden in the grid of letters. Words run in straight lines.' },
     { emoji: '👆', heading: 'Selecting a Word', body: 'Drag your finger from the first letter of a word to the last.\nOr tap the first letter, then tap the last one.\nFound words get coloured in and crossed off the list.' },

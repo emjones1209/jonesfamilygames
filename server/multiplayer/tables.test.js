@@ -251,10 +251,12 @@ const engines = {
   canasta: require('../../client/src/games/canasta/canastaEngine.js'),
   handfoot: require('../../client/src/games/handfoot/handFootEngine.js'),
   dice: require('../../client/src/games/dice/diceEngine.js'),
+  euchre: require('../../client/src/games/euchre/euchreEngine.js'),
 };
 
 /** Cards this view shows from hands other than `you`'s (Bridge's dummy is allowed once it's on the table). */
 function peeked(game, v, you) {
+  if (game === 'euchre' && (v.kitty.some(Boolean) || (you !== v.dealer && v.discarded))) return true;
   if (game === 'dice') return false;
   if (v.robotPlan) return true;
   const hands = v.table ? v.table.hands : v.hands;
@@ -290,7 +292,8 @@ for (const [game, robots] of tablesToPlay) {
         ? (v.phase === 'draw' ? { type: 'draw' } : { type: 'discard', id: v.hands[t.you][0].id })
         : engine.robotAction(v, t.you, 'medium');
       // Hearts: the others' passes arrive before ours is counted, so only pass once a hand
-      if (action.type === 'pass') { if (passedHand === v.handNo) return; passedHand = v.handNo; }
+      // (In Euchre, "pass" is a bid, and you may pass in both rounds)
+      if (game === 'hearts' && action.type === 'pass') { if (passedHand === v.handNo) return; passedHand = v.handNo; }
       me.socket.emit('mp:action', { action });
     }, 1));
     me.socket.emit('mp:start');

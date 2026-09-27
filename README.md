@@ -10,6 +10,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - ♥️ Hearts
 - ♠️ Spades
 - 🐦 Rook
+- ♦️ Euchre
 - ♣️ Canasta (classic partnership)
 - 🦶 Hand and Foot (partnership, five decks)
 - 🚂 Mexican Train dominoes

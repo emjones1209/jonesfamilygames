@@ -17,6 +17,7 @@ export function CardHand({
   renderCard = defaultRender,
   label,
   wrap = false,
+  hints = { selected: 'Tap again to play', active: 'Your turn — pick a card' },
 }) {
   const [selectedId, setSelectedId] = useState(null);
   const active = legal.length > 0;
@@ -52,7 +53,7 @@ export function CardHand({
         })}
       </div>
       <p className="text-center text-white/50 text-xs mt-1 h-4">
-        {selected ? 'Tap again to play' : active ? 'Your turn — pick a card' : ''}
+        {selected ? hints.selected : active ? hints.active : ''}
       </p>
     </div>
   );

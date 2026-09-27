@@ -14,6 +14,7 @@ const GAMES = [
   { id: 'rook',            name: 'Rook',             emoji: '🐦',  color: 'from-orange-700 to-orange-900',   path: '/games/rook',            desc: 'The classic Rook card game' },
   { id: 'canasta',         name: 'Canasta',          emoji: '♣️',  color: 'from-emerald-700 to-emerald-900', path: '/games/canasta',         desc: 'Meld, build canastas, go out!' },
   { id: 'handfoot',        name: 'Hand and Foot',    emoji: '🦶',  color: 'from-cyan-700 to-cyan-900',       path: '/games/handfoot',        desc: 'Play your hand, then your foot!' },
+  { id: 'euchre',          name: 'Euchre',           emoji: '♦️',  color: 'from-rose-800 to-rose-950',       path: '/games/euchre',          desc: 'Call trump, watch the bowers!' },
   { id: 'bridge',          name: 'Bridge',           emoji: '🌉',  color: 'from-teal-700 to-teal-900',       path: '/games/bridge',          desc: 'Full Bridge with bidding' },
   { id: 'train',           name: 'Mexican Train',    emoji: '🚂',  color: 'from-sky-700 to-sky-900',         path: '/games/train',           desc: 'Dominoes for the whole family' },
   { id: 'dice',            name: 'Five Dice',        emoji: '🎲',  color: 'from-rose-700 to-rose-900',       path: '/games/dice',            desc: 'Roll, hold and score!' },

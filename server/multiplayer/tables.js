@@ -56,6 +56,10 @@ const GAMES = {
     name: 'Bridge', seats: 4, engine: load('bridge/bridgeEngine'),
     moves: ['bid', 'play'], tableMoves: ['nextHand'],
   },
+  euchre: {
+    name: 'Euchre', seats: 4, engine: load('euchre/euchreEngine'),
+    moves: ['call', 'pass', 'discard', 'play'], tableMoves: ['nextHand', 'newGame'],
+  },
   canasta: {
     name: 'Canasta', seats: 4, engine: load('canasta/canastaEngine'), pace: 2,
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],

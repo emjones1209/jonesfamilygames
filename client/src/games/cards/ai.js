@@ -24,13 +24,14 @@ import {
  * @param trump       trump suit or null
  * @param suitOf/rankOf  card accessors (Rook treats the Rook bird as trump)
  * @param pointsOf    card → points it is worth (Rook); 0 for other games
- * @param seats       players per trick
+ * @param seats       players at the table
+ * @param sittingOut  a seat that isn't playing this hand (Euchre's lone player's partner), or null
  * @param memory      tableMemory() for this seat — Hard play needs it
  * @param trumpTeam   team that chose trump (Bridge declarer, Rook bidder); null in Spades
  */
 export function choosePartnershipCard({
   legal, trick, seat, difficulty = 'medium', trump = null,
-  suitOf = standardSuit, rankOf = standardRank, pointsOf = () => 0, seats = 4,
+  suitOf = standardSuit, rankOf = standardRank, pointsOf = () => 0, seats = 4, sittingOut = null,
   memory = null, trumpTeam = null,
 }) {
   if (legal.length === 1) return legal[0];
@@ -66,8 +67,10 @@ export function choosePartnershipCard({
   // ── Following ────────────────────────────────────────────────────────────
   const winnerSeat = trick[winningIndex(trick, opts)].seat;
   const partnerWinning = winnerSeat === partnerOf(seat);
-  const lastToPlay = trick.length === seats - 1;
-  const later = Array.from({ length: seats - 1 - trick.length }, (_, i) => (seat + 1 + i) % seats);
+  // The other players in turn after this seat, leaving out anyone sitting this hand out
+  const others = Array.from({ length: seats - 1 }, (_, i) => (seat + 1 + i) % seats).filter(s => s !== sittingOut);
+  const lastToPlay = trick.length === others.length;
+  const later = others.slice(0, others.length - trick.length);
   const laterOpponents = later.filter(s => teamOf(s) !== teamOf(seat));
   const winners = legal.filter(c => wouldWin(trick, c, seat, opts));
   const losers = legal.filter(c => !winners.includes(c));
