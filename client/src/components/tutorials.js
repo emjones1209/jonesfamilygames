@@ -128,6 +128,14 @@ export const TUTORIALS = {
     { emoji: '🏆', heading: 'Scoring', body: 'Knock with less deadwood than your opponent and you score the difference.\nBut if they have the same or less, it\'s an undercut: they score the difference plus 25!\nGin (no deadwood at all) scores 25 plus their deadwood, and they can\'t lay off. Big Gin (all 11 cards in melds after you draw) scores 31 plus their deadwood.' },
     { emoji: '🎁', heading: 'Game Bonus', body: 'The first to 100 wins the game and gets 100 bonus points. Each player also gets 25 for every hand they won.\nIf the stock runs down to 2 cards without a knock, the hand is a draw — nobody scores.' },
   ],
+  checkers: [
+    { emoji: '⚫', heading: 'Goal', body: 'Capture all of your opponent\'s pieces — or leave them with no move to make. Black moves first; you swap colours each game.\nYour pieces start at the bottom of the board and only ever sit on the dark squares.' },
+    { emoji: '↗️', heading: 'Moving', body: 'Pieces move one square diagonally forward, onto an empty dark square.\nTap a piece and dots show where it can go; tap a dot to move there.' },
+    { emoji: '🦘', heading: 'Jumping', body: 'Jump over an opponent\'s piece diagonally, onto the empty square just beyond it, and it\'s captured.\nIf you can jump, you must! Pieces that can jump are outlined for you. And if your piece can jump again after landing, it keeps going — a double or triple jump, all in one turn.' },
+    { emoji: '👑', heading: 'Kings', body: 'Reach the far side of the board and your piece is crowned king (reaching it ends your turn). Kings can move and jump backwards as well as forwards.' },
+    { emoji: '💡', heading: 'Help', body: 'A red ring warns you when one of your pieces could be captured on your opponent\'s next turn.\nTap Suggest to see a good move in green and why it\'s good. Against the computer, Undo takes back your last move.' },
+    { emoji: '🤝', heading: 'Draws', body: 'The game is a draw if 40 moves go by for each player with no capture and no ordinary piece moving (just kings going back and forth), or if the same position comes up three times.' },
+  ],
   wordsearch: [
     { emoji: '🔍', heading: 'Goal', body: 'Find every word in the list hidden in the grid of letters. Words run in straight lines.' },
     { emoji: '👆', heading: 'Selecting a Word', body: 'Drag your finger from the first letter of a word to the last.\nOr tap the first letter, then tap the last one.\nFound words get coloured in and crossed off the list.' },

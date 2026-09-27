@@ -31,6 +31,8 @@ import { rotate as rotateEuchre } from '../games/euchre/euchreEngine';
 import { EuchreTable } from '../games/euchre/EuchreTable';
 import { rotate as rotateGin } from '../games/gin/ginEngine';
 import { GinTable } from '../games/gin/GinTable';
+import { rotate as rotateCheckers, unrotateAction as unrotateCheckers } from '../games/checkers/checkersEngine';
+import { CheckersTable } from '../games/checkers/CheckersTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
 import { ReactionBursts, ReactionPicker, REACTION_MS } from '../components/Reactions';
 
@@ -57,6 +59,10 @@ const GAMES = {
   canasta: { name: 'Canasta', Table: CanastaTable, rotate: rotateCanasta, seatNote: PARTNERS },
   euchre: { name: 'Euchre', Table: EuchreTable, rotate: rotateEuchre, seatNote: PARTNERS },
   gin: { name: 'Gin Rummy', Table: GinTable, rotate: rotateGin, seatNote: 'Two players, head to head.' },
+  checkers: {
+    name: 'Checkers', Table: CheckersTable, rotate: rotateCheckers, unrotate: unrotateCheckers,
+    seatNote: 'Two players. Seat 1 plays Black and moves first; colours swap each game.',
+  },
   handfoot: {
     name: 'Hand and Foot', Table: HandFootTable, rotate: rotateHandFoot, minSeats: 3,
     seatNote: 'Four players: seats 1 & 3 are partners, and so are seats 2 & 4. Or three, each for themselves (leave a seat empty).',

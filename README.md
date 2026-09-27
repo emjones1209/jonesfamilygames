@@ -18,6 +18,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - 🎲 Five Dice (Yahtzee-style)
 - 🌉 Bridge (Full)
 - ⛳ 6-Card Golf
+- ⚫ Checkers
 - 🧩 Jigsaw Puzzle (use your own photos!)
 - 🌸 Garden Match (Candy Crush-style)
 - 💣 Minesweeper

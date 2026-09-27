@@ -64,6 +64,10 @@ const GAMES = {
     name: 'Gin Rummy', seats: 2, engine: load('gin/ginEngine'), pace: 1.2,
     moves: ['draw', 'pass', 'discard', 'knock'], tableMoves: ['nextHand', 'newGame'],
   },
+  checkers: {
+    name: 'Checkers', seats: 2, engine: load('checkers/checkersEngine'),
+    moves: ['move', 'resign'], tableMoves: ['newGame'],
+  },
   canasta: {
     name: 'Canasta', seats: 4, engine: load('canasta/canastaEngine'), pace: 2,
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],

@@ -20,6 +20,7 @@ const GAMES = [
   { id: 'train',           name: 'Mexican Train',    emoji: '🚂',  color: 'from-sky-700 to-sky-900',         path: '/games/train',           desc: 'Dominoes for the whole family' },
   { id: 'dice',            name: 'Five Dice',        emoji: '🎲',  color: 'from-rose-700 to-rose-900',       path: '/games/dice',            desc: 'Roll, hold and score!' },
   { id: 'golf6',           name: '6-Card Golf',      emoji: '⛳',  color: 'from-lime-700 to-lime-900',       path: '/games/golf6',           desc: 'Lowest score wins!' },
+  { id: 'checkers',        name: 'Checkers',         emoji: '⚫',  color: 'from-amber-800 to-amber-950',     path: '/games/checkers',        desc: 'Jump your way to a king!' },
   { id: 'jigsaw',          name: 'Jigsaw Puzzle',    emoji: '🧩',  color: 'from-pink-700 to-pink-900',       path: '/games/jigsaw',          desc: 'Use your own photos!' },
   { id: 'match3',       name: 'Garden Match',  emoji: '🌸',  color: 'from-fuchsia-700 to-fuchsia-900', path: '/games/match3',       desc: 'Match flowers to bloom!' },
   { id: 'minesweeper',  name: 'Minesweeper',   emoji: '💣',  color: 'from-zinc-600 to-zinc-900',       path: '/games/minesweeper',  desc: 'Clear the minefield!' },
