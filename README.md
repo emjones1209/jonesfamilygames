@@ -20,6 +20,8 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - 🌸 Garden Match (Candy Crush-style)
 - 💣 Minesweeper
 - 🔢 2048
+- 🔍 Word Search (a new theme every day)
+- 🔍 Word Search (a new theme every day)
 
 ## Features
 - Full user accounts (JWT auth)

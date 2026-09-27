@@ -112,6 +112,12 @@ export const TUTORIALS = {
     { emoji: '💡', heading: 'Tips', body: 'Keep your biggest tile in a corner and build the row next to it in order (e.g. 256, 128, 64, 32).\nTry to use just two or three directions — only swipe away from your corner when you have to.' },
     { emoji: '↩️', heading: 'Undo & Game Over', body: 'You get one Undo each game to take back a move (before the game ends).\nThe game ends when the board is full and no tiles can join. Make 2048 to win — then keep going for an even bigger score if you like!' },
   ],
+  wordsearch: [
+    { emoji: '🔍', heading: 'Goal', body: 'Find every word in the list hidden in the grid of letters. Words run in straight lines.' },
+    { emoji: '👆', heading: 'Selecting a Word', body: 'Drag your finger from the first letter of a word to the last.\nOr tap the first letter, then tap the last one.\nFound words get coloured in and crossed off the list.' },
+    { emoji: '📅', heading: 'Puzzle of the Day', body: 'There\'s a new theme every day, and everyone in the family gets the same puzzle — so you can see who finds all the words fastest!\nOnce you\'ve done today\'s puzzle, you can play as many extra puzzles in today\'s theme as you like.' },
+    { emoji: '🎚️', heading: 'Difficulty', body: 'Easy: 8×8, words go across and down\nMedium: 10×10, words can also go diagonally\nHard: 12×12, words can also go backwards' },
+  ],
   match3: [
     { emoji: '🌸', heading: 'Goal', body: 'Swipe a flower toward a neighbour to swap them (or tap one, then the other) and line up 3 or more of the same kind. Reach the level goal before you run out of moves!' },
     { emoji: '✨', heading: 'Special Tiles', body: '🌟 Match 4 in a line = star (clears its row)\n💧 Match 5 in a line = water drop (clears its column)\n☀️ Match in an L or T shape = sun (clears a 3×3 area)\n\nA special keeps its flower, with a badge in the corner — match it with that flower to set it off. Everything a blast clears scores points, and a blast that hits another special sets it off too!' },

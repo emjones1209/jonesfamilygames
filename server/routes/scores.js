@@ -47,4 +47,38 @@ router.get('/leaderboard/:game', async (req, res) => {
   res.json(result.rows);
 });
 
+// GET /api/scores/daily/:game?date=YYYY-MM-DD — the family's times on a daily puzzle
+// (scores posted with metadata.daily = that date): each player's first finish at
+// each difficulty, fastest first. Filtered here rather than in SQL because
+// metadata is JSONB in PostgreSQL but text in SQLite.
+const DAILY_SCAN = 500;
+router.get('/daily/:game', requireAuth, async (req, res) => {
+  const { game } = req.params;
+  const { date } = req.query;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+  try {
+    const result = await pool.query(
+      `SELECT s.user_id, u.display_name, u.avatar, s.score, s.duration_s, s.difficulty, s.metadata, s.created_at
+       FROM scores s JOIN users u ON s.user_id = u.id
+       WHERE s.game = $1
+       ORDER BY s.created_at DESC, s.id DESC
+       LIMIT ${DAILY_SCAN}`,
+      [game]
+    );
+    const firsts = new Map();
+    for (const row of result.rows.reverse()) {       // oldest first, so each player's first finish wins
+      const meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : (row.metadata ?? {});
+      const key = `${row.user_id}:${row.difficulty}`;
+      if (meta.daily !== date || firsts.has(key)) continue;
+      firsts.set(key, {
+        displayName: row.display_name, avatar: row.avatar, difficulty: row.difficulty,
+        seconds: row.duration_s, score: row.score, you: row.user_id === req.user.id,
+      });
+    }
+    res.json([...firsts.values()].sort((a, b) => a.seconds - b.seconds));
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

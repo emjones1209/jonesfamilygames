@@ -28,6 +28,7 @@ import JigsawGame from "./games/jigsaw/JigsawGame";
 import Match3Game from "./games/match3/Match3Game";
 import MinesweeperGame from "./games/minesweeper/MinesweeperGame";
 import Game2048 from "./games/g2048/Game2048";
+import WordSearchGame from "./games/wordsearch/WordSearchGame";
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -75,6 +76,7 @@ function AppRoutes() {
       <Route path="/games/match3" element={<ProtectedRoute><Match3Game /></ProtectedRoute>} />
       <Route path="/games/minesweeper" element={<ProtectedRoute><MinesweeperGame /></ProtectedRoute>} />
       <Route path="/games/2048" element={<ProtectedRoute><Game2048 /></ProtectedRoute>} />
+      <Route path="/games/wordsearch" element={<ProtectedRoute><WordSearchGame /></ProtectedRoute>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

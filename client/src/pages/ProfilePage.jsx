@@ -5,12 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/Button';
 import api from '../utils/api';
-
-const AVATARS = ['default','cat','dog','star','heart','flower','sun','moon','crown','angel'];
-const AVATAR_EMOJIS = {
-  default:'😊', cat:'🐱', dog:'🐶', star:'⭐', heart:'❤️',
-  flower:'🌸', sun:'☀️', moon:'🌙', crown:'👑', angel:'😇',
-};
+import { AVATARS, AVATAR_EMOJIS } from '../utils/avatars';
 
 export default function ProfilePage() {
   const { user, updateUser, logout } = useAuth();

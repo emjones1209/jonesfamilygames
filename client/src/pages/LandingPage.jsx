@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
+import { avatarEmoji } from '../utils/avatars';
 
 const GAMES = [
   { id: 'bible-trivia',    name: 'Bible Trivia',    emoji: '✝️',  color: 'from-purple-700 to-purple-900',   path: '/games/trivia/bible',    desc: 'Test your scripture knowledge' },
@@ -21,6 +22,7 @@ const GAMES = [
   { id: 'match3',       name: 'Garden Match',  emoji: '🌸',  color: 'from-fuchsia-700 to-fuchsia-900', path: '/games/match3',       desc: 'Match flowers to bloom!' },
   { id: 'minesweeper',  name: 'Minesweeper',   emoji: '💣',  color: 'from-zinc-600 to-zinc-900',       path: '/games/minesweeper',  desc: 'Clear the minefield!' },
   { id: 'g2048',        name: '2048',          emoji: '🔢',  color: 'from-yellow-600 to-orange-800',   path: '/games/2048',         desc: 'Slide and join the numbers!' },
+  { id: 'wordsearch',   name: 'Word Search',   emoji: '🔍',  color: 'from-violet-700 to-indigo-900',   path: '/games/wordsearch',   desc: 'A new theme every day!' },
 ];
 
 export default function LandingPage() {
@@ -52,7 +54,7 @@ export default function LandingPage() {
               onClick={() => navigate('/profile')}
               className="flex items-center gap-2 bg-white/10 hover:bg-white/20 transition-colors rounded-2xl px-3 py-2"
             >
-              <span className="text-lg">{getAvatarEmoji(user?.avatar)}</span>
+              <span className="text-lg">{avatarEmoji(user?.avatar)}</span>
               <span className="text-white text-sm font-medium hidden sm:block">{user?.displayName}</span>
             </button>
             <button
@@ -129,12 +131,4 @@ export default function LandingPage() {
       </main>
     </div>
   );
-}
-
-function getAvatarEmoji(avatar) {
-  const avatars = {
-    default: '😊', cat: '🐱', dog: '🐶', star: '⭐', heart: '❤️',
-    flower: '🌸', sun: '☀️', moon: '🌙', crown: '👑', angel: '😇',
-  };
-  return avatars[avatar] || '😊';
 }
