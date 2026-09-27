@@ -10,8 +10,8 @@ import { SpadesTable } from './SpadesTable';
 import api from '../../utils/api';
 
 const NAMES = tableNames(4);
-// Your partner always plays at Medium, so the difficulty only changes the opponents
-const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
+// Your partner always plays its best (Hard), so the difficulty only changes the opponents
+const levelFor = (seat, difficulty) => (seat === 2 ? 'hard' : difficulty);
 const BID_MS = 600, ROBOT_MS = 700, COLLECT_MS = 1300;
 
 export default function SpadesGame() {

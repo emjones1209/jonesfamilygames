@@ -57,6 +57,49 @@ describe('Hand and Foot rules', () => {
     expect(rulesAct(s, { type: 'discard', id: 'K-hearts-1' }).turn).toBe(1);
   });
 
+  it('lets books keep growing, but keeps wild cards off clean books', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    const clean = { rank: 'K', cards: Array.from({ length: 7 }, (_, i) => card('K', 'spades', i + 1)) };
+    const dirty = { rank: 'Q', cards: [...Array.from({ length: 5 }, (_, i) => card('Q', 'clubs', i + 1)), card('2', 'clubs'), card('JK', 'joker')] };
+    s.melds[0] = [clean, dirty];
+    s = rulesAct(s, { type: 'draw' });
+    s.hands[0] = [card('K'), card('JK', 'joker', 2), card('2', 'spades'), card('Q'), card('5'), card('6')];
+    // A single natural card goes on the book of its rank, even without tapping it
+    s = rulesAct(s, { type: 'meld', ids: ['K-hearts-1'] });
+    expect(s.melds[0][0].cards).toHaveLength(8);
+    expect(isClean(s.melds[0][0])).toBe(true);
+    // No wild cards on a clean book…
+    expect(() => rulesAct(s, { type: 'meld', ids: ['JK-joker-2'], target: 0 })).toThrow(/clean book/);
+    // …but a dirty book takes one (up to 3 wild, never more wild than natural)
+    s = rulesAct(s, { type: 'meld', ids: ['2-spades-1'], target: 1 });
+    expect(s.melds[0][1].cards).toHaveLength(8);
+    expect(() => rulesAct(s, { type: 'meld', ids: ['JK-joker-2'], target: 1 })).toThrow(/at most 3 wild/);
+    // Cards must match the book they're put on
+    expect(() => rulesAct(s, { type: 'meld', ids: ['Q-hearts-1'], target: 0 })).toThrow(/don't go on the Ks/);
+    s = rulesAct(s, { type: 'meld', ids: ['Q-hearts-1'], target: 1 });
+    expect(s.melds[0][1].cards).toHaveLength(9);
+  });
+
+  it('lets you take the pile before your first meld, and Undo puts it back', () => {
+    let s = dealRound({ dealer: 3, round: 1 });                 // 90 needed
+    const pile = [card('5', 'clubs'), card('K', 'clubs'), card('9', 'spades')];
+    s.discard = [...pile];
+    s.hands[0] = [card('9'), card('9', 'clubs'), card('4'), card('4', 'spades'), card('4', 'clubs')];
+    s = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '9-clubs-1'] });
+    expect(s.phase).toBe('play');
+    expect(s.melds[0][0].cards).toHaveLength(3);                 // 9s: 30 — short of 90
+    expect(s.hands[0].map(c => c.id)).toEqual(expect.arrayContaining(['5-clubs-1', 'K-clubs-1']));
+    s = rulesAct(s, { type: 'meld', ids: ['4-hearts-1', '4-spades-1', '4-clubs-1'] });   // +15 = 45
+    expect(() => rulesAct(s, { type: 'discard', id: '5-clubs-1' })).toThrow(/at least 90/);
+    s = rulesAct(s, { type: 'undo' });
+    expect(s.phase).toBe('draw');                                // back to drawing, pile restored
+    expect(s.discard).toEqual(pile);
+    expect(s.melds[0]).toHaveLength(0);
+    expect(s.hands[0]).toHaveLength(5);
+    expect(rulesAct(s, { type: 'draw' }).hands[0]).toHaveLength(7);
+  });
+
   it('picks up your foot after taking a one-card pile with your last two cards', () => {
     let s = dealRound({ dealer: 3 });
     s.initialDone[0] = true;

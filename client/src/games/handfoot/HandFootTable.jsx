@@ -47,7 +47,7 @@ function MeldTile({ meld, onClick, fresh }) {
         ${book ? (clean ? 'bg-red-50 border-4 border-red-500 text-red-700' : 'bg-gray-100 border-4 border-gray-800 text-gray-900') : 'bg-white border-2 border-gray-300 text-gray-900'}
         ${onClick ? 'ring-4 ring-game-gold cursor-pointer' : fresh ? 'ring-4 ring-game-gold scale-110' : 'cursor-default'} transition-transform`}>
       <span className="text-lg md:text-xl leading-none">{meld.rank}</span>
-      <span className="text-[11px] md:text-xs">{book ? 'book' : `${meld.cards.length}/${BOOK}`}</span>
+      <span className="text-[11px] md:text-xs">{book ? (meld.cards.length > BOOK ? `book·${meld.cards.length}` : 'book') : `${meld.cards.length}/${BOOK}`}</span>
       {wild > 0 && <span className="text-[9px] text-purple-700">{wild} wild</span>}
       {book && <span className="absolute -top-2 -right-2 text-[9px] bg-game-gold text-game-bg rounded-full px-1.5">{clean ? CLEAN_BOOK : DIRTY_BOOK}</span>}
     </button>
@@ -67,7 +67,7 @@ function MeldArea({ title, melds, redThrees, books, onMeldClick, extra, freshRan
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
         {melds.map((m, i) => (
           <MeldTile key={`${m.rank}-${i}`} meld={m} fresh={!isBook(m) && m.rank === freshRank}
-            onClick={onMeldClick && !isBook(m) ? () => onMeldClick(m) : undefined} />
+            onClick={onMeldClick ? () => onMeldClick(m, i) : undefined} />
         ))}
       </div>
     </div>
@@ -83,7 +83,9 @@ function describe(m, names) {
   switch (m.kind) {
     case 'draw': return `${v('draws', 'draw')} 2 cards${m.reds ? ` (and ${m.reds > 1 ? `${m.reds} red 3s` : 'a red 3'} — +${m.reds * 100})` : ''}.`;
     case 'takePile': return `${v('takes', 'take')} the pile (${cardCount(m.count)}) with the ${m.rank}s!`;
-    case 'meld': return `${m.book ? `${v('finishes', 'finish')} a book of ${m.rank}s!` : `${v('melds', 'meld')} ${plural(m.count, m.rank)}.`}${foot}`;
+    case 'meld': return `${m.book ? `${v('finishes', 'finish')} a book of ${m.rank}s!`
+      : m.onBook ? `${v('adds', 'add')} ${plural(m.count, m.rank)} to the book of ${m.rank}s.`
+        : `${v('melds', 'meld')} ${plural(m.count, m.rank)}.`}${foot}`;
     case 'discard': return `${v('discards', 'discard')} the ${label(m.card)}.${foot}`;
     case 'undo': return `${v('takes', 'take')} back ${you ? 'your' : 'their'} melds.`;
     default: return '';
@@ -115,7 +117,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const toggle = id => setSelected(sel => (sel.includes(id) ? sel.filter(x => x !== id) : [...sel.filter(x => hand.some(c => c.id === x)), id]));
   const drawCards = () => { if (yourTurn && view.phase === 'draw') act({ type: 'draw' }); };
   const takePile = () => { if (yourTurn && view.phase === 'draw') { act({ type: 'takePile', ids: selected }); setSelected([]); } };
-  const meld = rank => { if (yourTurn && view.phase === 'play') { act({ type: 'meld', ids: selected, rank }); setSelected([]); } };
+  const meld = (rank, target) => { if (yourTurn && view.phase === 'play') { act({ type: 'meld', ids: selected, rank, target }); setSelected([]); } };
   const discard = () => {
     if (!yourTurn || view.phase !== 'play') return;
     if (selected.length !== 1) { setNote({ text: 'Select one card to discard.', move: view.moves[0] }); return; }
@@ -193,7 +195,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
       <MeldArea title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} redThrees={view.redThrees[0].length} books={ourBooks}
         freshRank={fresh?.team === 0 ? fresh.rank : null}
         extra={!view.initialDone[0] && view.melds[0].length ? `(${meldedValue(view, 0)} of ${need})` : ''}
-        onMeldClick={yourTurn && view.phase === 'play' && selected.length ? m => meld(m.rank) : undefined} />
+        onMeldClick={yourTurn && view.phase === 'play' && selected.length ? (m, i) => meld(m.rank, i) : undefined} />
 
       {/* The latest move, with the one before it underneath (fixed height, so nothing jumps) */}
       <div className="text-center min-h-[2.5rem]">

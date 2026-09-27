@@ -9,7 +9,7 @@
  * `act(state, action)` returns the
  * next state or throws an Error explaining why the move isn't allowed. Moves
  * name the acting seat (see handFootRules.js):
- *   { type: 'draw', seat }  { type: 'takePile', seat, ids }  { type: 'meld', seat, ids, rank? }
+ *   { type: 'draw', seat }  { type: 'takePile', seat, ids }  { type: 'meld', seat, ids, rank?, target? }
  *   { type: 'undo', seat }  { type: 'discard', seat, id }
  *   { type: 'nextHand' }    { type: 'newGame' }
  *
@@ -44,7 +44,9 @@ function describe(before, after, seat, a) {
       const cards = a.ids.map(id => before.hands[seat].find(c => c.id === id)).filter(Boolean);
       const rank = cards.find(isNatural)?.rank ?? a.rank;
       const meld = after.melds[team].find(m => m.rank === rank && cards.every(c => m.cards.some(x => x.id === c.id)));
-      return { seat, kind: 'meld', rank, count: cards.length, book: meld?.cards.length >= 7, foot };
+      // "finishes a book" only when this move takes it to 7 (cards added to a book later don't count)
+      const book = !!meld && meld.cards.length >= 7 && meld.cards.length - cards.length < 7;
+      return { seat, kind: 'meld', rank, count: cards.length, book, onBook: !!meld && !book && meld.cards.length - cards.length >= 7, foot };
     }
     case 'discard': return { seat, kind: 'discard', card: before.hands[seat].find(c => c.id === a.id), foot };
     default: return { seat, kind: a.type };
@@ -99,6 +101,7 @@ export function robotAction(s, seat, level) {
   if (s.phase === 'draw') return { ...chooseDraw(s, level), seat };
   let steps = s.robotPlan?.seat === seat ? s.robotPlan.steps : null;
   if (!steps?.length || !works(s, steps[0])) steps = choosePlay(s, level);     // plan (or re-plan) the turn
+  if (!steps.length) return { type: 'undo', seat };        // no way to finish (after taking the pile): put it back and draw
   const [step, ...rest] = steps;
   return { ...step, seat, plan: rest };
 }

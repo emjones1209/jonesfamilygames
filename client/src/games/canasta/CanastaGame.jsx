@@ -10,8 +10,8 @@ import { CanastaTable } from './CanastaTable';
 import api from '../../utils/api';
 
 const NAMES = tableNames(4);
-// Your partner always plays at Medium, so the difficulty only changes the opponents
-const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
+// Your partner always plays its best (Hard), so the difficulty only changes the opponents
+const levelFor = (seat, difficulty) => (seat === 2 ? 'hard' : difficulty);
 // Computer turns go slowly enough to read: a pause before drawing, then each meld or discard in turn
 const THINK_MS = 1500, STEP_MS = 2200;
 

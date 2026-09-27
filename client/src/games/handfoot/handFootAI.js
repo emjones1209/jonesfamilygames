@@ -12,7 +12,7 @@
  * beats medium by 1,100 to 1,800.)
  */
 import {
-  act, topOfPile, openMeld, teamOf, minimumFor, bookCount, canGoOut,
+  act, topOfPile, openMeld, teamOf, minimumFor, bookCount, canGoOut, meldedValue,
   isWild, isNatural, isBlackThree, isBook, valueOf, cardValue, BOOK, MAX_WILD,
 } from './handFootRules.js';
 
@@ -32,9 +32,18 @@ export function chooseDraw(s, level) {
   const seat = s.turn, top = topOfPile(s);
   const pair = top ? (groupHand(s.hands[seat]).byRank[top.rank] ?? []).slice(0, 2) : [];
   const ids = pair.map(c => c.id);
-  const ok = pair.length === 2 && attempt(s, { type: 'takePile', ids });
-  if (ok && (level !== 'easy' || Math.random() < 0.4)) return { type: 'takePile', ids };
-  return { type: 'draw' };
+  const taken = pair.length === 2 && attempt(s, { type: 'takePile', ids });
+  if (!taken || (level === 'easy' && Math.random() >= 0.4)) return { type: 'draw' };
+  // Before our side's first meld, only if the rest of the turn can reach the minimum
+  if (!s.initialDone[teamOf(s, seat)] && !turnWorks(taken, choosePlay(taken, level))) return { type: 'draw' };
+  return { type: 'takePile', ids };
+}
+
+/** Does this plan get to the end of the turn (a discard, or going out)? */
+function turnWorks(s, plan) {
+  let cur = s;
+  for (const step of plan) { cur = attempt(cur, step); if (!cur) return false; }
+  return plan.length > 0 && cur.phase !== 'play';
 }
 
 // ── Melding and discarding ───────────────────────────────────────────────────
@@ -52,12 +61,13 @@ export function choosePlay(s, level) {
   };
 
   // 1. First meld: sets of 3+, then pairs with a wild card, until the minimum is met
-  if (!cur.initialDone[team] && !cur.melds[team].length) {
+  //    (counting a meld already made by taking the pile)
+  if (!cur.initialDone[team]) {
     const { byRank, wilds } = groupHand(hand());
     const sets = Object.values(byRank).filter(g => g.length >= 3).map(g => g.slice(0, BOOK)).sort((a, b) => valueOf(b) - valueOf(a));
     const pairs = Object.values(byRank).filter(g => g.length === 2).sort((a, b) => valueOf(b) - valueOf(a));
     const plan = [];
-    let value = 0;
+    let value = meldedValue(cur, team);
     const spare = [...wilds];
     for (const g of sets) { if (value >= minimumFor(cur)) break; plan.push(g); value += valueOf(g); }
     for (const g of pairs) {
@@ -78,7 +88,10 @@ export function choosePlay(s, level) {
     for (let pass = 0; pass < 4 && cur.phase === 'play'; pass++) {
       for (const c of hand().filter(isNatural)) {
         if (cur.phase !== 'play') break;
-        if (openMeld(cur, team, c.rank)) run({ type: 'meld', ids: [c.id] });
+        if (openMeld(cur, team, c.rank)) { run({ type: 'meld', ids: [c.id] }); continue; }
+        // A spare card (not enough for a new meld) goes on a book of its rank: points, and one card fewer
+        const book = cur.melds[team].findIndex(m => m.rank === c.rank && isBook(m));
+        if (book >= 0 && (groupHand(hand()).byRank[c.rank]?.length ?? 0) < 3) run({ type: 'meld', ids: [c.id], target: book });
       }
       const { byRank } = groupHand(hand());
       for (const g of Object.values(byRank)) {
@@ -97,6 +110,11 @@ export function choosePlay(s, level) {
     }
   }
   if (cur.phase !== 'play') return actions;
+  // Melded but short of the minimum? Take the melds back (after taking the pile, that puts it back too)
+  if (!cur.initialDone[team] && cur.melds[team].length && meldedValue(cur, team) < minimumFor(cur)) {
+    cur = act(cur, { type: 'undo' }); actions.length = 0;
+    if (cur.phase !== 'play') return [];                       // (the caller draws instead)
+  }
 
   // 3. Discard
   const ordered = discardOrder(cur, level);

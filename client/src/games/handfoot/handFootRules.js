@@ -9,13 +9,16 @@
  *   foot of 11 cards each; you play your hand, then pick up your foot.
  * - Jokers and 2s are wild. Red 3s are set aside for 100 each (and replaced);
  *   black 3s can only be discarded.
- * - On your turn draw 2 cards, or — once your side has melded — take the top 7
- *   cards of the discard pile by melding its top card with two matching natural
- *   cards from your hand. Then meld, and end by discarding one card.
- * - A meld is 3 to 7 cards of one rank, with at least as many natural cards as
- *   wild ones (and at most 3 wild). Seven cards make a book: clean (no wild
- *   cards) 500, dirty 300. A finished book is closed; a new meld of the same
- *   rank can be started.
+ * - On your turn draw 2 cards, or take the top 7 cards of the discard pile by
+ *   melding its top card with two matching natural cards from your hand (Jones
+ *   family rules: even before your side's first meld — that meld then counts
+ *   towards the minimum, and Undo puts the pile back). Then meld, and end by
+ *   discarding one card.
+ * - A meld is 3 or more cards of one rank, with at least as many natural cards
+ *   as wild ones (and at most 3 wild). Seven cards make a book: clean (no wild
+ *   cards) 500, dirty 300. Books can keep growing (Jones family rules), though
+ *   never with a wild card on a clean book; a new meld of the same rank can be
+ *   started too.
  * - A side's first meld each hand must total at least 50, 90, 120 then 150
  *   points (by round), all laid in one turn.
  * - Used up your hand? Pick up your foot (straight away if you melded your
@@ -25,7 +28,8 @@
  *
  * `act(state, action)` returns the next state (for the player whose turn it
  * is) or throws an Error whose message explains why the move isn't allowed:
- *   { type: 'draw' }  { type: 'takePile', ids }  { type: 'meld', ids, rank? }
+ *   { type: 'draw' }  { type: 'takePile', ids }  { type: 'meld', ids, rank?, target? }
+ *   (`target`: which of the side's melds to add to, by position — e.g. a book)
  *   { type: 'undo' }  { type: 'discard', id }
  */
 import { shuffle } from '../../utils/cardEngine.js';
@@ -94,25 +98,42 @@ export const topOfPile = s => s.discard[s.discard.length - 1] ?? null;
 function checkMeld(cards) {
   const wild = cards.filter(isWild).length;
   if (cards.length < 3) throw new Error('A meld needs at least 3 cards.');
-  if (cards.length > BOOK) throw new Error(`A meld can't have more than ${BOOK} cards — that's a finished book.`);
   if (wild > cards.length - wild) throw new Error('A meld can\'t have more wild cards than natural ones.');
   if (wild > MAX_WILD) throw new Error(`A meld can have at most ${MAX_WILD} wild cards.`);
 }
 
-/** Put cards on the team's open meld of `rank`, or start a new one. */
-function placeCards(s, team, rank, cards) {
-  const open = openMeld(s, team, rank);
-  // Too many to fit on the open meld, but enough for a meld of their own? Start a new one
-  const ownMeld = cards.filter(isNatural).length >= 2 && cards.length >= 3;
-  if (open && !(open.cards.length + cards.length > BOOK && ownMeld)) {
-    const all = [...open.cards, ...cards];
-    checkMeld(all);
-    open.cards = all;
-  } else {
-    if (!cards.some(isNatural)) throw new Error('Wild cards can only be added to a meld you already have.');
-    checkMeld(cards);
-    s.melds[team].push({ rank, cards: [...cards] });
+/** Add cards to a meld (or a book — but no wild cards on a clean book). */
+function addTo(meld, cards) {
+  if (isBook(meld) && isClean(meld) && cards.some(isWild)) {
+    throw new Error('Wild cards can\'t go on a clean book — it would make it dirty (300 instead of 500).');
   }
+  const all = [...meld.cards, ...cards];
+  checkMeld(all);
+  meld.cards = all;
+}
+
+/**
+ * Put cards on one of the side's melds: `target` if given, else the unfinished
+ * meld of `rank`, else a new meld — or, for cards too few for a meld of their
+ * own, a book of that rank.
+ */
+function placeCards(s, team, rank, cards, target = null) {
+  if (target != null) {
+    const meld = s.melds[team][target];
+    if (!meld) throw new Error('Tap one of your own melds.');
+    if (meld.rank !== rank) throw new Error(`Those cards don't go on the ${meld.rank}s.`);
+    addTo(meld, cards);
+    return;
+  }
+  const open = openMeld(s, team, rank);
+  const ownMeld = cards.filter(isNatural).length >= 2 && cards.length >= 3;
+  // Too many to finish the open meld with, but enough for a meld of their own? Start a new one
+  if (open && !(open.cards.length + cards.length > BOOK && ownMeld)) return addTo(open, cards);
+  const book = s.melds[team].find(m => m.rank === rank && isBook(m));
+  if (!ownMeld && book) return addTo(book, cards);
+  if (!cards.some(isNatural)) throw new Error('Wild cards can only be added to a meld you already have.');
+  checkMeld(cards);
+  s.melds[team].push({ rank, cards: [...cards] });
 }
 
 // ── Dealing ──────────────────────────────────────────────────────────────────
@@ -165,7 +186,6 @@ export function checkPileTake(s, seat, ids = []) {
   const top = topOfPile(s);
   if (!top) throw new Error('The discard pile is empty.');
   if (!isNatural(top)) throw new Error('You can\'t take the pile when a wild card or a 3 is on top.');
-  if (!s.initialDone[teamOf(s, seat)]) throw new Error(`You can't take the pile until ${yours(s)} made a first meld.`);
   const cards = ids.map(id => s.hands[seat].find(c => c.id === id));
   if (cards.length < 2 || cards.some(c => !c || c.rank !== top.rank)) {
     throw new Error(`To take the pile, select two ${top.rank}s from your hand to meld with it.`);
@@ -195,6 +215,8 @@ export function act(s, action) {
       if (s.phase !== 'draw') throw new Error('You\'ve already drawn this turn.');
       const pair = checkPileTake(s, seat, action.ids);
       const next = clone(s);
+      // Before the side's first meld, Undo can put the pile back (in case the minimum can't be reached)
+      const beforeTaking = !s.initialDone[team] && snapshot(s, { discard: [...s.discard] });
       const taken = next.discard.splice(-TAKE);
       const top = taken.pop();
       const used = new Set(pair.map(c => c.id));
@@ -210,7 +232,9 @@ export function act(s, action) {
       if (next.inFoot[seat] && !canGoOut(next, team) && next.hands[seat].length < 2) {
         throw new Error(`You can't go out until ${yours(s)} a clean book and a dirty book, so keep at least 2 cards.`);
       }
-      return startPlay(next);
+      startPlay(next);
+      if (beforeTaking) next.turnStart = beforeTaking;
+      return next;
     }
 
     case 'meld': {
@@ -221,11 +245,12 @@ export function act(s, action) {
       if (cards.some(c => c.rank === '3')) throw new Error('3s can\'t be melded — black 3s can only be discarded.');
       const ranks = [...new Set(cards.filter(isNatural).map(c => c.rank))];
       if (ranks.length > 1) throw new Error('Meld one rank at a time.');
-      const rank = ranks[0] ?? action.rank;
+      const target = Number.isInteger(action.target) ? action.target : null;
+      const rank = ranks[0] ?? (target != null ? s.melds[team][target]?.rank : action.rank);
       if (!rank) throw new Error('To add wild cards, tap the meld they should go on.');
       const next = clone(s);
       next.hands[seat] = hand.filter(c => !cards.includes(c));
-      placeCards(next, team, rank, cards);
+      placeCards(next, team, rank, cards, target);
       const left = next.hands[seat].length;
       if (left === 0 && !next.inFoot[seat]) return pickUpFoot(next, seat);   // straight on with your foot
       if (next.inFoot[seat] && !canGoOut(next, team) && left < 2) {
@@ -249,6 +274,11 @@ export function act(s, action) {
       next.melds[team] = t.melds.map(m => ({ ...m, cards: [...m.cards] }));
       next.redThrees[team] = [...t.redThrees];
       next.stock = [...t.stock];
+      if (t.discard) {                                           // the pile goes back: draw again
+        next.discard = [...t.discard];
+        next.phase = 'draw';
+        next.turnStart = null;
+      }
       return next;
     }
 
@@ -296,13 +326,19 @@ function pickUpFoot(s, seat) {
   return s;
 }
 
-function startPlay(s) {
+/** What Undo goes back to: the player's cards and their side's melds (and more, see takePile). */
+function snapshot(s, extra = {}) {
   const seat = s.turn, team = teamOf(s, seat);
-  s.phase = 'play';
-  s.turnStart = {
+  return {
     hand: [...s.hands[seat]], foot: [...s.feet[seat]], inFoot: s.inFoot[seat],
     melds: s.melds[team].map(m => ({ ...m, cards: [...m.cards] })), redThrees: [...s.redThrees[team]], stock: [...s.stock],
+    ...extra,
   };
+}
+
+function startPlay(s) {
+  s.phase = 'play';
+  s.turnStart = snapshot(s);
   return s;
 }
 
