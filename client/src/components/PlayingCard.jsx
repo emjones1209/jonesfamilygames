@@ -36,7 +36,7 @@ export function PlayingCard({
   return (
     <motion.div
       className={`
-        ${cardClasses(size)} bg-white border-2 flex flex-col justify-between p-1 select-none
+        ${cardClasses(size)} bg-white border-2 flex flex-col justify-between p-1 select-none isolate
         ${selected ? 'border-primary-500 shadow-lg shadow-primary-500/50 -translate-y-2' : 'border-gray-300'}
         ${onClick && !disabled ? 'cursor-pointer hover:border-primary-400' : 'cursor-default'}
         ${disabled ? 'opacity-60' : ''}
@@ -48,6 +48,8 @@ export function PlayingCard({
     >
       <div className={`${color} font-bold leading-none`}>{rank}</div>
       <div className={`${color} text-center text-[1.4em] leading-none`}>{symbol}</div>
+      {/* ("isolate" above keeps this turned-round corner inside its own card: rotated
+          things are painted after ordinary content, so it showed through a card overlapping it) */}
       <div className={`${color} font-bold leading-none self-end rotate-180`}>{rank}</div>
     </motion.div>
   );
