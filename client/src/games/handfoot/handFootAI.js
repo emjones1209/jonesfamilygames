@@ -17,7 +17,6 @@ import {
 } from './handFootRules.js';
 
 const attempt = (s, action) => { try { return act(s, action); } catch { return null; } };
-const WILD_TAKE_PILE = 3;   // spend a wild card to take the pile only when it has at least this many cards
 
 /** Natural cards grouped by rank (3s left out), plus the wild cards (2s before jokers). */
 function groupHand(hand) {
@@ -29,14 +28,15 @@ function groupHand(hand) {
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
 /**
- * Take the pile (with a pair matching its top card, or — Medium and Hard, for
- * a pile worth it — one and a wild card) or draw two from the stock.
+ * Take the pile (with a pair matching its top card, or — Medium and Hard — one
+ * and a wild card; the rules only allow it once the pile has 5 cards) or draw
+ * two from the stock.
  */
 export function chooseDraw(s, level) {
   const seat = s.turn, top = topOfPile(s);
   const { byRank, wilds } = groupHand(s.hands[seat]);
   let pair = top ? (byRank[top.rank] ?? []).slice(0, 2) : [];
-  if (pair.length === 1 && wilds.length && level !== 'easy' && s.discard.length >= WILD_TAKE_PILE) pair = [pair[0], wilds[0]];
+  if (pair.length === 1 && wilds.length && level !== 'easy') pair = [pair[0], wilds[0]];
   const ids = pair.map(c => c.id);
   const taken = pair.length === 2 && attempt(s, { type: 'takePile', ids });
   if (!taken || (level === 'easy' && Math.random() >= 0.4)) return { type: 'draw' };

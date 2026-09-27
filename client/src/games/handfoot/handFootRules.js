@@ -14,7 +14,8 @@
  *   melding its top card with two matching natural cards from your hand — or
  *   one and a wild card (Jones family rules; even before your side's first
  *   meld — that meld then counts towards the minimum, and Undo puts the pile
- *   back). Then meld, and end by discarding one card.
+ *   back). The pile can't be taken until it has at least 5 cards (Jones
+ *   family rules). Then meld, and end by discarding one card.
  * - A meld is 3 or more cards of one rank, with more natural cards than wild
  *   ones (Jones family rules) and at most 3 wild. Seven cards make a book:
  *   clean (no wild cards) 500, dirty 300. Books can keep growing (Jones family
@@ -42,6 +43,7 @@ export const MINIMUMS = [50, 90, 120, 150];
 export const BOOK = 7;
 export const MAX_WILD = 3;
 export const TAKE = 5;                   // taking the pile gets you its top 5 cards
+export const MIN_PILE = 5;               // …and it can't be taken with fewer than 5 in it
 export const CLEAN_BOOK = 500, DIRTY_BOOK = 300, RED_THREE = 300, GOING_OUT = 100;
 export const CLEAN_TO_GO_OUT = 2, BOOKS_TO_GO_OUT = 5;   // 2 clean books + 3 dirty (or more clean)
 export const RANK_ORDER = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3'];
@@ -195,6 +197,9 @@ export function dealRound({ players = 4, round = 0, dealer = players - 1, scores
 export function checkPileTake(s, seat, ids = []) {
   const top = topOfPile(s);
   if (!top) throw new Error('The discard pile is empty.');
+  if (s.discard.length < MIN_PILE) {
+    throw new Error(`The pile needs at least ${MIN_PILE} cards before it can be picked up (it has ${s.discard.length}).`);
+  }
   if (!isNatural(top)) throw new Error('You can\'t take the pile when a wild card or a 3 is on top.');
   const cards = ids.map(id => s.hands[seat].find(c => c.id === id));
   const matching = cards.filter(c => c && c.rank === top.rank).length;
@@ -231,16 +236,8 @@ export function act(s, action) {
       const used = new Set(pair.map(c => c.id));
       next.hands[seat] = [...next.hands[seat].filter(c => !used.has(c.id)), ...taken];
       placeCards(next, team, top.rank, [top, ...pair]);
-      // A pile of one card, taken with your last two: on to your foot (or out, from your foot)
-      if (!next.hands[seat].length) {
-        if (!next.inFoot[seat]) pickUpFoot(next, seat);
-        else if (canGoOut(next, team)) return endHand(next, seat);
-        else throw new Error(`You can't go out until ${yours(s)} ${BOOKS_NEEDED}, so you can't take the pile with your last cards.`);
-      }
-      // …and until you can go out, keep 2 cards in your foot so you can still discard one
-      if (next.inFoot[seat] && !canGoOut(next, team) && next.hands[seat].length < 2) {
-        throw new Error(`You can't go out until ${yours(s)} ${BOOKS_NEEDED}, so keep at least 2 cards.`);
-      }
+      // (The pile has at least 5 cards, so this always leaves 4 more in your hand: taking it
+      // can never empty your hand or foot)
       startPlay(next);
       if (beforeTaking) next.turnStart = beforeTaking;
       return next;

@@ -13,7 +13,7 @@ import { RulesButton } from '../../components/RulesButton';
 import { ResultPanel } from '../cards/GameSetup';
 import {
   act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, bookCount, booksToGo, canGoOut,
-  isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE,
+  isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE, MIN_PILE,
 } from './handFootRules';
 import { waitingFor } from './handFootEngine';
 
@@ -140,7 +140,9 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const redThrees = hand.filter(isRedThree).length;
   const hint = !playing ? '' : !yourTurn ? `${names[view.turn]} is playing…`
     : view.phase === 'draw'
-      ? 'Tap the stock to draw 2 — or select two cards matching the top of the pile (or one and a wild card), then tap the pile to take its top 5.'
+      ? (view.discard.length < MIN_PILE
+        ? `Tap the stock to draw 2. (The pile can be picked up once it has ${MIN_PILE} cards.)`
+        : 'Tap the stock to draw 2 — or select two cards matching the top of the pile (or one and a wild card), then tap the pile to take its top 5.')
       : 'Select cards and tap Meld (or tap one of your melds to add to it). Finish by discarding one card.';
   // Which of our melds the selected cards could go on (the rules decide, so wild cards never break the limit)
   const canTake = i => {
@@ -193,6 +195,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         <div className="flex flex-col items-center">
           <p className="text-white/40 text-xs mb-1">
             Pile ({view.discard.length}){top && isBlackThree(top) && <span className="text-amber-300"> · blocked</span>}
+            {view.discard.length < MIN_PILE && <span className="text-white/30"> · needs {MIN_PILE}</span>}
           </p>
           <div onClick={takePile} className={`rounded-xl ${fresh === 'pile' ? 'ring-4 ring-game-gold' : ''} ${yourTurn && view.phase === 'draw' ? 'cursor-pointer' : ''}`}>
             {top ? <HFCard card={top} /> : <div className={`${CARD_BOX.sm} rounded-xl border-2 border-dashed border-white/20`} />}
@@ -237,7 +240,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         {view.phase === 'draw' || !yourTurn ? (
           <>
             <Button variant="primary" disabled={!yourTurn || view.phase !== 'draw'} onClick={drawCards}>Draw 2</Button>
-            <Button variant="secondary" disabled={!yourTurn || view.phase !== 'draw' || !top} onClick={takePile}>Take pile</Button>
+            <Button variant="secondary" disabled={!yourTurn || view.phase !== 'draw' || view.discard.length < MIN_PILE} onClick={takePile}>Take pile</Button>
           </>
         ) : (
           <>

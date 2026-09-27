@@ -84,7 +84,7 @@ describe('Hand and Foot rules', () => {
 
   it('lets you take the pile before your first meld, and Undo puts it back', () => {
     let s = dealRound({ dealer: 3, round: 1 });                 // 90 needed
-    const pile = [card('5', 'clubs'), card('K', 'clubs'), card('9', 'spades')];
+    const pile = [card('6', 'clubs'), card('7', 'clubs'), card('5', 'clubs'), card('K', 'clubs'), card('9', 'spades')];
     s.discard = [...pile];
     s.hands[0] = [card('9'), card('9', 'clubs'), card('4'), card('4', 'spades'), card('4', 'clubs')];
     s = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '9-clubs-1'] });
@@ -101,16 +101,17 @@ describe('Hand and Foot rules', () => {
     expect(rulesAct(s, { type: 'draw' }).hands[0]).toHaveLength(7);
   });
 
-  it('picks up your foot after taking a one-card pile with your last two cards', () => {
+  it('won\'t let anyone take a pile of fewer than 5 cards (Jones family rules)', () => {
     let s = dealRound({ dealer: 3 });
     s.initialDone[0] = true;
-    s.discard = [card('9', 'spades')];
-    s.hands[0] = [card('9'), card('9', 'clubs')];
+    s.hands[0] = [card('9'), card('9', 'clubs'), card('K')];
+    s.discard = [card('4', 'clubs'), card('5', 'clubs'), card('6', 'clubs'), card('9', 'spades')];
+    expect(() => rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '9-clubs-1'] })).toThrow(/at least 5 cards.*\(it has 4\)/);
+    s.discard = [card('7', 'clubs'), ...s.discard];
     s = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '9-clubs-1'] });
     expect(s.phase).toBe('play');
-    expect(s.inFoot[0]).toBe(true);
-    expect(s.hands[0].length).toBeGreaterThan(0);
     expect(s.melds[0][0].cards).toHaveLength(3);
+    expect(s.hands[0].map(c => c.rank).sort()).toEqual(['4', '5', '6', '7', 'K']);
   });
 
   it('picks up your foot when your hand is used up, and only goes out with a clean and a dirty book', () => {
@@ -167,6 +168,7 @@ describe('Jones family rules', () => {
     expect(() => rulesAct(s, { type: 'meld', ids: ['3-hearts-2', '3-diamonds-2', 'JK-joker-9'] })).toThrow(/3s can't be melded/);
     s = rulesAct(s, { type: 'discard', id: '3-hearts-2' });
     expect(s.discard.at(-1).id).toBe('3-hearts-2');
+    s.discard = [card('4', 'clubs'), card('5', 'clubs'), card('6', 'clubs'), card('7', 'clubs'), ...s.discard];   // (enough to be taken)
     s.hands[1] = [card('3', 'spades'), card('3', 'clubs')];
     expect(() => rulesAct(s, { type: 'takePile', ids: ['3-spades-1', '3-clubs-1'] })).toThrow(/a 3 is on top/);
   });
@@ -197,7 +199,7 @@ describe('Jones family rules', () => {
   it('takes the pile with one matching card and a wild card', () => {
     let s = dealRound({ dealer: 3 });
     s.initialDone[0] = true;
-    s.discard = [card('5', 'clubs'), card('9', 'spades')];
+    s.discard = [card('4', 'clubs'), card('6', 'clubs'), card('7', 'clubs'), card('5', 'clubs'), card('9', 'spades')];
     s.hands[0] = [card('9'), card('2', 'clubs'), card('K'), card('K', 'clubs')];
     expect(() => rulesAct(s, { type: 'takePile', ids: ['K-hearts-1', '2-clubs-1'] })).toThrow(/one 9 and a wild card/);
     expect(() => rulesAct(s, { type: 'takePile', ids: ['9-hearts-1'] })).toThrow(/two 9s/);
@@ -210,7 +212,7 @@ describe('Jones family rules', () => {
     let s = dealRound({ dealer: 3 });
     s.initialDone[0] = true;
     s.melds[0] = [{ rank: '9', cards: [card('9', 'clubs', 5), card('9', 'clubs', 6), card('JK', 'joker', 5)] }];
-    s.discard = [card('9', 'spades')];
+    s.discard = [card('4', 'clubs'), card('5', 'clubs'), card('6', 'clubs'), card('7', 'clubs'), card('9', 'spades')];
     s.hands[0] = [card('9'), card('2', 'clubs'), card('K')];
     // 9s so far: 2 natural + 1 wild; adding 9, 9, 2 would make 4 + 2 — fine, so they join it
     let t = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '2-clubs-1'] });
