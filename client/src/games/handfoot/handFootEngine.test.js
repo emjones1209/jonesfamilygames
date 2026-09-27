@@ -139,6 +139,29 @@ describe('Hand and Foot game engine', () => {
     }
   });
 
+  it('plays three-player games, everyone for themselves', () => {
+    const start = newGame({ players: 3 });
+    expect(start.hands).toHaveLength(3);
+    expect(start.melds).toHaveLength(3);
+    expect(count(start)).toBe(216);                              // four decks
+    const s = autoplay(start, ['hard', 'medium', 'easy']);
+    expect(s.phase).toBe('gameOver');
+    expect(s.scores).toHaveLength(3);
+    expect(s.history.every(h => h.length === 3)).toBe(true);
+    expect(s.winners.every(w => s.scores[w] === Math.max(...s.scores))).toBe(true);
+  });
+
+  it('turns a three-player table round, each player bringing their side', () => {
+    const s = autoplay(newGame({ players: 3 }), ['hard', 'medium', 'easy'], x => x.round === 1 && x.melds.every(m => m.length));
+    for (const seat of [1, 2]) {
+      const r = rotate(s, seat);
+      expect(r.hands[0]).toEqual(s.hands[seat]);
+      expect(r.melds[0]).toEqual(s.melds[seat]);
+      expect(r.scores[0]).toBe(s.scores[seat]);
+      expect(rotate(r, 3 - seat)).toEqual(s);
+    }
+  });
+
   it('turns the table round, swapping the teams for odd seats', () => {
     const s = autoplay(newGame(), undefined, x => x.round === 1 && x.melds[0].length && x.melds[1].length);
     for (const seat of [1, 2, 3]) {

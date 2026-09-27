@@ -40,7 +40,7 @@ export function chooseDraw(s, level) {
 // ── Melding and discarding ───────────────────────────────────────────────────
 /** The rest of the turn after drawing: melds, then a discard (unless it goes out). */
 export function choosePlay(s, level) {
-  const seat = s.turn, team = teamOf(seat);
+  const seat = s.turn, team = teamOf(s, seat);
   let cur = s;
   const actions = [];
   const hand = () => cur.hands[seat];
@@ -137,7 +137,7 @@ export function choosePlay(s, level) {
 
 /** Cards in the order the computer would rather throw them away. */
 function discardOrder(s, level) {
-  const seat = s.turn, team = teamOf(seat);
+  const seat = s.turn, team = teamOf(s, seat);
   const hand = s.hands[seat];
   if (level === 'easy') return [...hand].sort(() => Math.random() - 0.5);
   const { byRank } = groupHand(hand);

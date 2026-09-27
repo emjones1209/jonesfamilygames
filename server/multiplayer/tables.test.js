@@ -265,13 +265,13 @@ function peeked(game, v, you) {
 }
 
 let nextId = 40;
-for (const game of Object.keys(engines)) {
-  test(`a person and robots play ${game}`, async () => {
+const tablesToPlay = [...Object.keys(engines).map(game => [game, game === 'dice' ? [1] : [1, 2, 3]]), ['handfoot', [1, 2]]];
+for (const [game, robots] of tablesToPlay) {
+  test(`a person and ${robots.length} robot${robots.length > 1 ? 's' : ''} play ${game}`, async () => {
     const me = player(nextId++, 'Aunt Jo');
     await until(() => me.socket.connected);
     await me.emit('mp:create', { game });
     await until(() => me.table);
-    const robots = game === 'dice' ? [1] : [1, 2, 3];
     for (const seat of robots) me.socket.emit('mp:robot', { seat, on: true });
     await until(() => me.table.seats.filter(Boolean).length === robots.length + 1);
     assert.deepEqual(me.table.seats.filter(Boolean).slice(1).map(s => s.name), ['Phoebe', 'Xavier', 'Heraldo'].slice(0, robots.length));

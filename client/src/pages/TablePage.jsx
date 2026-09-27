@@ -51,7 +51,10 @@ const GAMES = {
   spades: { name: 'Spades', Table: SpadesTable, rotate: rotateSpades, seatNote: PARTNERS },
   bridge: { name: 'Bridge', Table: BridgeTable, rotate: rotateBridge, seatNote: `${PARTNERS} Everyone sees themselves as South.` },
   canasta: { name: 'Canasta', Table: CanastaTable, rotate: rotateCanasta, seatNote: PARTNERS },
-  handfoot: { name: 'Hand and Foot', Table: HandFootTable, rotate: rotateHandFoot, seatNote: PARTNERS },
+  handfoot: {
+    name: 'Hand and Foot', Table: HandFootTable, rotate: rotateHandFoot, minSeats: 3,
+    seatNote: 'Four players: seats 1 & 3 are partners, and so are seats 2 & 4. Or three, each for themselves (leave a seat empty).',
+  },
   dice: {
     name: 'Five Dice', Table: DiceTable, rotate: rotateDice, minSeats: 2,
     seatNote: '2 to 4 players. Empty seats are left out when the game starts.',

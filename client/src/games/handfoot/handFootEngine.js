@@ -4,7 +4,9 @@
  * on the server). The rules of a round are in handFootRules.js and the
  * computer players in handFootAI.js.
  *
- * Seats 0-3 clockwise; team 0 = seats 0 & 2. `act(state, action)` returns the
+ * Seats clockwise. Four players play in partnerships (side 0 = seats 0 & 2,
+ * side 1 = seats 1 & 3); three play each for themselves (side = seat).
+ * `act(state, action)` returns the
  * next state or throws an Error explaining why the move isn't allowed. Moves
  * name the acting seat (see handFootRules.js):
  *   { type: 'draw', seat }  { type: 'takePile', seat, ids }  { type: 'meld', seat, ids, rank? }
@@ -17,15 +19,14 @@
 import { dealRound, act as rulesAct, scoreHand, teamOf, nextSeat, topOfPile, isNatural, ROUNDS } from './handFootRules.js';
 import { chooseDraw, choosePlay } from './handFootAI.js';
 
-const SEATS = [0, 1, 2, 3];
 const MOVES = ['draw', 'takePile', 'meld', 'undo', 'discard'];
 
-function deal({ scores, history }, round, dealer) {
-  return { ...dealRound({ round, dealer, scores }), history, moves: [], robotPlan: null, result: null, winners: null };
+function deal({ players, scores, history }, round, dealer) {
+  return { ...dealRound({ players, round, dealer, scores }), history, moves: [], robotPlan: null, result: null, winners: null };
 }
 
-export function newGame({ dealer = 3 } = {}) {
-  return deal({ scores: [0, 0], history: [] }, 0, dealer);
+export function newGame({ players = 4, dealer = players - 1 } = {}) {
+  return deal({ players, scores: undefined, history: [] }, 0, dealer);
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────────
@@ -34,7 +35,7 @@ export const waitingFor = s => (s.phase === 'draw' || s.phase === 'play' ? s.tur
 
 /** What a move did, for "Phoebe takes the pile (7 cards) with the 9s!" */
 function describe(before, after, seat, a) {
-  const team = teamOf(seat);
+  const team = teamOf(before, seat);
   const foot = !before.inFoot[seat] && after.inFoot[seat];
   switch (a.type) {
     case 'draw': return { seat, kind: 'draw', reds: after.redThrees[team].length - before.redThrees[team].length };
@@ -67,10 +68,10 @@ export function act(s, a) {
   switch (a.type) {
     case 'nextHand':
       if (s.phase !== 'handOver') return s;
-      return deal(s, s.round + 1, nextSeat(s.dealer));
+      return deal(s, s.round + 1, nextSeat(s, s.dealer));
     case 'newGame':
       if (s.phase !== 'gameOver') return s;
-      return newGame({ dealer: nextSeat(s.dealer) });
+      return newGame({ players: s.players, dealer: nextSeat(s, s.dealer) });
     default:
       throw new Error(`Unknown action ${a.type}`);
   }
@@ -78,15 +79,15 @@ export function act(s, a) {
 
 function finishHand(s) {
   const res = scoreHand(s);
-  const scores = [s.scores[0] + res[0].total, s.scores[1] + res[1].total];
+  const scores = s.scores.map((total, side) => total + res[side].total);
   const last = s.round + 1 >= ROUNDS;
   const best = Math.max(...scores);
   return {
     ...s, scores, robotPlan: null,
-    history: [...s.history, [res[0].total, res[1].total]],
+    history: [...s.history, res.map(r => r.total)],
     result: { res, outBy: s.outBy },
     phase: last ? 'gameOver' : 'handOver',
-    winners: last ? [0, 1].filter(t => scores[t] === best) : null,
+    winners: last ? scores.map((t, side) => (t === best ? side : -1)).filter(side => side >= 0) : null,
   };
 }
 
@@ -115,12 +116,18 @@ export function viewFor(s, seat) {
   };
 }
 
-/** Turn a state (or view) round so that `seat` becomes seat 0. Teams swap when `seat` is odd. */
+/**
+ * Turn a state (or view) round so that `seat` becomes seat 0 (and so side 0).
+ * With partners the two sides swap when `seat` is odd; playing alone, sides
+ * turn round with the seats.
+ */
 export function rotate(s, seat) {
   if (!seat) return s;
-  const r = x => (x == null ? x : (x - seat + 4) % 4);
-  const arr = a => SEATS.map(i => a[(i + seat) % 4]);
-  const teams = a => (a && seat % 2 ? [a[1], a[0]] : a);
+  const n = s.players;
+  const r = x => (x == null ? x : (x - seat + n) % n);
+  const arr = a => a.map((_, i) => a[(i + seat) % n]);
+  const teams = a => (!a ? a : n === 4 ? (seat % 2 ? [a[1], a[0]] : a) : arr(a));
+  const side = t => (n === 4 ? (seat % 2 ? 1 - t : t) : r(t));
   return {
     ...s,
     turn: r(s.turn), dealer: r(s.dealer), outBy: r(s.outBy),
@@ -130,6 +137,6 @@ export function rotate(s, seat) {
     discardLog: s.discardLog.map(d => ({ ...d, seat: r(d.seat) })),
     moves: s.moves.map(m => ({ ...m, seat: r(m.seat) })),
     result: s.result && { res: teams(s.result.res), outBy: r(s.result.outBy) },
-    winners: s.winners && s.winners.map(t => (seat % 2 ? 1 - t : t)).sort(),
+    winners: s.winners && s.winners.map(side).sort(),
   };
 }

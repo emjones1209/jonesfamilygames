@@ -61,7 +61,7 @@ const GAMES = {
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],
   },
   handfoot: {
-    name: 'Hand and Foot', seats: 4, engine: load('handfoot/handFootEngine'), pace: 2,
+    name: 'Hand and Foot', seats: 4, minSeats: 3, engine: load('handfoot/handFootEngine'), pace: 2,
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],
   },
   dice: {

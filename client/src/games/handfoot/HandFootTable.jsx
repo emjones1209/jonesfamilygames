@@ -1,7 +1,8 @@
 /**
  * HandFootTable — the Hand and Foot screen, drawn from a game view (see
- * handFootEngine.js) in which the player looking at it is seat 0 (partnered
- * with seat 2). Used by the single-player game and by play-together tables.
+ * handFootEngine.js) in which the player looking at it is seat 0 — partnered
+ * with seat 2 when four play; with three, everyone plays for themselves.
+ * Used by the single-player game and by play-together tables.
  */
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
@@ -100,6 +101,11 @@ function describe(m, names) {
 export function HandFootTable({ view, names, onAction, onExit, error, subtitle, reactions = {}, overlay, gameOverActions }) {
   const [picked, setSelected] = useState([]);                 // ids of your selected cards
   const [note, setNote] = useState(null);                     // a hint of yours, until the next move
+  const n = view.players;
+  const partners = n === 4;
+  // Sides (a partnership, or one player): yours is 0; the others are named after their players
+  const opponents = partners ? [1] : Array.from({ length: n - 1 }, (_, i) => i + 1);
+  const sideName = side => (partners ? (side === 0 ? 'Us' : 'Them') : side === 0 ? 'You' : names[side]);
   const hand = sortHand(view.hands[0]);
   const selected = picked.filter(id => hand.some(c => c.id === id));   // (cards that have left your hand drop out)
   const playing = view.phase === 'draw' || view.phase === 'play';
@@ -120,11 +126,11 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   // What changed last (outlined in gold) while other players move
   const last = view.moves[0];
   const fresh = last && last.seat !== 0
-    ? (last.kind === 'discard' ? 'pile' : last.kind === 'meld' || last.kind === 'takePile' ? { team: teamOf(last.seat), rank: last.rank } : null)
+    ? (last.kind === 'discard' ? 'pile' : last.kind === 'meld' || last.kind === 'takePile' ? { team: teamOf(view, last.seat), rank: last.rank } : null)
     : null;
   const top = topOfPile(view);
   const need = view.initialDone[0] ? null : minimumFor(view);
-  const ourBooks = bookCount(view, 0), theirBooks = bookCount(view, 1);
+  const ourBooks = bookCount(view, 0);
   const canOut = ourBooks.clean >= 1 && ourBooks.dirty >= 1;
   const hint = !playing ? '' : !yourTurn ? `${names[view.turn]} is playing…`
     : view.phase === 'draw'
@@ -146,22 +152,25 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
           Hand and Foot · Round {view.round + 1} of {ROUNDS}{subtitle ? ` · ${subtitle}` : ''}
         </div>
         <div className="text-right text-xs">
-          <div className="text-white/90 font-semibold">Us {view.scores[0]} · Them {view.scores[1]}</div>
+          <div className="text-white/90 font-semibold">{view.scores.map((sc, side) => `${sideName(side)} ${sc}`).join(' · ')}</div>
           <div className="text-white/50">{need ? `First meld needs ${need}` : canOut ? 'You can go out from your foot' : 'Go out needs a clean + a dirty book'}</div>
         </div>
       </header>
 
       {/* Other players */}
       <div className="flex justify-center gap-2 text-xs flex-wrap">
-        {[1, 2, 3].map(seat => (
+        {Array.from({ length: n - 1 }, (_, i) => i + 1).map(seat => (
           <div key={seat} className={`px-3 py-1 rounded-full ${playing && view.turn === seat ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white/70'}`}>
-            {names[seat]}{seat === 2 ? ' (partner)' : ''} · {view.hands[seat].length} cards · {view.inFoot[seat] ? '🦶 in foot' : '✋ hand'}{reactions[seat] ? ` ${reactions[seat]}` : ''}
+            {names[seat]}{partners && seat === 2 ? ' (partner)' : ''} · {view.hands[seat].length} cards · {view.inFoot[seat] ? '🦶 in foot' : '✋ hand'}{reactions[seat] ? ` ${reactions[seat]}` : ''}
           </div>
         ))}
       </div>
 
-      <MeldArea title="Their melds" melds={view.melds[1]} redThrees={view.redThrees[1].length} books={theirBooks}
-        freshRank={fresh?.team === 1 ? fresh.rank : null} />
+      {opponents.map(side => (
+        <MeldArea key={side} title={partners ? 'Their melds' : `${names[side]}'s melds`}
+          melds={view.melds[side]} redThrees={view.redThrees[side].length} books={bookCount(view, side)}
+          freshRank={fresh?.team === side ? fresh.rank : null} />
+      ))}
 
       {/* Stock and discard pile */}
       <div className="flex justify-center items-end gap-6">
@@ -181,7 +190,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         </div>
       </div>
 
-      <MeldArea title="Our melds" melds={view.melds[0]} redThrees={view.redThrees[0].length} books={ourBooks}
+      <MeldArea title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} redThrees={view.redThrees[0].length} books={ourBooks}
         freshRank={fresh?.team === 0 ? fresh.rank : null}
         extra={!view.initialDone[0] && view.melds[0].length ? `(${meldedValue(view, 0)} of ${need})` : ''}
         onMeldClick={yourTurn && view.phase === 'play' && selected.length ? m => meld(m.rank) : undefined} />
@@ -229,7 +238,8 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
             <>
               <div className="text-5xl mb-2">{view.winners.includes(0) ? '🏆' : '😞'}</div>
               <h2 className="text-2xl font-bold text-game-gold mb-2">
-                {view.winners.length > 1 ? 'It\'s a tie!' : view.winners[0] === 0 ? 'Your team wins!' : 'They win!'}
+                {view.winners.length > 1 ? 'It\'s a tie!' : view.winners[0] === 0 ? (partners ? 'Your team wins!' : 'You win!')
+                  : partners ? 'They win!' : `${names[view.winners[0]]} wins!`}
               </h2>
             </>
           ) : (
@@ -238,7 +248,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
             </h2>
           )}
           <table className="w-full text-sm text-white/80 mb-4">
-            <thead><tr className="text-white/40 text-xs"><th /><th>Us</th><th>Them</th></tr></thead>
+            <thead><tr className="text-white/40 text-xs"><th />{view.scores.map((_, side) => <th key={side} className="truncate max-w-[5rem]">{sideName(side)}</th>)}</tr></thead>
             <tbody>
               {[
                 ['Clean books', r => r.clean * CLEAN_BOOK],
@@ -248,10 +258,10 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
                 ['Cards melded', r => r.cards],
                 ['Left in hands & feet', r => -r.left],
               ].map(([name, f]) => (
-                <tr key={name}><td className="text-left">{name}</td><td>{f(result.res[0])}</td><td>{f(result.res[1])}</td></tr>
+                <tr key={name}><td className="text-left">{name}</td>{result.res.map((r, side) => <td key={side}>{f(r)}</td>)}</tr>
               ))}
-              <tr className="font-semibold border-t border-white/10"><td className="text-left">This round</td><td>{result.res[0].total}</td><td>{result.res[1].total}</td></tr>
-              <tr className="font-bold text-game-gold"><td className="text-left">Total</td><td>{view.scores[0]}</td><td>{view.scores[1]}</td></tr>
+              <tr className="font-semibold border-t border-white/10"><td className="text-left">This round</td>{result.res.map((r, side) => <td key={side}>{r.total}</td>)}</tr>
+              <tr className="font-bold text-game-gold"><td className="text-left">Total</td>{view.scores.map((sc, side) => <td key={side}>{sc}</td>)}</tr>
             </tbody>
           </table>
           {view.phase === 'handOver'

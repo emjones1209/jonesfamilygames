@@ -1,23 +1,26 @@
 /**
- * Hand and Foot (partnership, four players) — one hand of it, as pure functions.
+ * Hand and Foot — one hand of it, as pure functions. Four players play in two
+ * partnerships (seats 0 & 2 against 1 & 3); three play each for themselves.
+ * "Side" below means a partnership, or a single player when there are three.
  * A close cousin of Canasta, with the common house rules:
  *
- * - Five decks with their jokers (270 cards). Everyone is dealt a hand and a
+ * - One more deck than players, with their jokers (270 cards for four players,
+ *   216 for three). Everyone is dealt a hand and a
  *   foot of 11 cards each; you play your hand, then pick up your foot.
  * - Jokers and 2s are wild. Red 3s are set aside for 100 each (and replaced);
  *   black 3s can only be discarded.
- * - On your turn draw 2 cards, or — once your team has melded — take the top 7
+ * - On your turn draw 2 cards, or — once your side has melded — take the top 7
  *   cards of the discard pile by melding its top card with two matching natural
  *   cards from your hand. Then meld, and end by discarding one card.
  * - A meld is 3 to 7 cards of one rank, with at least as many natural cards as
  *   wild ones (and at most 3 wild). Seven cards make a book: clean (no wild
  *   cards) 500, dirty 300. A finished book is closed; a new meld of the same
  *   rank can be started.
- * - A team's first meld each hand must total at least 50, 90, 120 then 150
+ * - A side's first meld each hand must total at least 50, 90, 120 then 150
  *   points (by round), all laid in one turn.
  * - Used up your hand? Pick up your foot (straight away if you melded your
  *   last card, or at the end of your turn if you discarded it).
- * - You go out from your foot, once your team has a clean book and a dirty
+ * - You go out from your foot, once your side has a clean book and a dirty
  *   book: +100 and the hand ends. It also ends if the stock runs out.
  *
  * `act(state, action)` returns the next state (for the player whose turn it
@@ -27,7 +30,6 @@
  */
 import { shuffle } from '../../utils/cardEngine.js';
 
-export const DECKS = 5;
 export const PILE_SIZE = 11;             // cards in each hand and each foot
 export const ROUNDS = 4;
 export const MINIMUMS = [50, 90, 120, 150];
@@ -38,13 +40,18 @@ export const CLEAN_BOOK = 500, DIRTY_BOOK = 300, RED_THREE = 100, GOING_OUT = 10
 export const RANK_ORDER = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3'];
 const SUITS = ['spades', 'hearts', 'diamonds', 'clubs'];
 
-export const teamOf = seat => seat % 2;
-export const nextSeat = seat => (seat + 1) % 4;
+/** The side `seat` plays for: partners share one when there are four players. */
+export const teamOf = (s, seat) => (s.players === 4 ? seat % 2 : seat);
+export const sideCount = s => (s.players === 4 ? 2 : s.players);
+export const seatsOf = (s, side) => Array.from({ length: s.players }, (_, i) => i).filter(seat => teamOf(s, seat) === side);
+export const nextSeat = (s, seat) => (seat + 1) % s.players;
+/** "your team has" with partners, "you have" when playing alone (for messages). */
+const yours = s => (s.players === 4 ? 'your team has' : 'you have');
 
 // ── Cards ────────────────────────────────────────────────────────────────────
-export function makeDeck() {
+export function makeDeck(decks = 5) {
   const deck = [];
-  for (let d = 1; d <= DECKS; d++) {
+  for (let d = 1; d <= decks; d++) {
     for (const suit of SUITS) for (const rank of ['2', ...RANK_ORDER]) deck.push({ id: `${rank}-${suit}-${d}`, suit, rank });
     for (const j of [1, 2]) deck.push({ id: `JK-${d}-${j}`, suit: 'joker', rank: 'JK' });
   }
@@ -78,7 +85,7 @@ export const bookCount = (s, team) => {
   const clean = done.filter(isClean).length;
   return { clean, dirty: done.length - clean };
 };
-/** A team may go out once it has a clean book and a dirty book. */
+/** A side may go out once it has a clean book and a dirty book. */
 export const canGoOut = (s, team) => { const b = bookCount(s, team); return b.clean >= 1 && b.dirty >= 1; };
 export const minimumFor = s => MINIMUMS[Math.min(s.round, MINIMUMS.length - 1)];
 export const meldedValue = (s, team) => s.melds[team].reduce((t, m) => t + valueOf(m.cards), 0);
@@ -114,30 +121,33 @@ function setAsideRedThrees(s, seat, cards) {
   let hand = cards;
   for (let red; (red = hand.find(isRedThree)) && s.stock.length;) {
     hand = hand.filter(c => c !== red);
-    s.redThrees[teamOf(seat)].push(red);
+    s.redThrees[teamOf(s, seat)].push(red);
     hand = [...hand, s.stock.pop()];
   }
   return hand;
 }
 
-export function dealRound({ round = 0, dealer = 3, scores = [0, 0], deck = shuffle(makeDeck()) } = {}) {
+export function dealRound({ players = 4, round = 0, dealer = players - 1, scores, deck = shuffle(makeDeck(players + 1)) } = {}) {
+  const sides = players === 4 ? 2 : players;
+  const each = (n, make) => Array.from({ length: n }, make);
   const s = {
-    round, dealer, scores,
+    players, round, dealer,
+    scores: scores ?? each(sides, () => 0),
     stock: [...deck],
-    hands: [[], [], [], []],
-    feet: [[], [], [], []],
-    inFoot: [false, false, false, false],
+    hands: each(players, () => []),
+    feet: each(players, () => []),
+    inFoot: each(players, () => false),
     discard: [],
-    redThrees: [[], []],
-    melds: [[], []],                     // per team: [{ rank, cards }]
-    initialDone: [false, false],
-    turn: nextSeat(dealer),
+    redThrees: each(sides, () => []),
+    melds: each(sides, () => []),        // per side: [{ rank, cards }]
+    initialDone: each(sides, () => false),
+    turn: (dealer + 1) % players,
     phase: 'draw',                       // draw | play | over
     turnStart: null,                     // snapshot for Undo
     discardLog: [],                      // [{ seat, card }] (for the computer players)
     outBy: null,
   };
-  for (const seat of [0, 1, 2, 3]) {
+  for (let seat = 0; seat < players; seat++) {
     s.hands[seat] = s.stock.splice(-PILE_SIZE);
     s.feet[seat] = s.stock.splice(-PILE_SIZE);
     s.hands[seat] = setAsideRedThrees(s, seat, s.hands[seat]);
@@ -155,7 +165,7 @@ export function checkPileTake(s, seat, ids = []) {
   const top = topOfPile(s);
   if (!top) throw new Error('The discard pile is empty.');
   if (!isNatural(top)) throw new Error('You can\'t take the pile when a wild card or a 3 is on top.');
-  if (!s.initialDone[teamOf(seat)]) throw new Error('Your team has to make its first meld before taking the pile.');
+  if (!s.initialDone[teamOf(s, seat)]) throw new Error(`You can't take the pile until ${yours(s)} made a first meld.`);
   const cards = ids.map(id => s.hands[seat].find(c => c.id === id));
   if (cards.length < 2 || cards.some(c => !c || c.rank !== top.rank)) {
     throw new Error(`To take the pile, select two ${top.rank}s from your hand to meld with it.`);
@@ -166,7 +176,7 @@ export function checkPileTake(s, seat, ids = []) {
 // ── Actions ──────────────────────────────────────────────────────────────────
 export function act(s, action) {
   if (s.phase === 'over') throw new Error('The hand is over.');
-  const seat = s.turn, team = teamOf(seat);
+  const seat = s.turn, team = teamOf(s, seat);
   switch (action.type) {
     case 'draw': {
       if (s.phase !== 'draw') throw new Error('You\'ve already drawn this turn.');
@@ -194,11 +204,11 @@ export function act(s, action) {
       if (!next.hands[seat].length) {
         if (!next.inFoot[seat]) pickUpFoot(next, seat);
         else if (canGoOut(next, team)) return endHand(next, seat);
-        else throw new Error('You can\'t go out until your team has a clean book and a dirty book, so you can\'t take the pile with your last cards.');
+        else throw new Error(`You can't go out until ${yours(s)} a clean book and a dirty book, so you can't take the pile with your last cards.`);
       }
       // …and until you can go out, keep 2 cards in your foot so you can still discard one
       if (next.inFoot[seat] && !canGoOut(next, team) && next.hands[seat].length < 2) {
-        throw new Error('You can\'t go out until your team has a clean book and a dirty book, so keep at least 2 cards.');
+        throw new Error(`You can't go out until ${yours(s)} a clean book and a dirty book, so keep at least 2 cards.`);
       }
       return startPlay(next);
     }
@@ -219,7 +229,7 @@ export function act(s, action) {
       const left = next.hands[seat].length;
       if (left === 0 && !next.inFoot[seat]) return pickUpFoot(next, seat);   // straight on with your foot
       if (next.inFoot[seat] && !canGoOut(next, team) && left < 2) {
-        throw new Error('You can\'t go out until your team has a clean book and a dirty book, so keep at least 2 cards.');
+        throw new Error(`You can't go out until ${yours(s)} a clean book and a dirty book, so keep at least 2 cards.`);
       }
       if (left === 0) {                                          // went out by melding every card
         checkMinimum(next, team);
@@ -251,7 +261,7 @@ export function act(s, action) {
       if (next.melds[team].length) next.initialDone[team] = true;
       next.hands[seat] = next.hands[seat].filter(c => c !== card);
       if (!next.hands[seat].length && next.inFoot[seat] && !canGoOut(next, team)) {
-        throw new Error('You can\'t go out until your team has a clean book and a dirty book.');
+        throw new Error(`You can't go out until ${yours(s)} a clean book and a dirty book.`);
       }
       next.discard.push(card);
       next.discardLog.push({ seat, card });
@@ -259,7 +269,7 @@ export function act(s, action) {
         if (next.inFoot[seat]) return endHand(next, seat);       // went out
         pickUpFoot(next, seat);                                  // your foot, ready for your next turn
       }
-      next.turn = nextSeat(seat);
+      next.turn = nextSeat(s, seat);
       next.phase = 'draw';
       next.turnStart = null;
       return next;
@@ -270,7 +280,7 @@ export function act(s, action) {
   }
 }
 
-/** A team's first melds, all laid in one turn, must reach the round's minimum. */
+/** A side's first melds, all laid in one turn, must reach the round's minimum. */
 function checkMinimum(s, team) {
   if (s.initialDone[team] || !s.melds[team].length) return;
   const value = meldedValue(s, team);
@@ -287,7 +297,7 @@ function pickUpFoot(s, seat) {
 }
 
 function startPlay(s) {
-  const seat = s.turn, team = teamOf(seat);
+  const seat = s.turn, team = teamOf(s, seat);
   s.phase = 'play';
   s.turnStart = {
     hand: [...s.hands[seat]], foot: [...s.feet[seat]], inFoot: s.inFoot[seat],
@@ -320,17 +330,17 @@ function clone(s) {
 
 // ── Scoring ──────────────────────────────────────────────────────────────────
 /**
- * Score a finished hand for each team: books (clean 500, dirty 300), red 3s
+ * Score a finished hand for each side: books (clean 500, dirty 300), red 3s
  * (100 each), going out (100) and the melded cards, minus every card left in
- * the partners' hands and feet.
+ * its players' hands and feet.
  */
 export function scoreHand(s) {
-  return [0, 1].map(team => {
+  return Array.from({ length: sideCount(s) }, (_, team) => {
     const { clean, dirty } = bookCount(s, team);
     const redThrees = s.redThrees[team].length * RED_THREE;
-    const goingOut = s.outBy != null && teamOf(s.outBy) === team ? GOING_OUT : 0;
+    const goingOut = s.outBy != null && teamOf(s, s.outBy) === team ? GOING_OUT : 0;
     const cards = meldedValue(s, team);
-    const left = [team, team + 2].reduce((t, seat) => t + valueOf(s.hands[seat]) + valueOf(s.feet[seat]), 0);
+    const left = seatsOf(s, team).reduce((t, seat) => t + valueOf(s.hands[seat]) + valueOf(s.feet[seat]), 0);
     const total = clean * CLEAN_BOOK + dirty * DIRTY_BOOK + redThrees + goingOut + cards - left;
     return { clean, dirty, redThrees, goingOut, cards, left, total };
   });
