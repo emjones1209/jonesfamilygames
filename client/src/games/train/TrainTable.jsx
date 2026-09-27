@@ -8,7 +8,7 @@
  * it (then ↻ turns it round, and the trains it fits light up), and play it by
  * tapping a lit-up train or dragging it there.
  */
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, RotateCw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { RulesButton } from '../../components/RulesButton';
@@ -118,11 +118,28 @@ export function TrainTable({ view, names, onAction, onExit, error, subtitle, rea
     }
     return {};
   };
+  // A drag is followed on the whole window, not the tile: the tile's element moves as the
+  // hand rearranges, and the browser can stop sending it events — which left a tile stuck
+  // to nothing. Wherever the finger lifts (or the app loses focus), the drag ends.
   const onTileDown = (e, id) => {
-    if (e.button > 0) return;
+    if (e.button > 0 || press.current) return;
     const r = e.currentTarget.getBoundingClientRect();
-    press.current = { id, sx: e.clientX, sy: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
+    const pointer = e.pointerId;
+    const mine = ev => ev.pointerId === pointer;
+    const move = ev => { if (mine(ev)) latest.current.move(ev); };
+    const up = ev => { if (mine(ev)) { stop(); latest.current.up(ev); } };
+    const cancel = ev => { if (!ev.pointerId || mine(ev)) { stop(); latest.current.cancel(); } };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', cancel);
+      window.removeEventListener('blur', cancel);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', cancel);
+    window.addEventListener('blur', cancel);
+    press.current = { id, sx: e.clientX, sy: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, moved: false, stop };
   };
   const onTileMove = e => {
     const p = press.current;
@@ -146,7 +163,11 @@ export function TrainTable({ view, names, onAction, onExit, error, subtitle, rea
     const { train } = dropTarget(e.clientX, e.clientY);
     if (train !== undefined) playOn(p.id, train);
   };
-  const onTileCancel = () => { press.current = null; setDrag(null); };
+  const onTileCancel = () => { press.current = null; setDrag(null); };     // the tile goes back to your hand
+  // The window listeners call the latest handlers (they see the current hand and trains)
+  const latest = useRef(null);
+  useEffect(() => { latest.current = { move: onTileMove, up: onTileUp, cancel: onTileCancel }; });
+  useEffect(() => () => press.current?.stop(), []);                       // leaving the table mid-drag
   const dragged = drag && inHand.get(drag.id);
   const face = t => (flipped.has(t.id) ? { a: t.b, b: t.a } : { a: t.a, b: t.b });
 
@@ -236,7 +257,7 @@ export function TrainTable({ view, names, onAction, onExit, error, subtitle, rea
       <div className="flex flex-wrap justify-center gap-2 pt-3">
         {hand.map(t => (
           <div key={t.id} data-tile={t.id} className={`relative touch-none cursor-grab ${drag?.id === t.id ? 'opacity-25' : ''}`}
-            onPointerDown={e => onTileDown(e, t.id)} onPointerMove={onTileMove} onPointerUp={onTileUp} onPointerCancel={onTileCancel}>
+            onPointerDown={e => onTileDown(e, t.id)}>
             <Domino {...face(t)} selected={selected === t.id} dim={yourTurn && !playableIds.has(t.id)} />
             {selected === t.id && !drag && (
               // Turn the selected tile round (its own button, so it doesn't start a drag or a tap)
