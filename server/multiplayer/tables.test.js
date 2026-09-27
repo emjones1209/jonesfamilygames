@@ -254,6 +254,7 @@ const engines = {
   euchre: require('../../client/src/games/euchre/euchreEngine.js'),
   gin: require('../../client/src/games/gin/ginEngine.js'),
   checkers: require('../../client/src/games/checkers/checkersEngine.js'),
+  chess: require('../../client/src/games/chess/chessEngine.js'),
 };
 
 /** Cards this view shows from hands other than `you`'s (Bridge's dummy is allowed once it's on the table). */
@@ -261,7 +262,7 @@ function peeked(game, v, you) {
   if (game === 'euchre' && (v.kitty.some(Boolean) || (you !== v.dealer && v.discarded))) return true;
   // Gin shows both hands once someone knocks
   if (game === 'gin') return !['handOver', 'gameOver'].includes(v.phase) && (v.hands[1 - you].some(Boolean) || v.stock.some(Boolean));
-  if (game === 'dice' || game === 'checkers') return false;         // nothing is hidden
+  if (game === 'dice' || game === 'checkers' || game === 'chess') return false;   // nothing is hidden
   if (v.robotPlan) return true;
   const hands = v.table ? v.table.hands : v.hands;
   const dummy = game === 'bridge' && engines.bridge.dummyShown(v) ? v.contract.dummy : -1;
@@ -271,7 +272,7 @@ function peeked(game, v, you) {
 }
 
 let nextId = 40;
-const tablesToPlay = [...Object.keys(engines).map(game => [game, ['dice', 'gin', 'checkers'].includes(game) ? [1] : [1, 2, 3]]), ['handfoot', [1, 2]]];
+const tablesToPlay = [...Object.keys(engines).map(game => [game, ['dice', 'gin', 'checkers', 'chess'].includes(game) ? [1] : [1, 2, 3]]), ['handfoot', [1, 2]]];
 for (const [game, robots] of tablesToPlay) {
   test(`a person and ${robots.length} robot${robots.length > 1 ? 's' : ''} play ${game}`, async () => {
     const me = player(nextId++, 'Aunt Jo');

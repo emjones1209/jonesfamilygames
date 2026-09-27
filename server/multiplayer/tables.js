@@ -68,6 +68,10 @@ const GAMES = {
     name: 'Checkers', seats: 2, engine: load('checkers/checkersEngine'),
     moves: ['move', 'resign'], tableMoves: ['newGame'],
   },
+  chess: {
+    name: 'Chess', seats: 2, engine: load('chess/chessEngine'),
+    moves: ['move', 'resign'], tableMoves: ['newGame'],
+  },
   canasta: {
     name: 'Canasta', seats: 4, engine: load('canasta/canastaEngine'), pace: 2,
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],

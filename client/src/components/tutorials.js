@@ -136,6 +136,15 @@ export const TUTORIALS = {
     { emoji: '💡', heading: 'Help', body: 'A red ring warns you when one of your pieces could be captured on your opponent\'s next turn.\nTap Suggest to see a good move in green and why it\'s good. Against the computer, Undo takes back your last move.' },
     { emoji: '🤝', heading: 'Draws', body: 'The game is a draw if 40 moves go by for each player with no capture and no ordinary piece moving (just kings going back and forth), or if the same position comes up three times.' },
   ],
+  chess: [
+    { emoji: '♟️', heading: 'Goal', body: 'Checkmate the enemy king: attack it so it has no way to escape. White moves first; players take turns moving one piece.\nNew to chess? Try Learn to Play — short lessons for each piece.' },
+    { emoji: '🏰', heading: 'Rook, Bishop, Queen', body: 'Rook: straight lines (up, down, sideways), as far as it likes.\nBishop: diagonals, as far as it likes.\nQueen: any straight line or diagonal — the strongest piece.\nNone of them can jump over other pieces.' },
+    { emoji: '🐴', heading: 'Knight and King', body: 'Knight: an "L" — two squares one way, then one to the side. It jumps over pieces!\nKing: one square in any direction, but never onto a square that\'s attacked.' },
+    { emoji: '♟', heading: 'Pawns', body: 'Pawns move forward one square (two on their first move) but capture one square diagonally forward. A pawn reaching the far side becomes a queen (or another piece of your choice).' },
+    { emoji: '⚠️', heading: 'Check and Checkmate', body: 'A king under attack is "in check" — you must get out of it: move the king, block, or capture the attacker.\nIf there\'s no way out, it\'s checkmate and the game is over. If a player can\'t move but isn\'t in check, it\'s stalemate — a draw.' },
+    { emoji: '🏯', heading: 'Special Moves', body: 'Castling: the king moves two squares towards a rook, and the rook jumps over it — if neither has moved, nothing is between them, and the king isn\'t in or passing through check.\nEn passant: a pawn that just moved two squares can be captured by a pawn beside it, as if it had moved one.' },
+    { emoji: '🎓', heading: 'The Coach', body: 'Tap a piece to see dots where it can go. With the coach on, a red ring shows a piece that could be taken for free, and you\'re warned before a risky move. Suggest shows a good move in green and explains why. Tips has advice for good play.' },
+  ],
   wordsearch: [
     { emoji: '🔍', heading: 'Goal', body: 'Find every word in the list hidden in the grid of letters. Words run in straight lines.' },
     { emoji: '👆', heading: 'Selecting a Word', body: 'Drag your finger from the first letter of a word to the last.\nOr tap the first letter, then tap the last one.\nFound words get coloured in and crossed off the list.' },

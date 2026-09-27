@@ -8,6 +8,7 @@
  *   'capture'   a move that captures (a ring)    'last'     the last move's squares (tinted)
  *   'danger'    your piece that can be taken     'hint'     the suggested move (green)
  *   'movable'   a piece that can move now (when you must choose, e.g. a forced jump)
+ *   'check'     a king in check (a red glow)
  */
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -41,6 +42,7 @@ export function BoardGrid({
               style={{ background: dark ? colors.dark : colors.light, cursor: onSquare ? 'pointer' : 'default' }}>
               {has('last') && <span className="absolute inset-0" style={{ background: 'rgba(250, 204, 21, 0.35)' }} />}
               {has('hint') && <span className="absolute inset-0" style={{ background: 'rgba(74, 222, 128, 0.45)' }} />}
+              {has('check') && <span className="absolute inset-0" style={{ background: 'radial-gradient(circle, rgba(239, 68, 68, 0.9) 20%, rgba(239, 68, 68, 0) 75%)' }} />}
               {has('selected') && <span className="absolute inset-0" style={{ boxShadow: 'inset 0 0 0 4px #facc15' }} />}
               {has('movable') && <span className="absolute inset-0" style={{ boxShadow: 'inset 0 0 0 3px rgba(250, 204, 21, 0.8)' }} />}
               {has('target') && <span className="absolute rounded-full" style={{ width: '30%', height: '30%', background: 'rgba(0, 0, 0, 0.35)' }} />}

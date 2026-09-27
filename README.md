@@ -19,6 +19,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - 🌉 Bridge (Full)
 - ⛳ 6-Card Golf
 - ⚫ Checkers
+- ♟️ Chess (with lessons and a coach for beginners)
 - 🧩 Jigsaw Puzzle (use your own photos!)
 - 🌸 Garden Match (Candy Crush-style)
 - 💣 Minesweeper
