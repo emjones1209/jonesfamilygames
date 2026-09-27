@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newGame, act, waitingFor, robotAction, viewFor, rotate } from './trainEngine';
+import { newGame, act, waitingFor, robotAction, viewFor, rotate, unrotateAction } from './trainEngine';
 import { legalMoves, MEXICAN } from './trainRules';
 
 /** Let computer players play until `until` (or the game ends). */
@@ -61,6 +61,28 @@ describe('Mexican Train game engine', () => {
     expect(v.boneyard).toHaveLength(s.boneyard.length);
     const json = JSON.stringify(v);
     for (const t of [...s.hands[0], ...s.hands[2], ...s.boneyard]) expect(json).not.toContain(`"${t.id}"`);
+  });
+
+  it('a move made on a turned-round screen counts on the right train', () => {
+    // As at a play-together table: each player picks from their own turned-round screen
+    for (const players of [2, 3, 4]) {
+      let s = newGame({ players });
+      let ownTrain = 0;
+      for (let step = 0; step < 3000 && s.phase !== 'gameOver'; step++) {
+        if (s.phase === 'roundOver') { s = act(s, { type: 'nextRound' }); continue; }
+        const seat = s.turn;
+        const screen = rotate(viewFor(s, seat), seat);
+        const moves = legalMoves(screen, 0);
+        // Prefer your own train (index 0 on your screen), as a person usually would
+        const move = moves.find(m => m.train === 0) ?? moves[0];
+        if (!move) { s = act(s, robotAction(s, seat, 'easy')); continue; }
+        if (move.train === 0) ownTrain++;
+        const sent = unrotateAction({ type: 'play', ...move }, seat, players);
+        s = act(s, { ...sent, seat });                          // throws if it landed on the wrong train
+        if (sent.train < players) expect(s.trains[sent.train].owner === seat || s.trains[sent.train].open).toBe(true);
+      }
+      expect(ownTrain).toBeGreaterThan(0);
+    }
   });
 
   it('turns the table round so each player comes first, trains and all', () => {

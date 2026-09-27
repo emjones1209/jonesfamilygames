@@ -91,6 +91,15 @@ export function viewFor(s, seat) {
 }
 
 /**
+ * A move made on a turned-round screen (see rotate), put back the right way
+ * round: its train number is counted from `seat`'s own train.
+ */
+export function unrotateAction(a, seat, players) {
+  if (!seat || a.train == null || a.train >= players) return a;          // the Mexican Train is always last
+  return { ...a, train: (a.train + seat) % players };
+}
+
+/**
  * Turn a state (or view) round so that `seat` becomes seat 0 — each player's
  * screen always shows them first. The players' trains turn round with them;
  * the Mexican Train stays last.

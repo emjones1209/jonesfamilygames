@@ -13,7 +13,7 @@ import { rotate as rotateRook } from '../games/rook/rookEngine';
 import { RookTable } from '../games/rook/RookTable';
 import { rotate as rotateGolf, HOLE_CHOICES } from '../games/golf6/golfEngine';
 import { GolfTable } from '../games/golf6/GolfTable';
-import { rotate as rotateTrain, ROUND_CHOICES } from '../games/train/trainEngine';
+import { rotate as rotateTrain, unrotateAction as unrotateTrain, ROUND_CHOICES } from '../games/train/trainEngine';
 import { TrainTable } from '../games/train/TrainTable';
 import { rotate as rotateHearts } from '../games/hearts/heartsEngine';
 import { HeartsTable } from '../games/hearts/HeartsTable';
@@ -25,13 +25,16 @@ import { rotate as rotateCanasta } from '../games/canasta/canastaEngine';
 import { CanastaTable } from '../games/canasta/CanastaTable';
 import { rotate as rotateDice } from '../games/dice/diceEngine';
 import { DiceTable } from '../games/dice/DiceTable';
+import { rotate as rotateHandFoot } from '../games/handfoot/handFootEngine';
+import { HandFootTable } from '../games/handfoot/HandFootTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
 import { ReactionBursts, ReactionPicker, REACTION_MS } from '../components/Reactions';
 
 const REACTIONS = ['👍', '😂', '😮', '😬', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
 const PARTNERS = 'Seats 1 & 3 are partners, and so are seats 2 & 4.';
 // Each game's screen, how to turn its view round, what the lobby says about seats,
-// and the setting the host picks (if any)
+// the setting the host picks (if any), and — for moves that name a seat's
+// things (Mexican Train's trains) — how to turn a move back the right way round
 const GAMES = {
   rook: { name: 'Rook', Table: RookTable, rotate: rotateRook, seatNote: PARTNERS },
   golf: {
@@ -40,7 +43,7 @@ const GAMES = {
     option: { key: 'holes', label: 'Holes to play', values: HOLE_CHOICES, unit: 'hole' },
   },
   train: {
-    name: 'Mexican Train', Table: TrainTable, rotate: rotateTrain, minSeats: 2,
+    name: 'Mexican Train', Table: TrainTable, rotate: rotateTrain, unrotate: unrotateTrain, minSeats: 2,
     seatNote: '2 to 4 players. Empty seats are left out when the game starts.',
     option: { key: 'rounds', label: 'Rounds', values: ROUND_CHOICES, unit: 'round' },
   },
@@ -48,6 +51,7 @@ const GAMES = {
   spades: { name: 'Spades', Table: SpadesTable, rotate: rotateSpades, seatNote: PARTNERS },
   bridge: { name: 'Bridge', Table: BridgeTable, rotate: rotateBridge, seatNote: `${PARTNERS} Everyone sees themselves as South.` },
   canasta: { name: 'Canasta', Table: CanastaTable, rotate: rotateCanasta, seatNote: PARTNERS },
+  handfoot: { name: 'Hand and Foot', Table: HandFootTable, rotate: rotateHandFoot, seatNote: PARTNERS },
   dice: {
     name: 'Five Dice', Table: DiceTable, rotate: rotateDice, minSeats: 2,
     seatNote: '2 to 4 players. Empty seats are left out when the game starts.',
@@ -246,7 +250,8 @@ export default function TablePage() {
 
   return (
     <game.Table view={view} names={names} error={error} reactions={shown}
-      onAction={action => send('mp:action', { action })}   // the server fills in your real seat
+      // The server fills in your real seat; anything counted from your seat is turned back first
+      onAction={action => send('mp:action', { action: game.unrotate ? game.unrotate(action, you, n) : action })}
       onExit={() => navigate('/')}
       overlay={<>{banner}{toasts}{reactionBar}</>}
       gameOverActions={
