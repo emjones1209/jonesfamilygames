@@ -2,7 +2,7 @@
  * Hearts rules and AI (pure functions).
  * Seats: 0 = You, 1 = Left, 2 = Across, 3 = Right (clockwise).
  */
-import { followSuit, wouldWin, lowest, highest, standardRank } from '../cards/tricks';
+import { followSuit, wouldWin, lowest, highest, standardRank } from '../cards/tricks.js';
 
 export const TWO_OF_CLUBS = '2-clubs';
 export const QUEEN_OF_SPADES = 'Q-spades';

@@ -27,6 +27,8 @@
  */
 // seats: the table's size; minSeats: fewest players a game can start with (else every seat)
 // moves: a player's own moves; tableMoves: moves anyone at the table can make (e.g. deal again)
+// pace: robots take this many times longer over each step (for games whose turns are several steps)
+const load = name => require(`../../client/src/games/${name}.js`);
 const GAMES = {
   rook: {
     name: 'Rook', seats: 4, engine: require('../../client/src/games/rook/rookEngine.js'),
@@ -41,6 +43,26 @@ const GAMES = {
     name: 'Mexican Train', seats: 4, minSeats: 2, engine: require('../../client/src/games/train/trainEngine.js'),
     moves: ['play', 'draw', 'pass'], tableMoves: ['nextRound', 'newGame'],
     options: { rounds: { values: [3, 7, 13], default: 13 } },
+  },
+  hearts: {
+    name: 'Hearts', seats: 4, engine: load('hearts/heartsEngine'),
+    moves: ['pass', 'play'], tableMoves: ['nextHand', 'newGame'],
+  },
+  spades: {
+    name: 'Spades', seats: 4, engine: load('spades/spadesEngine'),
+    moves: ['bid', 'play'], tableMoves: ['nextHand', 'newGame'],
+  },
+  bridge: {
+    name: 'Bridge', seats: 4, engine: load('bridge/bridgeEngine'),
+    moves: ['bid', 'play'], tableMoves: ['nextHand'],
+  },
+  canasta: {
+    name: 'Canasta', seats: 4, engine: load('canasta/canastaEngine'), pace: 2,
+    moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],
+  },
+  dice: {
+    name: 'Five Dice', seats: 4, minSeats: 2, engine: load('dice/diceEngine'), pace: 1.8,
+    moves: ['roll', 'hold', 'score'], tableMoves: ['newGame'],
   },
 };
 
@@ -113,8 +135,12 @@ function createTables(io, {
     if (seat != null) {
       table.timer = setTimeout(() => {
         if (!waitingOn(engine, table.state).includes(seat)) return;
-        apply(table, engine.robotAction(table.state, seat, table.level));
-      }, robotMs);
+        try {
+          apply(table, engine.robotAction(table.state, seat, table.level));
+        } catch (e) {
+          console.error(`Robot move refused at table ${table.code} (${table.game}):`, e.message);   // never take the server down
+        }
+      }, robotMs * (GAMES[table.game].pace ?? 1));
     } else if (s.phase === 'playing' && s.table?.status === 'collecting') {
       table.timer = setTimeout(() => apply(table, { type: 'collect' }), collectMs);
     }
@@ -241,7 +267,10 @@ function createTables(io, {
       try {
         const { moves, tableMoves } = GAMES[table.game];
         if (tableMoves.includes(action.type)) apply(table, { type: action.type });
-        else if (moves.includes(action.type)) apply(table, { ...action, seat });
+        else if (moves.includes(action.type)) {
+          const { plan, ...move } = action;                  // (robots' plans are the server's business)
+          apply(table, { ...move, seat });
+        }
       } catch (e) {
         fail(null, e.message);
       }

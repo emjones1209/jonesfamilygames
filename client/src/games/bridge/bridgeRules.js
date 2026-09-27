@@ -3,7 +3,7 @@
  * Seats: 0 = South (you), 1 = West, 2 = North (partner), 3 = East.
  * Bids are strings: '1C'…'7NT' or 'Pass'.
  */
-import { partnerOf } from '../cards/tricks';
+import { partnerOf } from '../cards/tricks.js';
 
 export const DENOMINATIONS = ['C', 'D', 'H', 'S', 'NT'];
 export const SUIT_OF_DENOM = { C: 'clubs', D: 'diamonds', H: 'hearts', S: 'spades', NT: null };

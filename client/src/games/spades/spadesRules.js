@@ -2,8 +2,8 @@
  * Spades rules, scoring and AI (pure functions).
  * Teams: 0 = seats 0 & 2 (you and partner), 1 = seats 1 & 3.
  */
-import { followSuit, partnerOf, winningIndex, wouldWin, standardRank, lowest, highest } from '../cards/tricks';
-import { choosePartnershipCard } from '../cards/ai';
+import { followSuit, partnerOf, winningIndex, wouldWin, standardRank, lowest, highest } from '../cards/tricks.js';
+import { choosePartnershipCard } from '../cards/ai.js';
 
 export const TRUMP = 'spades';
 export const WINNING_SCORE = 500;

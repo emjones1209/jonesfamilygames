@@ -15,7 +15,7 @@
  *   { type: 'undo' }                         take back this turn's melds
  *   { type: 'discard', id }                  discard and end the turn
  */
-import { shuffle } from '../../utils/cardEngine';
+import { shuffle } from '../../utils/cardEngine.js';
 
 export const WINNING_SCORE = 5000;
 export const HAND_SIZE = 11;

@@ -1,243 +1,60 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tableNames } from '../players';
-import { buildDeck, shuffle } from '../../utils/cardEngine';
-import { Button } from '../../components/Button';
-import { PlayingCard } from '../../components/PlayingCard';
 import { TUTORIALS } from '../../components/tutorials';
-import { sortHand, trickWinner, followSuit, nextSeat, teamOf } from '../cards/tricks';
-import { tableMemory } from '../cards/memory';
-import { useTrickTable } from '../cards/useTrickTable';
-import { CardTable } from '../cards/CardTable';
-import { CardHand } from '../cards/CardHand';
-import { GameSetup, ResultPanel } from '../cards/GameSetup';
-import { choosePartnershipCard } from '../cards/ai';
-import {
-  DENOMINATIONS, PASS, bidHigher, bidLevel, bidDenom, currentBid, auctionOver, contractOf, scoreContract,
-  chooseBid, BRIDGE_SUIT_ORDER,
-} from './bridgeRules';
+import { GameSetup } from '../cards/GameSetup';
+import { newGame, act, waitingFor, robotAction } from './bridgeEngine';
+import { BridgeTable } from './BridgeTable';
 import api from '../../utils/api';
-import { RulesButton } from '../../components/RulesButton';
 
-const SHORT = tableNames(4);                                  // You are South; Phoebe West, Xavier North, Heraldo East
-const NAMES = ['South (You)', `West (${SHORT[1]})`, `North (${SHORT[2]})`, `East (${SHORT[3]})`];
-const DENOM_SYMBOL = { C: '♣', D: '♦', H: '♥', S: '♠', NT: 'NT' };
-const DENOM_COLOR = { C: 'text-white', D: 'text-red-400', H: 'text-red-400', S: 'text-white', NT: 'text-game-gold' };
-const bidText = bid => (bid === PASS ? 'Pass' : `${bidLevel(bid)}${DENOM_SYMBOL[bidDenom(bid)]}`);
-
-function dealHands() {
-  const deck = shuffle(buildDeck());
-  return [0, 1, 2, 3].map(s => deck.slice(s * 13, s * 13 + 13));
-}
-
+const NAMES = tableNames(4);            // You are South; Phoebe West, Xavier North, Heraldo East
 // Your partner always plays at Medium, so the difficulty only changes the opponents
 const levelFor = (seat, difficulty) => (seat === 2 ? 'medium' : difficulty);
-const DECK = buildDeck();
-
-const sortBridge = hand => sortHand(hand, { suitOrder: BRIDGE_SUIT_ORDER });
+const BID_MS = 700, ROBOT_MS = 700, COLLECT_MS = 1300;
 
 export default function BridgeGame() {
   const navigate = useNavigate();
   const [difficulty, setDifficulty] = useState(null);
-  const [phase, setPhase] = useState('setup');    // setup | bidding | playing | handOver
-  const [dealer, setDealer] = useState(0);
-  const [hands, setHands] = useState(null);
-  const [auction, setAuction] = useState([]);     // [{ seat, bid }]
-  const [contract, setContract] = useState(null);
-  const [scores, setScores] = useState({ ns: 0, ew: 0 });
-  const [result, setResult] = useState(null);
-
-  const bidTurn = (dealer + auction.length) % 4;
-  // The declarer chooses dummy's cards
-  const controllerOf = seat => (contract && seat === contract.dummy ? contract.declarer : seat);
-
-  const { table, deal, clear, play, legalFor } = useTrickTable({
-    winnerOf: trick => trickWinner(trick, { trump: contract?.trump }),
-    legalPlays: (t, seat) => followSuit(t.hands[seat], t.trick[0]?.card.suit),
-    isAi: seat => controllerOf(seat) !== 0,
-    chooseAiCard: (seat, t, legal) =>
-      choosePartnershipCard({
-        legal, trick: t.trick, seat, difficulty: levelFor(controllerOf(seat), difficulty), trump: contract?.trump,
-        trumpTeam: contract ? teamOf(contract.declarer) : null,
-        memory: tableMemory({ history: t.history, trick: t.trick, hand: t.hands[seat], deck: DECK }),
-      }),
-    onHandDone: t => {
-      const declarerTricks = t.tricksWon[contract.declarer] + t.tricksWon[contract.dummy];
-      const res = scoreContract(contract, declarerTricks);
-      const newScores = { ns: scores.ns + res.ns, ew: scores.ew + res.ew };
-      setScores(newScores);
-      setResult({ ...res, declarerTricks });
-      setPhase('handOver');
-      api.post('/scores', { game: 'bridge', score: newScores.ns, difficulty }).catch(() => {});
-    },
-  });
-
-  const startHand = newDealer => {
-    clear();                       // drop the finished hand's table
-    setDealer(newDealer);
-    setHands(dealHands());
-    setAuction([]);
-    setContract(null);
-    setResult(null);
-    setPhase('bidding');
-  };
+  const [game, setGame] = useState(null);
+  const [error, setError] = useState('');
+  const posted = useRef(-1);             // the hand whose score was last posted
 
   const startGame = diff => {
     setDifficulty(diff);
-    setScores({ ns: 0, ew: 0 });
-    startHand(0);
+    setGame(newGame());
+    setError('');
   };
 
-  const placeBid = bid => {
-    const next = [...auction, { seat: bidTurn, bid }];
-    setAuction(next);
-    if (!auctionOver(next)) return;
-    const c = contractOf(next);
-    if (!c) { setResult({ passedOut: true }); setPhase('handOver'); return; }
-    setContract(c);
-    deal(hands, nextSeat(c.declarer));   // the player on declarer's left leads
-    setPhase('playing');
+  const apply = action => {
+    try { setGame(act(game, action)); setError(''); } catch (e) { setError(e.message); }
   };
 
-  // Computer bids
+  // Computer players (a computer declarer plays dummy's cards too), and the pause over a finished trick
   useEffect(() => {
-    if (phase !== 'bidding' || bidTurn === 0) return;
-    const timer = setTimeout(() => placeBid(chooseBid({ hand: hands[bidTurn], auction, seat: bidTurn, difficulty: levelFor(bidTurn, difficulty) })), 700);
-    return () => clearTimeout(timer);
-  });
+    if (!game) return;
+    const seat = waitingFor(game);
+    if (seat != null && seat !== 0) {
+      const timer = setTimeout(() => apply(robotAction(game, seat, levelFor(seat, difficulty))), game.phase === 'bidding' ? BID_MS : ROBOT_MS);
+      return () => clearTimeout(timer);
+    }
+    if (game.phase === 'playing' && game.table.status === 'collecting') {
+      const timer = setTimeout(() => apply({ type: 'collect' }), COLLECT_MS);
+      return () => clearTimeout(timer);
+    }
+    if (game.phase === 'handOver' && !game.result.passedOut && posted.current !== game.handNo) {
+      posted.current = game.handNo;
+      api.post('/scores', { game: 'bridge', score: game.scores.ns, difficulty }).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, difficulty]);
 
-  const myHand = useMemo(() => sortBridge(table?.hands[0] ?? hands?.[0] ?? []), [table, hands]);
-
-  if (phase === 'setup') {
+  if (!game) {
     return (
       <GameSetup emoji="🌉" title="Bridge" subtitle="Contract bridge with bidding."
-        note="You play South with North as your partner. The deal rotates each hand."
+        note="You play South with North (Xavier) as your partner. The deal rotates each hand."
         bgClass="from-game-bg to-teal-900" tutorial={TUTORIALS.bridge} onStart={startGame} />
     );
   }
 
-  if (phase === 'bidding') {
-    const high = currentBid(auction);
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-game-bg to-teal-900 p-4 flex flex-col items-center gap-3">
-        <RulesButton game="bridge" title="Bridge" className="self-end" />
-        <div className="text-white/60 text-sm">NS {scores.ns} · EW {scores.ew} · {SHORT[dealer]} dealt</div>
-        <h2 className="text-2xl font-bold text-white">Bidding</h2>
-        <AuctionGrid auction={auction} dealer={dealer} />
-        <div className="flex flex-wrap justify-center gap-1 max-w-2xl">
-          {myHand.map(card => <PlayingCard key={card.id} card={{ ...card, faceUp: true }} size="sm" />)}
-        </div>
-        {bidTurn === 0 ? (
-          <div className="w-full max-w-md">
-            <div className="grid grid-cols-5 gap-1">
-              {[1, 2, 3, 4, 5, 6, 7].flatMap(level => DENOMINATIONS.map(d => {
-                const bid = `${level}${d}`;
-                const ok = bidHigher(bid, high);
-                return (
-                  <button key={bid} disabled={!ok} onClick={() => placeBid(bid)}
-                    className={`py-2 rounded-lg text-sm font-bold min-h-[40px] ${ok ? `bg-white/10 hover:bg-white/20 ${DENOM_COLOR[d]}` : 'bg-white/5 text-white/15'}`}>
-                    {level}{DENOM_SYMBOL[d]}
-                  </button>
-                );
-              }))}
-            </div>
-            <Button variant="ghost" className="w-full mt-2" onClick={() => placeBid(PASS)}>Pass</Button>
-          </div>
-        ) : (
-          <p className="text-white/50 animate-pulse">{NAMES[bidTurn]} is bidding…</p>
-        )}
-      </div>
-    );
-  }
-
-  // ── Play ───────────────────────────────────────────────────────────────────
-  const dummy = contract?.dummy;
-  const dummyShown = table && (table.trickNumber > 0 || table.trick.length > 0);
-  const declarerTricks = table && contract ? table.tricksWon[contract.declarer] + table.tricksWon[dummy] : 0;
-  const iAmDeclarer = contract?.declarer === 0;
-  const dummyCards = dummy != null && table ? sortBridge(table.hands[dummy]) : [];
-
-  // Dummy's cards face-up after the opening lead; you tap them when you declare
-  const dummyView = (
-    <div className={dummy === 2 ? '' : 'max-w-[7.5rem] md:max-w-[11rem] lg:max-w-[12.5rem]'}>
-      <CardHand cards={dummyCards} size="xs" wrap={dummy !== 2}
-        legal={iAmDeclarer && table?.turn === dummy ? legalFor(dummy) : []}
-        onPlay={card => play(dummy, card)} />
-    </div>
-  );
-  const sides = dummyShown && dummy !== 0 ? { [dummy]: dummyView } : {};
-
-  let message = '';
-  if (table?.status === 'collecting') message = `${SHORT[table.winner]} ${table.winner === 0 ? 'win' : 'wins'} the trick`;
-  else if (table?.status === 'playing' && table.turn === dummy && iAmDeclarer) message = `Play a card from dummy (${SHORT[dummy]})`;
-  else if (contract && !dummyShown) message = `${SHORT[nextSeat(contract.declarer)]} makes the opening lead`;
-
-  return (
-    <>
-      <CardTable
-        title={contract ? `${bidText(contract.bid)} by ${SHORT[contract.declarer]}` : 'Bridge'}
-        scoreLine={`${declarerTricks}/${contract ? contract.level + 6 : 0} tricks · NS ${scores.ns} EW ${scores.ew}`}
-        names={NAMES.map((n, s) => (s === dummy ? `${SHORT[s]} (dummy)` : n))}
-        table={table}
-        seatDetail={seat => table?.tricksWon[seat] || null}
-        sides={sides}
-        rules={{ game: 'bridge', title: 'Bridge' }}
-        message={message}
-        bgClass="from-game-bg to-teal-900"
-      >
-        <CardHand
-          cards={myHand}
-          label={dummy === 0 ? "You're dummy — North plays your cards" : undefined}
-          legal={dummy === 0 ? [] : legalFor(0)}
-          onPlay={card => play(0, card)}
-        />
-      </CardTable>
-
-      {phase === 'handOver' && result && (
-        <ResultPanel>
-          {result.passedOut ? (
-            <>
-              <h2 className="text-xl font-bold text-white mb-2">All four players passed</h2>
-              <p className="text-white/60 mb-4">The hand is thrown in and redealt.</p>
-            </>
-          ) : (
-            <>
-              <h2 className={`text-xl font-bold mb-1 ${result.made ? 'text-green-400' : 'text-game-red'}`}>
-                {bidText(contract.bid)} by {SHORT[contract.declarer]}: {result.made
-                  ? (result.overtricks ? `made +${result.overtricks}` : 'made')
-                  : `down ${result.down}`}
-              </h2>
-              <p className="text-white/60 text-sm mb-3">Declarer took {result.declarerTricks} tricks (needed {contract.level + 6})</p>
-              <p className="text-white mb-4">NS {scores.ns} · EW {scores.ew}</p>
-            </>
-          )}
-          <div className="flex gap-3">
-            <Button variant="secondary" className="flex-1" onClick={() => navigate('/')}>Home</Button>
-            <Button variant="primary" className="flex-1" onClick={() => startHand(nextSeat(dealer))}>Next Hand</Button>
-          </div>
-        </ResultPanel>
-      )}
-    </>
-  );
-}
-
-/** The auction so far, one column per player starting with the dealer. */
-function AuctionGrid({ auction, dealer }) {
-  const order = [0, 1, 2, 3].map(i => (dealer + i) % 4);
-  const rows = [];
-  for (let i = 0; i < auction.length; i += 4) rows.push(auction.slice(i, i + 4));
-  return (
-    <table className="text-sm text-white/80 w-full max-w-xs">
-      <thead>
-        <tr>{order.map(s => <th key={s} className="text-white/40 text-xs font-normal">{SHORT[s]}</th>)}</tr>
-      </thead>
-      <tbody>
-        {rows.map((row, i) => (
-          <tr key={i}>
-            {order.map((_, j) => <td key={j} className="text-center">{row[j] ? bidText(row[j].bid) : ''}</td>)}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
+  return <BridgeTable view={game} names={NAMES} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty} />;
 }

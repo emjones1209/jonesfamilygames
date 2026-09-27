@@ -141,14 +141,16 @@ games_suite/
 ## Play Together (multiplayer)
 Family members play at one table from their own devices at the same time.
 One person opens a table from **Play Together** and shares its 4-letter code;
-empty seats can be filled with robots. Rook (4 players), 6-Card Golf (2–4
-players, 1, 3 or 9 holes) and Mexican Train (2–4 players, 3, 7 or 13 rounds)
-can be played together so far.
+empty seats can be filled with robots (Phoebe, Xavier and Heraldo). Every game
+with computer players can be played together: Rook, Spades, Canasta, Bridge and
+Hearts (4 players), and 6-Card Golf (1, 3 or 9 holes), Mexican Train (3, 7 or
+13 rounds) and Five Dice (2–4 players).
 
 - `server/multiplayer/tables.js` holds the tables in memory (they're for one
   sitting; a restart ends games in progress), checks every move with the same
-  rules code the browser uses (`client/src/games/rook/rookEngine.js`,
-  `client/src/games/golf6/golfEngine.js`, `client/src/games/train/trainEngine.js`), runs
+  rules code the browser uses (each game's `*Engine.js`, e.g.
+  `client/src/games/rook/rookEngine.js`; the single-player games run on the same
+  engines and table screens), runs
   the robots, and sends each player only their own view of the game.
 - A player whose device disconnects keeps their seat; after 30 seconds a robot
   plays for them until they come back.

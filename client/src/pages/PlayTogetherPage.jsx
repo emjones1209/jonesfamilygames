@@ -4,13 +4,17 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '../components/Button';
 import { request } from '../utils/socket';
 
-// Games that can be played together so far (more to come)
+// Every game with computer players can be played together
 const GAMES = [
   { id: 'rook', name: 'Rook', emoji: '🐦', note: '4 players · partners' },
   { id: 'golf', name: '6-Card Golf', emoji: '⛳', note: '2–4 players' },
   { id: 'train', name: 'Mexican Train', emoji: '🚂', note: '2–4 players' },
+  { id: 'dice', name: 'Five Dice', emoji: '🎲', note: '2–4 players' },
+  { id: 'hearts', name: 'Hearts', emoji: '♥️', note: '4 players' },
+  { id: 'spades', name: 'Spades', emoji: '♠️', note: '4 players · partners' },
+  { id: 'canasta', name: 'Canasta', emoji: '♣️', note: '4 players · partners' },
+  { id: 'bridge', name: 'Bridge', emoji: '🌉', note: '4 players · partners' },
 ];
-const SOON = ['Spades', 'Hearts', 'Bridge', 'Canasta'];
 
 export const LAST_TABLE_KEY = 'lastTable';
 
@@ -69,7 +73,6 @@ export default function PlayTogetherPage() {
               {g.emoji} {g.name} <span className="text-white/60 text-sm ml-2">{g.note}</span>
             </Button>
           ))}
-          <p className="text-white/40 text-xs text-center">Coming soon: {SOON.join(', ')}</p>
         </div>
 
         {error && <p className="text-red-300 text-center">{error}</p>}

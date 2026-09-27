@@ -15,7 +15,7 @@
 import {
   act, planPileTake, topOfPile, pileFrozen, teamMeld, teamOf, nextSeat, needed,
   isWild, isBlackThree, cardValue, valueOf, hasCanasta, isCanasta, isNaturalMeld,
-} from './canastaRules';
+} from './canastaRules.js';
 
 const attempt = (s, action) => { try { return act(s, action); } catch { return null; } };
 const canTake = (s, seat, ids) => { try { planPileTake(s, seat, ids); return true; } catch { return false; } };

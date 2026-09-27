@@ -70,3 +70,24 @@ export function collectTrick(state) {
 
 export const leadSuitOf = (state, suitOf = c => c.suit) =>
   state.trick.length ? suitOf(state.trick[0].card) : null;
+
+/**
+ * The table turned round so that `seat` becomes seat 0 (each player's screen
+ * shows them at the bottom); used by the game engines' rotate().
+ */
+export function rotateTable(t, seat, n = SEATS) {
+  if (!t || !seat) return t;
+  const r = x => (x == null ? x : (x - seat + n) % n);
+  const arr = a => a.map((_, i) => a[(i + seat) % n]);
+  const plays = p => p.map(x => ({ ...x, seat: r(x.seat) }));
+  return {
+    ...t,
+    hands: arr(t.hands), taken: arr(t.taken), tricksWon: arr(t.tricksWon),
+    trick: plays(t.trick), history: t.history.map(plays),
+    turn: r(t.turn), leader: r(t.leader), winner: r(t.winner),
+    lastTrick: t.lastTrick && { plays: plays(t.lastTrick.plays), winner: r(t.lastTrick.winner) },
+  };
+}
+
+/** The table as `seat` may see it: other players' hands keep their size but not their cards. */
+export const tableViewFor = (t, seat) => t && { ...t, hands: t.hands.map((h, i) => (i === seat ? h : h.map(() => null))) };

@@ -239,3 +239,59 @@ test('a person and two robots play Mexican Train', async () => {
   assert.equal(grandpa.sawOthersCards, false, 'Grandpa saw someone else\'s tiles');
   assert.deepEqual(code.length, 4);
 });
+
+// ── The other games: one person and robots play through a hand (Five Dice: a whole game) ──
+const engines = {
+  hearts: require('../../client/src/games/hearts/heartsEngine.js'),
+  spades: require('../../client/src/games/spades/spadesEngine.js'),
+  bridge: require('../../client/src/games/bridge/bridgeEngine.js'),
+  canasta: require('../../client/src/games/canasta/canastaEngine.js'),
+  dice: require('../../client/src/games/dice/diceEngine.js'),
+};
+
+/** Cards this view shows from hands other than `you`'s (Bridge's dummy is allowed once it's on the table). */
+function peeked(game, v, you) {
+  if (game === 'dice') return false;
+  if (v.robotPlan) return true;
+  const hands = v.table ? v.table.hands : v.hands;
+  const dummy = game === 'bridge' && engines.bridge.dummyShown(v) ? v.contract.dummy : -1;
+  if (hands.some((h, seat) => seat !== you && seat !== dummy && h.some(Boolean))) return true;
+  return game === 'canasta' && v.stock.some(Boolean);
+}
+
+let nextId = 40;
+for (const game of Object.keys(engines)) {
+  test(`a person and robots play ${game}`, async () => {
+    const me = player(nextId++, 'Aunt Jo');
+    await until(() => me.socket.connected);
+    await me.emit('mp:create', { game });
+    await until(() => me.table);
+    const robots = game === 'dice' ? [1] : [1, 2, 3];
+    for (const seat of robots) me.socket.emit('mp:robot', { seat, on: true });
+    await until(() => me.table.seats.filter(Boolean).length === robots.length + 1);
+    assert.deepEqual(me.table.seats.filter(Boolean).slice(1).map(s => s.name), ['Phoebe', 'Xavier', 'Heraldo'].slice(0, robots.length));
+
+    const engine = engines[game];
+    const done = v => (game === 'dice' ? v.phase === 'gameOver' : ['handOver', 'gameOver'].includes(v.phase));
+    let sawSomething = false, passedHand = -1;
+    me.socket.on('mp:table', t => setTimeout(() => {
+      const v = t.view;
+      if (!v) return;
+      if (peeked(game, v, t.you)) sawSomething = true;
+      const mine = engine.waitingOn ? engine.waitingOn(v).includes(t.you) : engine.waitingFor(v) === t.you;
+      if (!mine || done(v)) return;
+      // Canasta: just draw and throw a card away; the rest: play as a robot would, from what we can see
+      const action = game === 'canasta'
+        ? (v.phase === 'draw' ? { type: 'draw' } : { type: 'discard', id: v.hands[t.you][0].id })
+        : engine.robotAction(v, t.you, 'medium');
+      // Hearts: the others' passes arrive before ours is counted, so only pass once a hand
+      if (action.type === 'pass') { if (passedHand === v.handNo) return; passedHand = v.handNo; }
+      me.socket.emit('mp:action', { action });
+    }, 1));
+    me.socket.emit('mp:start');
+    await until(() => me.table.status === 'playing');
+    await until(() => done(me.table.view), 60000);
+    assert.equal(sawSomething, false, `saw cards that should be hidden in ${game}`);
+    assert.deepEqual(me.errors, []);
+  });
+}
