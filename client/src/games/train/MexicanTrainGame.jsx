@@ -9,12 +9,12 @@ import { newGame, act, waitingFor, robotAction } from './trainEngine';
 import { TrainTable } from './TrainTable';
 import api from '../../utils/api';
 
-const LENGTHS = [[13, 'Full game (13 rounds)'], [7, 'Half game (7 rounds)'], [3, 'Quick game (3 rounds)']];
+const LENGTHS = [[4, 'Standard game (4 rounds)'], [7, 'Longer game (7 rounds)'], [13, 'Full game (13 rounds, 12|12 down to 0|0)']];
 const AI_MS = 900;
 
 export default function MexicanTrainGame() {
   const navigate = useNavigate();
-  const [settings, setSettings] = useState({ players: 4, rounds: 13 });
+  const [settings, setSettings] = useState({ players: 4, rounds: 4 });
   const [difficulty, setDifficulty] = useState(null);
   const [game, setGame] = useState(null);
   const [error, setError] = useState('');

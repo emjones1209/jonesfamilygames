@@ -19,14 +19,14 @@
 import { dealRound, act as rulesAct, roundScores, isDouble, MEXICAN } from './trainRules.js';
 import { chooseAction } from './trainAI.js';
 
-export const ROUND_CHOICES = [3, 7, 13];
+export const ROUND_CHOICES = [4, 7, 13];
 
 // Phases: play | roundOver | gameOver (trainRules marks a finished round 'over')
 function deal({ players, rounds, totals, history, lastRound, winners }, round) {
   return { ...dealRound({ players, round }), rounds, totals, history, lastRound, winners, lastMove: null };
 }
 
-export function newGame({ players = 4, rounds = 13 } = {}) {
+export function newGame({ players = 4, rounds = 4 } = {}) {
   return deal({ players, rounds, totals: Array(players).fill(0), history: [], lastRound: null, winners: null }, 0);
 }
 

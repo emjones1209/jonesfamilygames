@@ -42,7 +42,7 @@ const GAMES = {
   train: {
     name: 'Mexican Train', seats: 4, minSeats: 2, engine: require('../../client/src/games/train/trainEngine.js'),
     moves: ['play', 'draw', 'pass'], tableMoves: ['nextRound', 'newGame'],
-    options: { rounds: { values: [3, 7, 13], default: 13 } },
+    options: { rounds: { values: [4, 7, 13], default: 4 } },
   },
   hearts: {
     name: 'Hearts', seats: 4, engine: load('hearts/heartsEngine'),

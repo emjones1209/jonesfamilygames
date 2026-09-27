@@ -212,9 +212,12 @@ test('a person and two robots play Mexican Train', async () => {
   await until(() => grandpa.socket.connected);
   const { code } = await grandpa.emit('mp:create', { game: 'train' });
   await until(() => grandpa.table);
-  assert.equal(grandpa.table.options.rounds, 13);
-  grandpa.socket.emit('mp:option', { key: 'rounds', value: 3 });
-  await until(() => grandpa.table.options.rounds === 3);
+  assert.equal(grandpa.table.options.rounds, 4);
+  grandpa.socket.emit('mp:option', { key: 'rounds', value: 3 });          // not one of the choices: ignored
+  grandpa.socket.emit('mp:option', { key: 'rounds', value: 7 });
+  await until(() => grandpa.table.options.rounds === 7);
+  grandpa.socket.emit('mp:option', { key: 'rounds', value: 4 });
+  await until(() => grandpa.table.options.rounds === 4);
   for (const seat of [2, 3]) grandpa.socket.emit('mp:robot', { seat, on: true });
   await until(() => grandpa.table.seats.filter(Boolean).length === 3);
 
@@ -235,7 +238,7 @@ test('a person and two robots play Mexican Train', async () => {
   assert.equal(grandpa.table.view.players, 3);
 
   await until(() => grandpa.table.view.phase === 'gameOver', 30000);
-  assert.equal(grandpa.table.view.history.length, 3);
+  assert.equal(grandpa.table.view.history.length, 4);
   assert.equal(grandpa.sawOthersCards, false, 'Grandpa saw someone else\'s tiles');
   assert.deepEqual(code.length, 4);
 });
