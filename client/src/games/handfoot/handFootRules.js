@@ -143,12 +143,13 @@ function placeCards(s, team, rank, cards, target = null) {
   }
   const open = openMeld(s, team, rank);
   const ownMeld = cards.filter(isNatural).length >= 2 && cards.length >= 3;
-  // Too many to finish the open meld with, but enough for a meld of their own? Start a new one
-  if (open && !(open.cards.length + cards.length > BOOK && ownMeld)) {
+  // Cards join the side's unfinished meld of their rank (even if that takes it past 7 — books
+  // keep growing)…
+  if (open) {
     try {
       return addTo(open, cards);
     } catch (e) {
-      if (!ownMeld) throw e;             // (e.g. a wild card too many for that meld: these start their own)
+      if (!ownMeld) throw e;             // …unless they can't (a wild card too many): then they start their own
     }
   }
   const book = s.melds[team].find(m => m.rank === rank && isBook(m));

@@ -208,21 +208,48 @@ describe('Jones family rules', () => {
     expect(s.hands[0].map(c => c.id)).toContain('5-clubs-1');
   });
 
-  it('starts a new meld when the wild card can\'t join the open one', () => {
+  it('taking the pile with a wild card joins the meld you already have', () => {
     let s = dealRound({ dealer: 3 });
     s.initialDone[0] = true;
-    s.melds[0] = [{ rank: '9', cards: [card('9', 'clubs', 5), card('9', 'clubs', 6), card('JK', 'joker', 5)] }];
+    s.melds[0] = [{ rank: '9', cards: [card('9', 'clubs', 5), card('9', 'clubs', 6), card('9', 'clubs', 7), card('JK', 'joker', 5), card('2', 'hearts', 5)] }];
     s.discard = [card('4', 'clubs'), card('5', 'clubs'), card('6', 'clubs'), card('7', 'clubs'), card('9', 'spades')];
     s.hands[0] = [card('9'), card('2', 'clubs'), card('K')];
-    // 9s so far: 2 natural + 1 wild; adding 9, 9, 2 would make 4 + 2 — fine, so they join it
-    let t = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '2-clubs-1'] });
-    expect(t.melds[0]).toHaveLength(1);
-    expect(t.melds[0][0].cards).toHaveLength(6);
-    // But a meld already at its wild-card limit (3 natural, 2 wild) can't take another: a new meld starts
-    s.melds[0] = [{ rank: '9', cards: [card('9', 'clubs', 5), card('9', 'clubs', 6), card('9', 'clubs', 7), card('JK', 'joker', 5), card('2', 'hearts', 5)] }];
-    s.hands[0] = [card('9'), card('2', 'clubs'), card('JK', 'joker', 6), card('K')];
-    t = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '2-clubs-1'] });
-    expect(t.melds[0].map(m => m.cards.length)).toEqual([5, 3]);
+    // 9s so far: 3 natural + 2 wild; adding 9, 9, 2 makes 5 natural + 3 wild — allowed, so they join it
+    s = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '2-clubs-1'] });
+    expect(s.melds[0].map(m => m.cards.length)).toEqual([8]);
+  });
+
+  it('starts a new meld only when the cards can\'t join the one you have (too many wild cards)', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    // 8s so far: 3 natural + 2 wild. Adding three 8s and two 2s would make 4 wild cards — over the limit of 3
+    s.melds[0] = [{ rank: '8', cards: [card('8', 'clubs', 5), card('8', 'clubs', 6), card('8', 'clubs', 7), card('JK', 'joker', 5), card('2', 'hearts', 5)] }];
+    s = rulesAct(s, { type: 'draw' });
+    s.hands[0] = [card('8'), card('8', 'spades'), card('8', 'diamonds'), card('2', 'clubs'), card('2', 'spades'), card('5')];
+    s = rulesAct(s, { type: 'meld', ids: ['8-hearts-1', '8-spades-1', '8-diamonds-1', '2-clubs-1', '2-spades-1'] });
+    expect(s.melds[0].map(m => m.cards.length)).toEqual([5, 5]);    // on their own: 3 natural + 2 wild
+  });
+
+  it('taking the pile adds to the meld you already have of that rank', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = [{ rank: '9', cards: Array.from({ length: 5 }, (_, i) => card('9', 'clubs', 5 + i)) }];
+    s.discard = [card('4', 'clubs'), card('5', 'clubs'), card('6', 'clubs'), card('7', 'clubs'), card('9', 'spades')];
+    s.hands[0] = [card('9'), card('9', 'diamonds'), card('K')];
+    s = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '9-diamonds-1'] });
+    expect(s.melds[0]).toHaveLength(1);
+    expect(s.melds[0][0].cards).toHaveLength(8);                  // 5 + the 9 on the pile + your two: a book
+    expect(isBook(s.melds[0][0])).toBe(true);
+  });
+
+  it('melding cards of a rank you already have a meld of adds them to it', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = [{ rank: 'Q', cards: Array.from({ length: 5 }, (_, i) => card('Q', 'clubs', 5 + i)) }];
+    s = rulesAct(s, { type: 'draw' });
+    s.hands[0] = [card('Q'), card('Q', 'spades'), card('Q', 'diamonds'), card('5')];
+    s = rulesAct(s, { type: 'meld', ids: ['Q-hearts-1', 'Q-spades-1', 'Q-diamonds-1'] });
+    expect(s.melds[0].map(m => m.cards.length)).toEqual([8]);
   });
 
   it('won\'t let wild cards catch up with the natural ones on a meld', () => {
