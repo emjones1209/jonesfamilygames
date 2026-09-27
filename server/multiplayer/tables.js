@@ -60,6 +60,10 @@ const GAMES = {
     name: 'Canasta', seats: 4, engine: load('canasta/canastaEngine'), pace: 2,
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],
   },
+  handfoot: {
+    name: 'Hand and Foot', seats: 4, engine: load('handfoot/handFootEngine'), pace: 2,
+    moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],
+  },
   dice: {
     name: 'Five Dice', seats: 4, minSeats: 2, engine: load('dice/diceEngine'), pace: 1.8,
     moves: ['roll', 'hold', 'score'], tableMoves: ['newGame'],

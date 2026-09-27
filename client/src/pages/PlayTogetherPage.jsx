@@ -13,6 +13,7 @@ const GAMES = [
   { id: 'hearts', name: 'Hearts', emoji: '♥️', note: '4 players' },
   { id: 'spades', name: 'Spades', emoji: '♠️', note: '4 players · partners' },
   { id: 'canasta', name: 'Canasta', emoji: '♣️', note: '4 players · partners' },
+  { id: 'handfoot', name: 'Hand and Foot', emoji: '🦶', note: '4 players · partners' },
   { id: 'bridge', name: 'Bridge', emoji: '🌉', note: '4 players · partners' },
 ];
 

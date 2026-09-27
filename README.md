@@ -11,6 +11,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - ♠️ Spades
 - 🐦 Rook
 - ♣️ Canasta (classic partnership)
+- 🦶 Hand and Foot (partnership, five decks)
 - 🚂 Mexican Train dominoes
 - 🎲 Five Dice (Yahtzee-style)
 - 🌉 Bridge (Full)
@@ -142,8 +143,8 @@ games_suite/
 Family members play at one table from their own devices at the same time.
 One person opens a table from **Play Together** and shares its 4-letter code;
 empty seats can be filled with robots (Phoebe, Xavier and Heraldo). Every game
-with computer players can be played together: Rook, Spades, Canasta, Bridge and
-Hearts (4 players), and 6-Card Golf (1, 3 or 9 holes), Mexican Train (3, 7 or
+with computer players can be played together: Rook, Spades, Canasta, Hand and
+Foot, Bridge and Hearts (4 players), and 6-Card Golf (1, 3 or 9 holes), Mexican Train (3, 7 or
 13 rounds) and Five Dice (2–4 players).
 
 - `server/multiplayer/tables.js` holds the tables in memory (they're for one

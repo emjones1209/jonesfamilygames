@@ -246,6 +246,7 @@ const engines = {
   spades: require('../../client/src/games/spades/spadesEngine.js'),
   bridge: require('../../client/src/games/bridge/bridgeEngine.js'),
   canasta: require('../../client/src/games/canasta/canastaEngine.js'),
+  handfoot: require('../../client/src/games/handfoot/handFootEngine.js'),
   dice: require('../../client/src/games/dice/diceEngine.js'),
 };
 
@@ -256,7 +257,8 @@ function peeked(game, v, you) {
   const hands = v.table ? v.table.hands : v.hands;
   const dummy = game === 'bridge' && engines.bridge.dummyShown(v) ? v.contract.dummy : -1;
   if (hands.some((h, seat) => seat !== you && seat !== dummy && h.some(Boolean))) return true;
-  return game === 'canasta' && v.stock.some(Boolean);
+  if (game === 'handfoot' && (v.feet.flat().some(Boolean) || v.turnStart)) return true;   // feet stay face down
+  return (game === 'canasta' || game === 'handfoot') && v.stock.some(Boolean);
 }
 
 let nextId = 40;
@@ -280,8 +282,8 @@ for (const game of Object.keys(engines)) {
       if (peeked(game, v, t.you)) sawSomething = true;
       const mine = engine.waitingOn ? engine.waitingOn(v).includes(t.you) : engine.waitingFor(v) === t.you;
       if (!mine || done(v)) return;
-      // Canasta: just draw and throw a card away; the rest: play as a robot would, from what we can see
-      const action = game === 'canasta'
+      // Canasta, Hand and Foot: just draw and throw a card away; the rest: play as a robot would, from what we can see
+      const action = game === 'canasta' || game === 'handfoot'
         ? (v.phase === 'draw' ? { type: 'draw' } : { type: 'discard', id: v.hands[t.you][0].id })
         : engine.robotAction(v, t.you, 'medium');
       // Hearts: the others' passes arrive before ours is counted, so only pass once a hand
