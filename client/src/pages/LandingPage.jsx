@@ -20,6 +20,7 @@ const GAMES = [
   { id: 'jigsaw',          name: 'Jigsaw Puzzle',    emoji: '🧩',  color: 'from-pink-700 to-pink-900',       path: '/games/jigsaw',          desc: 'Use your own photos!' },
   { id: 'match3',       name: 'Garden Match',  emoji: '🌸',  color: 'from-fuchsia-700 to-fuchsia-900', path: '/games/match3',       desc: 'Match flowers to bloom!' },
   { id: 'minesweeper',  name: 'Minesweeper',   emoji: '💣',  color: 'from-zinc-600 to-zinc-900',       path: '/games/minesweeper',  desc: 'Clear the minefield!' },
+  { id: 'g2048',        name: '2048',          emoji: '🔢',  color: 'from-yellow-600 to-orange-800',   path: '/games/2048',         desc: 'Slide and join the numbers!' },
 ];
 
 export default function LandingPage() {

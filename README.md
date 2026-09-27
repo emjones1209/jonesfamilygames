@@ -19,6 +19,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - 🧩 Jigsaw Puzzle (use your own photos!)
 - 🌸 Garden Match (Candy Crush-style)
 - 💣 Minesweeper
+- 🔢 2048
 
 ## Features
 - Full user accounts (JWT auth)

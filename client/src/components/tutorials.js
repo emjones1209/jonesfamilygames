@@ -105,6 +105,13 @@ export const TUTORIALS = {
     { emoji: '👆', heading: 'Tapping a Number', body: 'When a number has that many flags around it, tap it to open all its other neighbours at once.\nIf the flags don\'t add up yet, tapping it lights up the squares it counts so you can see where to look.' },
     { emoji: '🎚️', heading: 'Difficulty', body: 'Easy: 9×9 with 10 mines • Medium: 12×12 with 25 mines • Hard: 16×16 with 50 mines.\nTap the face to start a new game.' },
   ],
+  g2048: [
+    { emoji: '🔢', heading: 'Goal', body: 'Join matching numbers to make bigger ones, all the way up to the 2048 tile!' },
+    { emoji: '👆', heading: 'Sliding', body: 'Swipe up, down, left or right and every tile slides as far as it can that way. (On a keyboard, use the arrow keys.)\nAfter each move a new 2 — or sometimes a 4 — appears in an empty square.' },
+    { emoji: '➕', heading: 'Joining Tiles', body: 'When two tiles with the same number slide into each other they join into one: 2 + 2 makes 4, 4 + 4 makes 8, and so on. Each join adds the new number to your score.\nA tile can only join once per move.' },
+    { emoji: '💡', heading: 'Tips', body: 'Keep your biggest tile in a corner and build the row next to it in order (e.g. 256, 128, 64, 32).\nTry to use just two or three directions — only swipe away from your corner when you have to.' },
+    { emoji: '↩️', heading: 'Undo & Game Over', body: 'You get one Undo each game to take back a move (before the game ends).\nThe game ends when the board is full and no tiles can join. Make 2048 to win — then keep going for an even bigger score if you like!' },
+  ],
   match3: [
     { emoji: '🌸', heading: 'Goal', body: 'Swipe a flower toward a neighbour to swap them (or tap one, then the other) and line up 3 or more of the same kind. Reach the level goal before you run out of moves!' },
     { emoji: '✨', heading: 'Special Tiles', body: '🌟 Match 4 in a line = star (clears its row)\n💧 Match 5 in a line = water drop (clears its column)\n☀️ Match in an L or T shape = sun (clears a 3×3 area)\n\nA special keeps its flower, with a badge in the corner — match it with that flower to set it off. Everything a blast clears scores points, and a blast that hits another special sets it off too!' },
