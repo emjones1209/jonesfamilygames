@@ -252,11 +252,14 @@ const engines = {
   handfoot: require('../../client/src/games/handfoot/handFootEngine.js'),
   dice: require('../../client/src/games/dice/diceEngine.js'),
   euchre: require('../../client/src/games/euchre/euchreEngine.js'),
+  gin: require('../../client/src/games/gin/ginEngine.js'),
 };
 
 /** Cards this view shows from hands other than `you`'s (Bridge's dummy is allowed once it's on the table). */
 function peeked(game, v, you) {
   if (game === 'euchre' && (v.kitty.some(Boolean) || (you !== v.dealer && v.discarded))) return true;
+  // Gin shows both hands once someone knocks
+  if (game === 'gin') return !['handOver', 'gameOver'].includes(v.phase) && (v.hands[1 - you].some(Boolean) || v.stock.some(Boolean));
   if (game === 'dice') return false;
   if (v.robotPlan) return true;
   const hands = v.table ? v.table.hands : v.hands;
@@ -267,7 +270,7 @@ function peeked(game, v, you) {
 }
 
 let nextId = 40;
-const tablesToPlay = [...Object.keys(engines).map(game => [game, game === 'dice' ? [1] : [1, 2, 3]]), ['handfoot', [1, 2]]];
+const tablesToPlay = [...Object.keys(engines).map(game => [game, game === 'dice' || game === 'gin' ? [1] : [1, 2, 3]]), ['handfoot', [1, 2]]];
 for (const [game, robots] of tablesToPlay) {
   test(`a person and ${robots.length} robot${robots.length > 1 ? 's' : ''} play ${game}`, async () => {
     const me = player(nextId++, 'Aunt Jo');

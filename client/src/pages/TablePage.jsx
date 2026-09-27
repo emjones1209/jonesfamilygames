@@ -29,6 +29,8 @@ import { rotate as rotateHandFoot } from '../games/handfoot/handFootEngine';
 import { HandFootTable } from '../games/handfoot/HandFootTable';
 import { rotate as rotateEuchre } from '../games/euchre/euchreEngine';
 import { EuchreTable } from '../games/euchre/EuchreTable';
+import { rotate as rotateGin } from '../games/gin/ginEngine';
+import { GinTable } from '../games/gin/GinTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
 import { ReactionBursts, ReactionPicker, REACTION_MS } from '../components/Reactions';
 
@@ -54,6 +56,7 @@ const GAMES = {
   bridge: { name: 'Bridge', Table: BridgeTable, rotate: rotateBridge, seatNote: `${PARTNERS} Everyone sees themselves as South.` },
   canasta: { name: 'Canasta', Table: CanastaTable, rotate: rotateCanasta, seatNote: PARTNERS },
   euchre: { name: 'Euchre', Table: EuchreTable, rotate: rotateEuchre, seatNote: PARTNERS },
+  gin: { name: 'Gin Rummy', Table: GinTable, rotate: rotateGin, seatNote: 'Two players, head to head.' },
   handfoot: {
     name: 'Hand and Foot', Table: HandFootTable, rotate: rotateHandFoot, minSeats: 3,
     seatNote: 'Four players: seats 1 & 3 are partners, and so are seats 2 & 4. Or three, each for themselves (leave a seat empty).',

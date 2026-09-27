@@ -11,6 +11,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - ♠️ Spades
 - 🐦 Rook
 - ♦️ Euchre
+- 🎴 Gin Rummy
 - ♣️ Canasta (classic partnership)
 - 🦶 Hand and Foot (partnership, five decks)
 - 🚂 Mexican Train dominoes

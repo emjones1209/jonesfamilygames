@@ -120,6 +120,14 @@ export const TUTORIALS = {
     { emoji: '🏆', heading: 'Scoring', body: 'The team that chose trump needs at least 3 of the 5 tricks:\n3 or 4 tricks = 1 point\nAll 5 tricks (a "march") = 2 points\nFewer than 3 = "euchred": the other team gets 2 points!' },
     { emoji: '🦸', heading: 'Going Alone', body: 'With a really strong hand, the player who chooses trump can go alone: their partner puts their cards down and sits the hand out.\nTake all 5 tricks alone for 4 points (3 or 4 tricks still score 1).' },
   ],
+  gin: [
+    { emoji: '🎴', heading: 'Goal', body: 'Arrange your 10 cards into melds, then "knock" to end the hand. The first player to 100 points wins.\nA meld is a set (3 or 4 cards of the same rank, like 7♠ 7♥ 7♦) or a run (3 or more in a row in one suit, like 4♥ 5♥ 6♥). Aces are low: A-2-3 is a run, but Q-K-A isn\'t.' },
+    { emoji: '🗑️', heading: 'Deadwood', body: 'Cards that aren\'t in a meld are deadwood. They count against you: aces 1, number cards their number, and J, Q, K 10 each.\nYour hand is shown already sorted into melds (outlined in green), with your deadwood count above it.' },
+    { emoji: '🔄', heading: 'Your Turn', body: 'Draw one card — from the face-down stock, or the top card of the pile — then throw one card away onto the pile.\nYou can\'t throw back a card you just took from the pile.\nAt the start, each player gets a chance to take the first face-up card; if you both pass, the first player draws from the stock.' },
+    { emoji: '✊', heading: 'Knocking', body: 'When your deadwood is 10 or less after you throw a card away, you can knock instead of discarding. Both hands are shown.\nYour opponent may "lay off" their deadwood onto your melds (e.g. adding the 7♥ to your 4♥ 5♥ 6♥) — this is done for you.' },
+    { emoji: '🏆', heading: 'Scoring', body: 'Knock with less deadwood than your opponent and you score the difference.\nBut if they have the same or less, it\'s an undercut: they score the difference plus 25!\nGin (no deadwood at all) scores 25 plus their deadwood, and they can\'t lay off. Big Gin (all 11 cards in melds after you draw) scores 31 plus their deadwood.' },
+    { emoji: '🎁', heading: 'Game Bonus', body: 'The first to 100 wins the game and gets 100 bonus points. Each player also gets 25 for every hand they won.\nIf the stock runs down to 2 cards without a knock, the hand is a draw — nobody scores.' },
+  ],
   wordsearch: [
     { emoji: '🔍', heading: 'Goal', body: 'Find every word in the list hidden in the grid of letters. Words run in straight lines.' },
     { emoji: '👆', heading: 'Selecting a Word', body: 'Drag your finger from the first letter of a word to the last.\nOr tap the first letter, then tap the last one.\nFound words get coloured in and crossed off the list.' },

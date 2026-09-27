@@ -60,6 +60,10 @@ const GAMES = {
     name: 'Euchre', seats: 4, engine: load('euchre/euchreEngine'),
     moves: ['call', 'pass', 'discard', 'play'], tableMoves: ['nextHand', 'newGame'],
   },
+  gin: {
+    name: 'Gin Rummy', seats: 2, engine: load('gin/ginEngine'), pace: 1.2,
+    moves: ['draw', 'pass', 'discard', 'knock'], tableMoves: ['nextHand', 'newGame'],
+  },
   canasta: {
     name: 'Canasta', seats: 4, engine: load('canasta/canastaEngine'), pace: 2,
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],
