@@ -8,6 +8,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export const REACTION_MS = 3500;     // how long a reaction stays on screen
 
+// Big emoji come from vector pictures (Noto Emoji, in public/emoji) rather than the
+// device's emoji font, which turns blocky when blown up this large
+const EMOJI_FILES = {
+  '👍': '1f44d', '😂': '1f602', '😮': '1f62e', '😬': '1f62c', '🥺': '1f97a', '🤦': '1f926',
+  '🎉': '1f389', '👏': '1f44f', '😄': '1f604', '✨': '2728',
+};
+
+/** An emoji as a sharp picture (falling back to the font for any we haven't a picture of). */
+function Emoji({ char, className = 'inline-block w-[1em] h-[1em] align-[-0.125em]' }) {
+  const file = EMOJI_FILES[char];
+  return file ? <img src={`/emoji/${file}.svg`} alt={char} draggable={false} className={className} /> : <span>{char}</span>;
+}
+
+/** Text with any emoji in it drawn as pictures ("Hurry up! 😄"). */
+const WithEmoji = ({ text }) => [...text].map((ch, i) => (EMOJI_FILES[ch] ? <Emoji key={i} char={ch} /> : ch));
+
 const isWords = r => /[A-Za-z]/.test(r);
 const BUBBLES = [
   'from-pink-500 to-orange-400', 'from-sky-500 to-indigo-500', 'from-emerald-500 to-lime-400', 'from-fuchsia-500 to-purple-600',
@@ -38,11 +54,11 @@ function Burst({ reaction, you, players, name }) {
         const dist = 90 + (i % 3) * 30;
         return (
           <span key={i} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-            <motion.span className="block text-2xl md:text-3xl"
+            <motion.span className="block"
               initial={{ x: 0, y: 0, scale: 0.2, opacity: 1 }}
               animate={{ x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, scale: 1, opacity: 0, rotate: 180 }}
               transition={{ duration: 1.1, delay: 0.1, ease: 'easeOut' }}>
-              {spark}
+              <Emoji char={spark} className="block w-7 h-7 md:w-9 md:h-9" />
             </motion.span>
           </span>
         );
@@ -54,10 +70,10 @@ function Burst({ reaction, you, players, name }) {
         transition={{ duration: 0.7, ease: 'easeOut' }}>
         {words ? (
           <div className={`bg-gradient-to-br ${bubbleFor(emoji)} text-white font-black text-3xl md:text-5xl px-6 py-3 rounded-[2rem] border-4 border-white shadow-2xl -rotate-3 whitespace-nowrap`}>
-            {emoji}
+            <WithEmoji text={emoji} />
           </div>
         ) : (
-          <div className="text-8xl md:text-9xl drop-shadow-[0_6px_12px_rgba(0,0,0,0.5)] leading-none">{emoji}</div>
+          <Emoji char={emoji} className="block w-28 h-28 md:w-40 md:h-40 drop-shadow-[0_6px_12px_rgba(0,0,0,0.5)]" />
         )}
       </motion.div>
       <div className="mt-2 bg-black/70 text-white font-bold rounded-full px-4 py-1 text-base md:text-lg shadow-lg whitespace-nowrap">{name}</div>
@@ -100,7 +116,7 @@ export function ReactionPicker({ choices, open, onToggle, onPick }) {
                 whileTap={{ scale: 1.3 }}
                 className={`rounded-2xl bg-white/10 hover:bg-white/20 text-white min-h-[64px] leading-tight
                   ${isWords(r) ? 'text-base font-bold' : 'text-4xl'}`}>
-                {r}
+                {isWords(r) ? <WithEmoji text={r} /> : <Emoji char={r} className="block w-10 h-10 md:w-11 md:h-11 mx-auto" />}
               </motion.button>
             ))}
           </motion.div>

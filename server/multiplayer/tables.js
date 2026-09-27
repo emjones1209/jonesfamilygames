@@ -80,7 +80,7 @@ const waitingOn = (engine, s) => (engine.waitingOn ? engine.waitingOn(s) : [engi
 const { COMPUTER_NAMES } = require('../../client/src/games/players.js');
 const robotName = table => COMPUTER_NAMES.find(n => !table.seats.some(s => s?.type === 'robot' && s.name === n)) ?? 'Robot';
 
-const REACTIONS = ['👍', '😂', '😮', '😬', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
+const REACTIONS = ['👍', '😂', '😮', '😬', '🥺', '🤦', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
 const LEVELS = ['easy', 'medium', 'hard'];
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';        // no I, L or O (easily confused)
 
