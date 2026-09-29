@@ -7,6 +7,7 @@ import { choosePartnershipCard } from '../cards/ai.js';
 
 export const TRUMP = 'spades';
 export const WINNING_SCORE = 500;
+export const TARGET_CHOICES = [200, 300, 500];     // what a play-together table can play to
 export const BAG_LIMIT = 10;       // every 10 overtricks costs 100 points
 export const NIL = 0;
 
@@ -58,9 +59,9 @@ export function scoreHand(bids, tricks, bags = [0, 0]) {
 }
 
 /** Winning team index, or null if nobody has reached the target (or it's tied). */
-export function winnerOf(scores) {
+export function winnerOf(scores, target = WINNING_SCORE) {
   const [a, b] = scores;
-  if (Math.max(a, b) < WINNING_SCORE || a === b) return null;
+  if (Math.max(a, b) < target || a === b) return null;
   return a > b ? 0 : 1;
 }
 

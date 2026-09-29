@@ -152,7 +152,9 @@ One person opens a table from **Play Together** and shares its 4-letter code;
 empty seats can be filled with robots (Phoebe, Xavier and Heraldo). Every game
 with computer players can be played together: Rook, Spades, Canasta, Bridge and
 Hearts (4 players), Hand and Foot (3 each for themselves, or 4 as partners), and 6-Card Golf (1, 3 or 9 holes), Mexican Train (4, 7 or
-13 rounds) and Five Dice (2–4 players).
+13 rounds) and Five Dice (2–4 players). Spades tables can play to 200, 300 or
+500, and in partnership games the host can move people between seats to choose
+partners.
 
 - `server/multiplayer/tables.js` holds the tables in memory (they're for one
   sitting; a restart ends games in progress), checks every move with the same

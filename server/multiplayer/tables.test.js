@@ -243,6 +243,38 @@ test('a person and two robots play Mexican Train', async () => {
   assert.deepEqual(code.length, 4);
 });
 
+test('the host picks Spades partners and a shorter game', async () => {
+  const host = player(30, 'Emily'), friend = player(31, 'Sam');
+  await until(() => host.socket.connected && friend.socket.connected);
+  const { code } = await host.emit('mp:create', { game: 'spades' });
+  await friend.emit('mp:join', { code });
+  for (const seat of [2, 3]) host.socket.emit('mp:robot', { seat, on: true });
+  await until(() => host.table?.seats.filter(Boolean).length === 4);
+  assert.deepEqual(host.table.seats.map(s => s.name), ['Emily', 'Sam', 'Phoebe', 'Xavier']);
+
+  // Sam sits opposite Emily (her partner): only the host can move people
+  friend.socket.emit('mp:swap', { from: 1, to: 2 });
+  host.socket.emit('mp:swap', { from: 1, to: 9 });                     // no such seat: ignored
+  host.socket.emit('mp:swap', { from: 1, to: 2 });
+  await until(() => host.table.seats[2].name === 'Sam');
+  assert.deepEqual(host.table.seats.map(s => s.name), ['Emily', 'Phoebe', 'Sam', 'Xavier']);
+  assert.equal(friend.table.you, 2);
+
+  assert.equal(host.table.options.target, 500);
+  host.socket.emit('mp:option', { key: 'target', value: 250 });        // not one of the choices: ignored
+  host.socket.emit('mp:option', { key: 'target', value: 200 });
+  await until(() => host.table.options.target === 200);
+  host.socket.emit('mp:start');
+  await until(() => host.table.status === 'playing');
+  assert.equal(host.table.view.target, 200);
+
+  host.socket.emit('mp:swap', { from: 0, to: 1 });                     // too late once the game's on: ignored
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(host.table.seats[0].name, 'Emily');
+  host.socket.emit('mp:leave');
+  friend.socket.emit('mp:leave');
+});
+
 // ── The other games: one person and robots play through a hand (Five Dice: a whole game) ──
 const engines = {
   hearts: require('../../client/src/games/hearts/heartsEngine.js'),

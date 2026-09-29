@@ -18,6 +18,7 @@ import { TrainTable } from '../games/train/TrainTable';
 import { rotate as rotateHearts } from '../games/hearts/heartsEngine';
 import { HeartsTable } from '../games/hearts/HeartsTable';
 import { rotate as rotateSpades } from '../games/spades/spadesEngine';
+import { TARGET_CHOICES } from '../games/spades/spadesRules';
 import { SpadesTable } from '../games/spades/SpadesTable';
 import { rotate as rotateBridge } from '../games/bridge/bridgeEngine';
 import { BridgeTable } from '../games/bridge/BridgeTable';
@@ -41,10 +42,10 @@ import { ReactionBursts, ReactionPicker, REACTION_MS } from '../components/React
 const REACTIONS = ['👍', '😂', '😮', '😬', '🥺', '🤦', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
 const PARTNERS = 'Seats 1 & 3 are partners, and so are seats 2 & 4.';
 // Each game's screen, how to turn its view round, what the lobby says about seats,
-// the setting the host picks (if any), and — for moves that name a seat's
+// whether opposite seats are partners, the setting the host picks (if any), and — for moves that name a seat's
 // things (Mexican Train's trains) — how to turn a move back the right way round
 const GAMES = {
-  rook: { name: 'Rook', Table: RookTable, rotate: rotateRook, seatNote: PARTNERS },
+  rook: { name: 'Rook', Table: RookTable, rotate: rotateRook, seatNote: PARTNERS, teams: true },
   golf: {
     name: '6-Card Golf', Table: GolfTable, rotate: rotateGolf, minSeats: 2,
     seatNote: '2 to 4 players. Empty seats are left out when the game starts.',
@@ -56,10 +57,13 @@ const GAMES = {
     option: { key: 'rounds', label: 'Rounds', values: ROUND_CHOICES, unit: 'round' },
   },
   hearts: { name: 'Hearts', Table: HeartsTable, rotate: rotateHearts, seatNote: 'Four players, each playing for themselves.' },
-  spades: { name: 'Spades', Table: SpadesTable, rotate: rotateSpades, seatNote: PARTNERS },
-  bridge: { name: 'Bridge', Table: BridgeTable, rotate: rotateBridge, seatNote: `${PARTNERS} Everyone sees themselves as South.` },
-  canasta: { name: 'Canasta', Table: CanastaTable, rotate: rotateCanasta, seatNote: PARTNERS },
-  euchre: { name: 'Euchre', Table: EuchreTable, rotate: rotateEuchre, seatNote: PARTNERS },
+  spades: {
+    name: 'Spades', Table: SpadesTable, rotate: rotateSpades, seatNote: PARTNERS, teams: true,
+    option: { key: 'target', label: 'Play to', values: TARGET_CHOICES, unit: 'point' },
+  },
+  bridge: { name: 'Bridge', Table: BridgeTable, rotate: rotateBridge, seatNote: `${PARTNERS} Everyone sees themselves as South.`, teams: true },
+  canasta: { name: 'Canasta', Table: CanastaTable, rotate: rotateCanasta, seatNote: PARTNERS, teams: true },
+  euchre: { name: 'Euchre', Table: EuchreTable, rotate: rotateEuchre, seatNote: PARTNERS, teams: true },
   gin: { name: 'Gin Rummy', Table: GinTable, rotate: rotateGin, seatNote: 'Two players, head to head.' },
   checkers: {
     name: 'Checkers', Table: CheckersTable, rotate: rotateCheckers, unrotate: unrotateCheckers,
@@ -92,6 +96,7 @@ export default function TablePage() {
   const [error, setError] = useState('');
   const [reactions, setReactions] = useState([]);       // [{ id, seat, emoji }] shown for a few seconds
   const [picker, setPicker] = useState(false);
+  const [moving, setMoving] = useState(null);           // the seat the host is moving (lobby)
   const errorTimer = useRef(null);
 
   useEffect(() => {
@@ -174,6 +179,9 @@ export default function TablePage() {
     const option = game.option;
     const chosen = option && table.options?.[option.key];
     const chosenText = option ? `${chosen} ${option.unit}${chosen === 1 ? '' : 's'}` : '';
+    const teamOf = i => (you != null ? (i % 2 === you % 2 ? 'Your team' : 'Other team') : `Team ${i % 2 ? 'B' : 'A'}`);
+    const moveTo = i => { send('mp:swap', { from: moving, to: i }); setMoving(null); };
+    const small = 'text-sm text-white bg-white/10 rounded-lg px-3 min-h-[40px]';
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-indigo-950 p-5">
         {banner}
@@ -191,14 +199,27 @@ export default function TablePage() {
           <div className="card-panel flex flex-col gap-2">
             <p className="text-white/50 text-xs">{game.seatNote}</p>
             {table.seats.map((seat, i) => (
-              <div key={i} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${i === you ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/5'}`}>
+              <div key={i} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${i === you ? 'bg-game-gold/20 border border-game-gold' : i === moving ? 'bg-white/15 border border-white/40' : 'bg-white/5'}`}>
                 <span className="text-white/40 text-sm w-6">{i + 1}</span>
-                <span className="flex-1 text-white">{seatName(seat)}{i === you ? ' (you)' : ''}</span>
-                {!seat && <button onClick={() => send('mp:sit', { seat: i })} className="text-sm text-white bg-white/10 rounded-lg px-3 min-h-[40px]">Sit here</button>}
-                {!seat && <button onClick={() => send('mp:robot', { seat: i, on: true })} className="text-sm text-white bg-white/10 rounded-lg px-3 min-h-[40px]">Add robot</button>}
-                {seat?.type === 'robot' && <button onClick={() => send('mp:robot', { seat: i, on: false })} className="text-sm text-white bg-white/10 rounded-lg px-3 min-h-[40px]">Remove</button>}
+                <span className="flex-1 min-w-0 text-white">
+                  {seatName(seat)}{i === you ? ' (you)' : ''}
+                  {game.teams && <span className="block text-xs text-white/40">{teamOf(i)}</span>}
+                </span>
+                {moving != null ? (
+                  i === moving
+                    ? <button onClick={() => setMoving(null)} className={small}>Cancel</button>
+                    : <button onClick={() => moveTo(i)} className={small}>{seat ? 'Swap here' : 'Move here'}</button>
+                ) : (
+                  <>
+                    {!seat && <button onClick={() => send('mp:sit', { seat: i })} className={small}>Sit here</button>}
+                    {!seat && <button onClick={() => send('mp:robot', { seat: i, on: true })} className={small}>Add robot</button>}
+                    {seat && isHost && <button onClick={() => setMoving(i)} className={small}>Move</button>}
+                    {seat?.type === 'robot' && <button onClick={() => send('mp:robot', { seat: i, on: false })} className={small}>Remove</button>}
+                  </>
+                )}
               </div>
             ))}
+            {isHost && game.teams && <p className="text-white/50 text-xs">Tap Move to choose who partners whom.</p>}
           </div>
 
           {isHost ? (

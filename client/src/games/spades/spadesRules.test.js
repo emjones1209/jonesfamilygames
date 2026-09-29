@@ -47,6 +47,8 @@ describe('Spades scoring', () => {
     expect(winnerOf([499, 300])).toBe(null);
     expect(winnerOf([510, 520])).toBe(1);
     expect(winnerOf([520, 520])).toBe(null);
+    expect(winnerOf([210, 150], 200)).toBe(0);
+    expect(winnerOf([190, 150], 200)).toBe(null);
   });
 });
 

@@ -21,6 +21,15 @@ describe('Spades game engine', () => {
     }
   });
 
+  it('plays to a shorter target when asked, and keeps it for the next game', () => {
+    const s = autoplay(newGame({ target: 200 }));
+    expect(s.phase).toBe('gameOver');
+    expect(s.scores[s.winner]).toBeGreaterThanOrEqual(200);
+    expect(s.scores[s.winner]).toBeLessThan(500);
+    expect(act(s, { type: 'newGame' }).target).toBe(200);
+    expect(rotate(s, 1).target).toBe(200);
+  });
+
   it('plays all 13 tricks each hand', () => {
     const s = autoplay(newGame(), undefined, x => x.phase === 'handOver' || x.phase === 'gameOver');
     expect(teamTricks(s)[0] + teamTricks(s)[1]).toBe(13);

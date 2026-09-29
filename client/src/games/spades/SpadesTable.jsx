@@ -27,7 +27,7 @@ const bidLabel = b => (b == null ? '…' : b === NIL ? 'Nil' : b);
  */
 export function SpadesTable({ view, names, onAction, onExit, error, subtitle, reactions = {}, overlay, gameOverActions }) {
   const myHand = useMemo(() => sortHand(view.table?.hands[0] ?? view.hands[0]), [view]);
-  const scoreLine = `Us ${view.scores[0]} · Them ${view.scores[1]}`;
+  const scoreLine = `Us ${view.scores[0]} · Them ${view.scores[1]}${view.target ? ` · to ${view.target}` : ''}`;
 
   if (view.phase === 'bidding') {
     const partnerBid = view.bids[2];

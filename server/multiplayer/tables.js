@@ -14,8 +14,9 @@
  *   mp:sit    { seat }                            take an empty seat (or a robot's, once playing)
  *   mp:stand                                      give up your seat (before the game starts)
  *   mp:robot  { seat, on }                        put a robot in an empty seat, or take it out
+ *   mp:swap   { from, to }                        swap two seats, e.g. to choose partners (host only)
  *   mp:level  { level }                           robots' skill (host only)
- *   mp:option { key, value }                      a game setting, e.g. Golf's holes or Mexican Train's rounds (host only)
+ *   mp:option { key, value }                      a game setting, e.g. Golf's holes or Spades' winning score (host only)
  *   mp:start                                      deal (host only, every seat filled — or, for games
  *                                                 with a minimum, enough of them; empty seats are dropped)
  *   mp:action { action }                          a move in the game
@@ -51,6 +52,7 @@ const GAMES = {
   spades: {
     name: 'Spades', seats: 4, engine: load('spades/spadesEngine'),
     moves: ['bid', 'play'], tableMoves: ['nextHand', 'newGame'],
+    options: { target: { values: [200, 300, 500], default: 500 } },
   },
   bridge: {
     name: 'Bridge', seats: 4, engine: load('bridge/bridgeEngine'),
@@ -246,6 +248,15 @@ function createTables(io, {
       if (!Number.isInteger(seat) || seat < 0 || seat >= table.seats.length) return;
       if (on && table.seats[seat] === null) table.seats[seat] = { type: 'robot', name: robotName(table) };
       if (!on && table.seats[seat]?.type === 'robot') table.seats[seat] = null;
+      broadcast(table);
+    });
+
+    socket.on('mp:swap', ({ from, to } = {}) => {
+      const table = current();
+      if (!table || !inLobby(table) || table.hostId !== user.id) return;
+      const ok = x => Number.isInteger(x) && x >= 0 && x < table.seats.length;
+      if (!ok(from) || !ok(to) || from === to) return;
+      [table.seats[from], table.seats[to]] = [table.seats[to], table.seats[from]];
       broadcast(table);
     });
 

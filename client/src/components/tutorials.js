@@ -24,7 +24,7 @@ export const TUTORIALS = {
     { emoji: '🤖', heading: 'Difficulty', body: 'Easy: the computer plays any card.\nMedium: it ducks tricks and dumps the Q♠ and high hearts.\nHard: it remembers every card played, leads cards that can\'t win, empties a short suit when passing, flushes out the Q♠ and stops anyone shooting the moon (and may try it itself).' },
   ],
   spades: [
-    { emoji: '♠️', heading: 'Goal', body: 'Work with your partner (across the table) to win at least as many tricks as you bid. Spades are always trump. First team to 500 wins.' },
+    { emoji: '♠️', heading: 'Goal', body: 'Work with your partner (across the table) to win at least as many tricks as you bid. Spades are always trump. First team to 500 wins (a play-together table can choose a shorter game).' },
     { emoji: '🤔', heading: 'Bidding', body: 'Before playing, everyone bids how many tricks they expect to win; you and your partner\'s bids are added together. Bid "Nil" to try to win no tricks at all.' },
     { emoji: '🎮', heading: 'Playing', body: 'Follow the suit led if you can. Spades beat every other suit. You can\'t lead spades until one has been played, unless you only have spades.' },
     { emoji: '📊', heading: 'Scoring', body: 'Make your bid: 10 points per trick bid, +1 for each extra trick (a "bag"). Miss it: lose 10 per trick bid.\nEvery 10 bags costs 100 points!\nNil: +100 if you win no tricks, −100 if you win any.' },
