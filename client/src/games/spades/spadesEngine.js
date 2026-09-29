@@ -18,7 +18,7 @@ import { buildDeck, shuffle } from '../../utils/cardEngine.js';
 import { trickWinner, nextSeat, teamOf } from '../cards/tricks.js';
 import { dealTable, playCard, collectTrick, rotateTable, tableViewFor } from '../cards/trickTable.js';
 import { tableMemory } from '../cards/memory.js';
-import { TRUMP, legalPlays, scoreHand, winnerOf, chooseBid, chooseCard } from './spadesRules.js';
+import { TRUMP, WINNING_SCORE, legalPlays, scoreHand, winnerOf, chooseBid, chooseCard } from './spadesRules.js';
 
 const DECK = buildDeck();
 const SEATS = [0, 1, 2, 3];
@@ -36,9 +36,9 @@ function deal(game, dealer, deck = shuffle(buildDeck())) {
   };
 }
 
-/** Seat 3 deals first, so seat 0 bids and leads first. */
-export function newGame({ dealer = 3, deck } = {}) {
-  return deal({ scores: [0, 0], bags: [0, 0], handNo: 0, winner: null }, dealer, deck);
+/** Seat 3 deals first, so seat 0 bids and leads first. The first team to `target` points wins. */
+export function newGame({ dealer = 3, deck, target = WINNING_SCORE } = {}) {
+  return deal({ target, scores: [0, 0], bags: [0, 0], handNo: 0, winner: null }, dealer, deck);
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ export function act(s, a) {
       if (table.status !== 'done') return { ...s, table };
       const result = scoreHand(s.bids, table.tricksWon, s.bags);
       const scores = [s.scores[0] + result.delta[0], s.scores[1] + result.delta[1]];
-      const winner = winnerOf(scores);
+      const winner = winnerOf(scores, s.target);
       return { ...s, table, scores, bags: result.bags, lastHand: result, winner, phase: winner != null ? 'gameOver' : 'handOver' };
     }
 
@@ -96,7 +96,7 @@ export function act(s, a) {
 
     case 'newGame':
       if (s.phase !== 'gameOver') return s;
-      return newGame({ dealer: nextSeat(s.dealer) });
+      return newGame({ dealer: nextSeat(s.dealer), target: s.target });
 
     default:
       throw new Error(`Unknown action ${a.type}`);
