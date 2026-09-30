@@ -1,7 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { FullPageLoader } from "./components/LoadingSpinner";
 import { AppUpdater } from "./components/AppUpdater";   // keeps the saved app up to date
+import { afterLogin } from "./utils/afterLogin";
 
 // Pages
 import LoginPage from "./pages/LoginPage";
@@ -35,17 +36,20 @@ import MinesweeperGame from "./games/minesweeper/MinesweeperGame";
 import Game2048 from "./games/g2048/Game2048";
 import WordSearchGame from "./games/wordsearch/WordSearchGame";
 
+// Signing in takes you back to the page you were headed for (e.g. a table you were invited to)
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <FullPageLoader text="Loading..." />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   return children;
 }
 
 function PublicRoute({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <FullPageLoader text="Loading..." />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={afterLogin(location.state)} replace />;
   return children;
 }
 
