@@ -5,10 +5,11 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Share2 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 import { getSocket, request } from '../utils/socket';
+import { inviteText, shareInvite } from '../utils/share';
 import { rotate as rotateRook } from '../games/rook/rookEngine';
 import { RookTable } from '../games/rook/RookTable';
 import { rotate as rotateGolf, HOLE_CHOICES } from '../games/golf6/golfEngine';
@@ -97,6 +98,7 @@ export default function TablePage() {
   const [reactions, setReactions] = useState([]);       // [{ id, seat, emoji }] shown for a few seconds
   const [picker, setPicker] = useState(false);
   const [moving, setMoving] = useState(null);           // the seat the host is moving (lobby)
+  const [shared, setShared] = useState('');             // what happened to the last invite ('copied', 'failed')
   const errorTimer = useRef(null);
 
   useEffect(() => {
@@ -182,6 +184,12 @@ export default function TablePage() {
     const teamOf = i => (you != null ? (i % 2 === you % 2 ? 'Your team' : 'Other team') : `Team ${i % 2 ? 'B' : 'A'}`);
     const moveTo = i => { send('mp:swap', { from: moving, to: i }); setMoving(null); };
     const small = 'text-sm text-white bg-white/10 rounded-lg px-3 min-h-[40px]';
+    const invite = async () => {
+      const url = `${window.location.origin}/together/${table.code}`;
+      const result = await shareInvite({ title: `${game.name} — Family Games`, text: inviteText(game.name), url });
+      setShared(result);
+      if (result === 'copied' || result === 'failed') setTimeout(() => setShared(''), 4000);
+    };
     return (
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-indigo-950 p-5">
         {banner}
@@ -193,7 +201,12 @@ export default function TablePage() {
             <h1 className="game-title text-3xl">{game.name} table</h1>
             <p className="text-white/60 text-sm mt-2">Tell the others this code:</p>
             <div className="text-5xl font-black tracking-[0.3em] text-game-gold my-2">{table.code}</div>
-            <p className="text-white/40 text-xs">They open Play Together and type it in.</p>
+            <p className="text-white/40 text-xs">They open Play Together and type it in — or send them a link:</p>
+            <Button variant="gold" className="mt-3 inline-flex items-center gap-2" onClick={invite}>
+              <Share2 size={18} /> Share invite
+            </Button>
+            {shared === 'copied' && <p className="text-game-gold text-sm mt-2">Invitation copied — paste it into a message.</p>}
+            {shared === 'failed' && <p className="text-red-300 text-sm mt-2">Couldn't share from here — send them the code instead.</p>}
           </div>
 
           <div className="card-panel flex flex-col gap-2">

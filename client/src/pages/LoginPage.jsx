@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/Button';
+import { afterLogin } from '../utils/afterLogin';
 
 export default function LoginPage() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const invited = afterLogin(location.state).startsWith('/together/');
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [form, setForm] = useState({ email: '', displayName: '', password: '', inviteCode: '' });
   const [error, setError] = useState('');
@@ -23,8 +26,9 @@ export default function LoginPage() {
         if (!form.displayName.trim()) { setError('Display name required'); setLoading(false); return; }
         await register(form.email, form.displayName, form.password, form.inviteCode);
       }
-      // New accounts see the welcome guide first
-      navigate(mode === 'register' ? '/welcome' : '/');
+      // New accounts see the welcome guide first, unless they're on their way to a table they were invited to
+      const next = afterLogin(location.state);
+      navigate(mode === 'register' && !invited ? '/welcome' : next, { replace: true });
     } catch (err) {
       setError(err.response?.data?.error || 'Something went wrong');
     } finally {
@@ -47,6 +51,7 @@ export default function LoginPage() {
           <img src="/logo.png" alt="Joneses family games logo" className="w-40 h-40 md:w-48 md:h-48 mx-auto mb-3" />
           <h1 className="text-3xl font-bold text-game-gold font-display">Family Games</h1>
           <p className="text-white/50 mt-1">Welcome to the family game room!</p>
+          {invited && <p className="text-game-gold mt-3">Sign in to join the game you were invited to.</p>}
         </div>
 
         {/* Tab switcher */}
