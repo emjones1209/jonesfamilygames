@@ -14,9 +14,10 @@ export function RulesButton({ game, title, className = '' }) {
 
   return (
     <>
-      <button onClick={() => setOpen(true)}
-        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 text-xs font-semibold min-h-[36px] shrink-0 ${className}`}>
-        <BookOpen size={14} /> Rules
+      {/* Just the book on phones, to leave room in the header */}
+      <button onClick={() => setOpen(true)} aria-label="Rules"
+        className={`flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 text-xs font-semibold min-h-[36px] min-w-[36px] shrink-0 ${className}`}>
+        <BookOpen size={14} /> <span className="hidden md:inline">Rules</span>
       </button>
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setOpen(false)}>

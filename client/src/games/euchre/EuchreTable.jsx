@@ -8,8 +8,9 @@ import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
 import { RulesButton } from '../../components/RulesButton';
 import { SUIT_SYMBOLS } from '../../utils/cardEngine';
-import { CardTable } from '../cards/CardTable';
+import { CardTable, Wide } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
+import { useMediaQuery, SHORT_SCREEN } from '../../utils/useMediaQuery';
 import { ResultPanel } from '../cards/GameSetup';
 import { sortHand, WINNING_SCORE } from './euchreRules';
 import { waitingFor, legalFor, teamTricks, mustCall } from './euchreEngine';
@@ -39,6 +40,7 @@ function callLabel(call) {
  * @param overlay     extra content drawn over the table (e.g. the reactions bar)
  */
 export function EuchreTable({ view, names, onAction, onExit, error, subtitle, reactions = {}, overlay, gameOverActions }) {
+  const short = useMediaQuery(SHORT_SCREEN);    // a phone turned sideways
   const myHand = useMemo(() => sortHand(view.table?.hands[0] ?? view.hands[0], view.phase === 'bidding' ? null : view.trump),
     [view]);
   const scoreLine = `Us ${view.scores[0]} · Them ${view.scores[1]}`;
@@ -46,31 +48,35 @@ export function EuchreTable({ view, names, onAction, onExit, error, subtitle, re
 
   if (view.phase === 'bidding' || view.phase === 'discard') {
     return (
-      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 flex flex-col items-center gap-4`}>
+      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 short:p-2 flex flex-col items-center gap-4 short:gap-1.5`}>
         <div className="self-stretch flex items-center justify-between">
           <button onClick={onExit} className="text-white/50 hover:text-white text-sm min-h-[44px] px-2">← Back</button>
           <RulesButton game="euchre" title="Euchre" />
         </div>
-        <div className="text-white/60 text-sm">{scoreLine} · first to {WINNING_SCORE}</div>
-        <h2 className="text-2xl font-bold text-white">
+        <div className="text-white/60 text-sm short:-mt-11">{scoreLine} · first to {WINNING_SCORE}</div>
+        <h2 className="text-2xl short:text-lg font-bold text-white">
           {view.phase === 'discard' ? 'Picking up' : view.round === 1 ? 'Order it up?' : 'Name trump'}
         </h2>
         <div className="grid grid-cols-4 gap-2 w-full max-w-md">
           {names.map((name, seat) => (
-            <div key={seat} className={`rounded-xl p-2 text-center ${seat === waitingFor(view) ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/5'}`}>
+            <div key={seat} className={`rounded-xl p-2 short:p-1 short:flex short:items-center short:justify-center short:gap-2 text-center ${seat === waitingFor(view) ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/5'}`}>
               <div className="text-white/60 text-xs truncate">{name}{seat === view.dealer ? ' (dealer)' : ''}{reactions[seat] ? ` ${reactions[seat]}` : ''}</div>
               <div className="text-white font-bold">{callLabel(view.calls[seat])}</div>
             </div>
           ))}
         </div>
 
+        {/* The turned-up card, with your hand beside it on a phone turned sideways */}
+        <div className="flex flex-col short:flex-row items-center gap-4 short:gap-6">
         <div className="flex flex-col items-center gap-1">
           <div className={view.round === 2 ? 'opacity-40 grayscale' : ''}>
-            <PlayingCard card={{ ...view.upcard, faceUp: true }} size="md" />
+            <PlayingCard card={{ ...view.upcard, faceUp: true }} size={short ? 'sm' : 'md'} />
           </div>
-          <div className="text-white/50 text-xs">
+          <div className={`text-white/50 text-xs ${view.round === 2 ? '' : 'short:hidden'}`}>
             {view.round === 2 ? <>Turned down: <Suit suit={view.turnedDown} name /></> : 'The turned-up card'}
           </div>
+        </div>
+        {!(view.phase === 'discard' && waitingFor(view) === 0) && <HandRow cards={myHand} />}
         </div>
 
         {view.phase === 'discard' ? (
@@ -85,7 +91,6 @@ export function EuchreTable({ view, names, onAction, onExit, error, subtitle, re
             </div>
           ) : (
             <>
-              <HandRow cards={myHand} />
               <p className="text-white/50 animate-pulse text-center">
                 {names[view.dealer]} picked up the {cardName(view.upcard)} and is throwing a card away…
               </p>
@@ -93,7 +98,6 @@ export function EuchreTable({ view, names, onAction, onExit, error, subtitle, re
           )
         ) : (
           <>
-            <HandRow cards={myHand} />
             {waitingFor(view) === 0
               ? <CallButtons view={view} names={names} onAction={onAction} />
               : <p className="text-white/50 animate-pulse">{say(view.bidTurn, { you: 'are deciding…', them: 'is deciding…' })}</p>}
@@ -113,7 +117,7 @@ export function EuchreTable({ view, names, onAction, onExit, error, subtitle, re
   return (
     <>
       <CardTable
-        title={`Euchre${subtitle ? ` · ${subtitle}` : ''}`}
+        title={<>Euchre{subtitle && <Wide> · {subtitle}</Wide>}</>}
         rules={{ game: 'euchre', title: 'Euchre' }}
         onBack={onExit}
         scoreLine={
@@ -121,7 +125,8 @@ export function EuchreTable({ view, names, onAction, onExit, error, subtitle, re
             <div className="text-white/90 font-semibold">
               Trump <Suit suit={view.trump} /> · {names[view.maker]} called it{view.alone ? ' alone' : ''}
             </div>
-            <div className="text-white/50">Tricks: Us {tricks[0]} · Them {tricks[1]} · Game: {scoreLine}</div>
+            <div className="text-white/50">Tricks: Us {tricks[0]} · Them {tricks[1]}</div>
+            <div className="text-white/50"><Wide>Game: </Wide>{scoreLine}</div>
           </>
         }
         names={names}

@@ -9,6 +9,8 @@ import { PlayingCard } from '../../components/PlayingCard';
 import { CARD_BOX } from '../../components/cardSizes';
 import { Button } from '../../components/Button';
 import { RulesButton } from '../../components/RulesButton';
+import { Wide, Narrow } from '../../components/Wide';
+import { TurnUpright } from '../../components/TurnUpright';
 import { ResultPanel } from '../cards/GameSetup';
 import {
   sortHand, topOfPile, pileFrozen, teamOf, needed, meldedValue, isWild, isBlackThree, isCanasta, isNaturalMeld,
@@ -60,7 +62,7 @@ function MeldArea({ title, melds, redThrees, onMeldClick, extra, freshRank }) {
         <span className="font-semibold text-white/80">{title}</span>
         <span>{redThrees > 0 && `Red 3s: ${'🔴'.repeat(redThrees)}`} {extra}</span>
       </div>
-      <div className="flex flex-wrap gap-2 min-h-[4.5rem] md:min-h-[5rem] items-center">
+      <div className="flex flex-wrap gap-2 min-h-[3rem] md:min-h-[5rem] items-center">
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
         {melds.map(m => <MeldTile key={m.rank} meld={m} onClick={onMeldClick ? () => onMeldClick(m) : undefined} highlight={!!onMeldClick} fresh={m.rank === freshRank} />)}
       </div>
@@ -130,16 +132,18 @@ export function CanastaTable({ view, names, onAction, onExit, error, subtitle, r
   return (
     <div className={`min-h-screen bg-gradient-to-br ${BG} p-3 flex flex-col gap-2 select-none`}>
       <header className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button onClick={onExit} className="p-2 text-white/50 hover:text-white min-h-[44px] min-w-[44px]" aria-label="Back">
             <ArrowLeft size={20} />
           </button>
           <RulesButton game="canasta" title="Canasta" />
         </div>
-        <div className="text-white/80 text-sm font-semibold">Canasta{subtitle ? ` · ${subtitle}` : ''}</div>
-        <div className="text-right text-xs">
+        <div className="text-white/80 text-sm font-semibold min-w-0 truncate">Canasta{subtitle && <Wide> · {subtitle}</Wide>}</div>
+        <div className="text-right text-[11px] md:text-xs leading-snug shrink-0">
           <div className="text-white/90 font-semibold">Us {view.scores[0]} · Them {view.scores[1]}</div>
-          <div className="text-white/50">{ourNeed ? `Your first meld needs ${ourNeed}` : 'Your team has melded'}</div>
+          <div className="text-white/50">
+            {ourNeed ? <><Wide>Your first meld needs</Wide><Narrow>First meld</Narrow> {ourNeed}</> : <><Wide>Your team has </Wide><Narrow>We&apos;ve </Narrow>melded</>}
+          </div>
         </div>
       </header>
 
@@ -147,7 +151,7 @@ export function CanastaTable({ view, names, onAction, onExit, error, subtitle, r
       <div className="flex justify-center gap-2 text-xs flex-wrap">
         {[1, 2, 3].map(seat => (
           <div key={seat} className={`px-3 py-1 rounded-full ${playing && view.turn === seat ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white/70'}`}>
-            {names[seat]}{seat === 2 ? ' (partner)' : ''} · {view.hands[seat].length} cards{reactions[seat] ? ` ${reactions[seat]}` : ''}
+            {names[seat]}{seat === 2 ? ' (partner)' : ''} · {view.hands[seat].length}<Wide> cards</Wide>{reactions[seat] ? ` ${reactions[seat]}` : ''}
           </div>
         ))}
       </div>
@@ -187,10 +191,11 @@ export function CanastaTable({ view, names, onAction, onExit, error, subtitle, r
         <p className="text-xs md:text-sm text-white/40">{describe(view.moves[1], names, 'play')}</p>
       </div>
 
-      {/* Your hand: tap cards to select several */}
-      <div className="flex flex-wrap justify-center gap-y-3 pt-2 pl-6 md:pl-8">
+      {/* Your hand: tap cards to select several. The cards overlap less on phones
+          (where they're smaller), so each card's suit still shows; they wrap into rows. */}
+      <div className="flex flex-wrap justify-center gap-y-3 pt-2 pl-3 md:pl-8">
         {hand.map(c => (
-          <div key={c.id} className="-ml-6 md:-ml-8">
+          <div key={c.id} className="-ml-3 md:-ml-8">
             <CanastaCard card={c} selected={selected.includes(c.id)} onClick={yourTurn ? () => toggle(c.id) : undefined} />
           </div>
         ))}
@@ -212,6 +217,7 @@ export function CanastaTable({ view, names, onAction, onExit, error, subtitle, r
       </div>
       <p className="text-center text-white/50 text-xs">{hint}</p>
       {overlay}
+      <TurnUpright game="Canasta" />
 
       {result && (
         <ResultPanel>

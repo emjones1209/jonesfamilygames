@@ -8,7 +8,7 @@ import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
 import { RulesButton } from '../../components/RulesButton';
 import { sortHand } from '../cards/tricks';
-import { CardTable } from '../cards/CardTable';
+import { CardTable, Wide } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
 import { ResultPanel } from '../cards/GameSetup';
 import { legalFor, pointsTaken } from './heartsEngine';
@@ -61,12 +61,12 @@ export function HeartsTable({ view, names, onAction, onExit, error, subtitle, re
     const toggle = card => setPassSel(sel =>
       sel.includes(card.id) ? sel.filter(id => id !== card.id) : sel.length < 3 ? [...sel, card.id] : sel);
     return (
-      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 flex flex-col items-center justify-center gap-4`}>
+      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 short:p-2 flex flex-col items-center justify-center gap-4 short:gap-1.5`}>
         <div className="self-stretch flex items-center justify-between">
           <button onClick={onExit} className="text-white/50 hover:text-white text-sm min-h-[44px] px-2">← Back</button>
           <RulesButton game="hearts" title="Hearts" />
         </div>
-        <h2 className="text-2xl font-bold text-white text-center">Pass 3 cards to {passTo} ({view.direction})</h2>
+        <h2 className="text-2xl short:text-lg font-bold text-white text-center">Pass 3 cards to {passTo} ({view.direction})</h2>
         {chosen ? (
           <p className="text-white/60 animate-pulse">Waiting for {listNames(waiting)} to choose…</p>
         ) : (
@@ -104,7 +104,7 @@ export function HeartsTable({ view, names, onAction, onExit, error, subtitle, re
   return (
     <>
       <CardTable
-        title={`Hearts${subtitle ? ` · ${subtitle}` : ''}`}
+        title={<>Hearts{subtitle && <Wide> · {subtitle}</Wide>}</>}
         rules={{ game: 'hearts', title: 'Hearts' }}
         onBack={onExit}
         scoreLine={<><div>Hand {view.handNo + 1}</div><div className="text-white/40">Totals · +this hand</div></>}

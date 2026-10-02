@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import { Button } from '../../components/Button';
 import { CARD_BOX, CARD_TEXT } from '../../components/cardSizes';
 import { RulesButton } from '../../components/RulesButton';
-import { CardTable } from '../cards/CardTable';
+import { CardTable, Wide } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
 import { ResultPanel } from '../cards/GameSetup';
 import { cardPoints, sortHand, COLOURS, COLOUR_STYLE, MAX_BID, NEST_SIZE } from './rookRules';
@@ -62,16 +62,16 @@ export function RookTable({ view, names, onAction, onExit, error, reactions = {}
   if (view.phase === 'bidding') {
     const next = nextBid(view);
     return (
-      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 flex flex-col items-center gap-4`}>
+      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 short:p-2 flex flex-col items-center gap-4 short:gap-1.5`}>
         {header}
-        <div className="text-white/60 text-sm">{scoreLine}</div>
-        <h2 className="text-2xl font-bold text-white">Bidding</h2>
+        <div className="text-white/60 text-sm short:-mt-11">{scoreLine}</div>
+        <h2 className="text-2xl short:text-lg font-bold text-white">Bidding</h2>
         <p className="text-white/50 text-sm text-center max-w-sm">
           Bid how many points your team will capture (counters: 5s, 10s and 14s, the Rook = 20, plus the nest).
         </p>
         <div className="grid grid-cols-4 gap-2 w-full max-w-md">
           {names.map((name, seat) => (
-            <div key={seat} className={`rounded-xl p-2 text-center ${seat === view.bidTurn ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/5'}`}>
+            <div key={seat} className={`rounded-xl p-2 short:p-1 short:flex short:items-center short:justify-center short:gap-2 text-center ${seat === view.bidTurn ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/5'}`}>
               <div className="text-white/60 text-xs truncate">{name}{seat === view.dealer ? ' (dealer)' : ''}{reactionFor(seat)}</div>
               <div className="text-white font-bold">{view.bids[seat] == null ? '—' : view.bids[seat] === 'pass' ? 'Pass' : view.bids[seat]}</div>
             </div>
@@ -98,9 +98,9 @@ export function RookTable({ view, names, onAction, onExit, error, reactions = {}
   if (view.phase === 'nest') {
     if (view.bidWinner !== 0) {
       return (
-        <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 flex flex-col items-center gap-4`}>
+        <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 short:p-2 flex flex-col items-center gap-4 short:gap-1.5`}>
           {header}
-          <h2 className="text-2xl font-bold text-white">{names[view.bidWinner]} won the bid at {view.high.bid}</h2>
+          <h2 className="text-2xl short:text-lg font-bold text-white">{names[view.bidWinner]} won the bid at {view.high.bid}</h2>
           <p className="text-white/50 animate-pulse">{names[view.bidWinner]} is choosing the nest and trump…{reactionFor(view.bidWinner)}</p>
           <div className="flex flex-wrap justify-center gap-1 max-w-2xl">
             {myHand.map(c => <RookCard key={c.id} card={c} />)}
@@ -112,9 +112,9 @@ export function RookTable({ view, names, onAction, onExit, error, reactions = {}
     const toggle = id => setNestSel(sel =>
       sel.includes(id) ? sel.filter(x => x !== id) : sel.length < NEST_SIZE ? [...sel, id] : sel);
     return (
-      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 flex flex-col items-center gap-4`}>
+      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 short:p-2 flex flex-col items-center gap-4 short:gap-1.5`}>
         {header}
-        <h2 className="text-2xl font-bold text-game-gold">You won the bid at {view.high.bid}!</h2>
+        <h2 className="text-2xl short:text-lg font-bold text-game-gold">You won the bid at {view.high.bid}!</h2>
         <p className="text-white/70 text-sm text-center max-w-sm">
           The nest's 5 cards (outlined) are now in your hand. Choose <b>5 cards to put back</b> in the nest,
           then pick trump. Points left in the nest go to whoever wins the last trick.
@@ -156,13 +156,13 @@ export function RookTable({ view, names, onAction, onExit, error, reactions = {}
   return (
     <>
       <CardTable
-        title={<span>Trump: <b style={{ color: trumpStyle?.color }}>{trumpStyle?.label}</b> · Bid {view.high.bid} ({names[view.bidWinner]})</span>}
+        title={<span>Trump: <b style={{ color: trumpStyle?.color }}>{trumpStyle?.label}</b> · Bid {view.high.bid}<Wide> ({names[view.bidWinner]})</Wide></span>}
         rules={{ game: 'rook', title: 'Rook' }}
         onBack={onExit}
         scoreLine={
           <>
-            <div className="text-white/90 font-semibold">This hand: Us {points[0]} · Them {points[1]}</div>
-            <div className="text-white/50">Game: {scoreLine}</div>
+            <div className="text-white/90 font-semibold"><Wide>This hand: </Wide>Us {points[0]} · Them {points[1]}</div>
+            <div className="text-white/50"><Wide>Game: </Wide>{scoreLine}</div>
           </>
         }
         names={names}
@@ -172,7 +172,7 @@ export function RookTable({ view, names, onAction, onExit, error, reactions = {}
           return parts.length ? parts.join(' ') : null;
         }}
         message={message}
-        renderTrickCard={card => <RookCard card={card} />}
+        renderTrickCard={(card, size) => <RookCard card={card} size={size} />}
         bgClass={BG}
       >
         <CardHand cards={myHand} legal={legalFor(view, 0)}

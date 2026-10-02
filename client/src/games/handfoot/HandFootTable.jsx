@@ -10,6 +10,8 @@ import { PlayingCard } from '../../components/PlayingCard';
 import { CARD_BOX } from '../../components/cardSizes';
 import { Button } from '../../components/Button';
 import { RulesButton } from '../../components/RulesButton';
+import { Wide, Narrow } from '../../components/Wide';
+import { TurnUpright } from '../../components/TurnUpright';
 import { ResultPanel } from '../cards/GameSetup';
 import {
   act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, bookCount, booksToGo, canGoOut,
@@ -64,7 +66,7 @@ function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, extr
           Books: {books.clean} clean · {books.dirty} dirty {extra}
         </span>
       </div>
-      <div className="flex flex-wrap gap-1.5 min-h-16 md:min-h-[4.5rem] items-center">
+      <div className="flex flex-wrap gap-1.5 min-h-[3rem] md:min-h-[4.5rem] items-center">
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
         {melds.map((m, i) => (
           <MeldTile key={`${m.rank}-${i}`} meld={m} fresh={!isBook(m) && m.rank === freshRank}
@@ -154,18 +156,21 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${BG} p-3 flex flex-col gap-2 select-none`}>
       <header className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button onClick={onExit} className="p-2 text-white/50 hover:text-white min-h-[44px] min-w-[44px]" aria-label="Back">
             <ArrowLeft size={20} />
           </button>
           <RulesButton game="handfoot" title="Hand and Foot" />
         </div>
-        <div className="text-white/80 text-sm font-semibold text-center">
-          Hand and Foot · Round {view.round + 1} of {ROUNDS}{subtitle ? ` · ${subtitle}` : ''}
+        <div className="text-white/80 text-sm font-semibold text-center min-w-0">
+          <Wide>Hand and Foot · </Wide>Round {view.round + 1} of {ROUNDS}{subtitle && <Wide> · {subtitle}</Wide>}
         </div>
-        <div className="text-right text-xs">
+        <div className="text-right text-[11px] md:text-xs leading-snug shrink-0 max-w-[55%] md:max-w-none">
           <div className="text-white/90 font-semibold">{view.scores.map((sc, side) => `${sideName(side)} ${sc}`).join(' · ')}</div>
-          <div className="text-white/50">{need ? `First meld needs ${need}` : canOut ? 'You can go out from your foot' : `To go out: ${booksLeft} more book${toGo.clean + toGo.dirty === 1 ? '' : 's'}`}</div>
+          <div className="text-white/50">
+            {need ? <>First meld<Wide> needs</Wide> {need}</> : canOut ? <><Wide>You can go out from your foot</Wide><Narrow>You can go out</Narrow></>
+              : <><Wide>To go out: </Wide>{booksLeft} more book{toGo.clean + toGo.dirty === 1 ? '' : 's'}<Narrow> to go out</Narrow></>}
+          </div>
         </div>
       </header>
 
@@ -173,7 +178,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
       <div className="flex justify-center gap-2 text-xs flex-wrap">
         {Array.from({ length: n - 1 }, (_, i) => i + 1).map(seat => (
           <div key={seat} className={`px-3 py-1 rounded-full ${playing && view.turn === seat ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white/70'}`}>
-            {names[seat]}{partners && seat === 2 ? ' (partner)' : ''} · {view.hands[seat].length} cards · {view.inFoot[seat] ? '🦶 in foot' : '✋ hand'}{reactions[seat] ? ` ${reactions[seat]}` : ''}
+            {names[seat]}{partners && seat === 2 ? ' (partner)' : ''} · {view.hands[seat].length}<Wide> cards</Wide> · {view.inFoot[seat] ? '🦶' : '✋'}<Wide>{view.inFoot[seat] ? ' in foot' : ' hand'}</Wide>{reactions[seat] ? ` ${reactions[seat]}` : ''}
           </div>
         ))}
       </div>
@@ -225,11 +230,12 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
       {/* Selected cards rise well clear of the row, so they're easy to see — and their whole
           top edge shows, a bigger place to tap them again (the cards still overlap as before,
           so the card next to one stays easy to tap too) */}
-      <div className="flex flex-wrap justify-center gap-y-3 pt-5 pl-6 md:pl-8">
+      {/* (On phones the cards are smaller, so they overlap less: each one's suit still shows) */}
+      <div className="flex flex-wrap justify-center gap-y-3 pt-5 pl-3 md:pl-8">
         {hand.map(c => {
           const isSelected = selected.includes(c.id);
           return (
-            <div key={c.id} className={`-ml-6 md:-ml-8 transition-transform ${isSelected ? '-translate-y-4' : ''}`}>
+            <div key={c.id} className={`-ml-3 md:-ml-8 transition-transform ${isSelected ? '-translate-y-4' : ''}`}>
               <HFCard card={c} selected={isSelected} onClick={yourTurn ? () => toggle(c.id) : undefined} />
             </div>
           );
@@ -255,6 +261,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
       </div>
       <p className="text-center text-white/50 text-xs">{hint}</p>
       {overlay}
+      <TurnUpright game="Hand and Foot" />
 
       {result && (
         <ResultPanel>
