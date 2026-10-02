@@ -39,25 +39,32 @@ function HFCard({ card, size = 'sm', selected, onClick }) {
   return <PlayingCard card={{ ...card, faceUp: true }} size={size} selected={selected} onClick={onClick} />;
 }
 
+// Your team's melds are drawn bigger than everyone else's, so they're easy to tell apart
+const TILE = {
+  ours: { box: 'w-14 h-[4.5rem] md:w-[4.5rem] md:h-24', rank: 'text-xl md:text-2xl', count: 'text-xs md:text-sm' },
+  theirs: { box: 'w-11 h-14 md:w-12 md:h-16', rank: 'text-base md:text-lg', count: 'text-[10px] md:text-[11px]' },
+};
+
 /** One meld: its rank and size; a finished book is red (clean) or black (dirty). */
-function MeldTile({ meld, onClick, fresh }) {
+function MeldTile({ meld, onClick, fresh, ours }) {
+  const tile = TILE[ours ? 'ours' : 'theirs'];
   const wild = meld.cards.filter(isWild).length;
   const book = isBook(meld), clean = isClean(meld);
   return (
     <button onClick={onClick} disabled={!onClick}
-      className={`relative w-12 h-16 md:w-14 md:h-[4.5rem] rounded-xl flex flex-col items-center justify-center shrink-0 font-bold
+      className={`relative ${tile.box} rounded-xl flex flex-col items-center justify-center shrink-0 font-bold
         ${book ? (clean ? 'bg-red-50 border-4 border-red-500 text-red-700' : 'bg-gray-100 border-4 border-gray-800 text-gray-900') : 'bg-white border-2 border-gray-300 text-gray-900'}
         ${onClick ? 'ring-4 ring-game-gold cursor-pointer' : fresh ? 'ring-4 ring-game-gold scale-110' : 'cursor-default'} transition-transform`}>
-      <span className="text-lg md:text-xl leading-none">{meld.rank}</span>
-      <span className="text-[11px] md:text-xs">{book ? (meld.cards.length > BOOK ? `book·${meld.cards.length}` : 'book') : `${meld.cards.length}/${BOOK}`}</span>
+      <span className={`${tile.rank} leading-none`}>{meld.rank}</span>
+      <span className={tile.count}>{book ? (meld.cards.length > BOOK ? `book·${meld.cards.length}` : 'book') : `${meld.cards.length}/${BOOK}`}</span>
       {wild > 0 && <span className="text-[9px] text-purple-700">{wild} wild</span>}
-      {book && <span className="absolute -top-2 -right-2 text-[9px] bg-game-gold text-game-bg rounded-full px-1.5">{clean ? CLEAN_BOOK : DIRTY_BOOK}</span>}
+      {book && <span className={`absolute -right-2 text-game-bg bg-game-gold rounded-full ${ours ? '-top-2 text-[9px] px-1.5' : '-top-2.5 text-[8px] px-1'}`}>{clean ? CLEAN_BOOK : DIRTY_BOOK}</span>}
     </button>
   );
 }
 
 /** `canTake(i)`: whether the selected cards may go on meld i (only those light up to be tapped). */
-function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, extra, freshRank }) {
+function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, extra, freshRank, ours = false }) {
   return (
     <div className="card-panel p-2">
       <div className="flex items-center justify-between text-xs text-white/60 mb-1 gap-2">
@@ -66,10 +73,10 @@ function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, extr
           Books: {books.clean} clean · {books.dirty} dirty {extra}
         </span>
       </div>
-      <div className="flex flex-wrap gap-1.5 min-h-[3rem] md:min-h-[4.5rem] items-center">
+      <div className={`flex flex-wrap gap-1.5 items-center ${ours ? 'min-h-[3rem] md:min-h-24' : 'min-h-[2.5rem] md:min-h-16'}`}>
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
         {melds.map((m, i) => (
-          <MeldTile key={`${m.rank}-${i}`} meld={m} fresh={!isBook(m) && m.rank === freshRank}
+          <MeldTile key={`${m.rank}-${i}`} meld={m} ours={ours} fresh={!isBook(m) && m.rank === freshRank}
             onClick={onMeldClick && canTake(i) ? () => onMeldClick(m, i) : undefined} />
         ))}
       </div>
@@ -208,7 +215,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         </div>
       </div>
 
-      <MeldArea title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} books={ourBooks}
+      <MeldArea ours title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} books={ourBooks}
         freshRank={fresh?.team === 0 ? fresh.rank : null}
         extra={!view.initialDone[0] && view.melds[0].length ? `(${meldedValue(view, 0)} of ${need})` : ''}
         onMeldClick={yourTurn && view.phase === 'play' && selected.length ? (m, i) => meld(m.rank, i) : undefined}

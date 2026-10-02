@@ -37,34 +37,41 @@ function CanastaCard({ card, size = 'sm', selected, onClick }) {
   return <PlayingCard card={{ ...card, faceUp: true }} size={size} selected={selected} onClick={onClick} />;
 }
 
+// Your team's melds are drawn bigger than the other team's, so they're easy to tell apart
+const TILE = {
+  ours: { box: 'w-16 h-20 md:w-20 md:h-24', rank: 'text-2xl md:text-3xl', count: 'text-sm md:text-base' },
+  theirs: { box: 'w-11 h-14 md:w-12 md:h-16', rank: 'text-lg md:text-xl', count: 'text-[11px] md:text-xs' },
+};
+
 /** One meld: its rank, how many cards (and wild cards), gold when it's a canasta. */
-function MeldTile({ meld, onClick, highlight, fresh }) {
+function MeldTile({ meld, onClick, highlight, fresh, ours }) {
+  const tile = TILE[ours ? 'ours' : 'theirs'];
   const wild = meld.cards.filter(isWild).length;
   const canasta = isCanasta(meld);
   const natural = canasta && isNaturalMeld(meld);
   return (
     <button onClick={onClick} disabled={!onClick}
-      className={`relative w-14 h-[4.5rem] md:w-16 md:h-20 rounded-xl flex flex-col items-center justify-center shrink-0 font-bold
+      className={`relative ${tile.box} rounded-xl flex flex-col items-center justify-center shrink-0 font-bold
         ${canasta ? (natural ? 'bg-red-50 border-4 border-red-500 text-red-700' : 'bg-gray-100 border-4 border-gray-800 text-gray-900') : 'bg-white border-2 border-gray-300 text-gray-900'}
         ${highlight ? 'ring-4 ring-game-gold' : fresh ? 'ring-4 ring-game-gold scale-110' : ''} transition-transform ${onClick ? 'cursor-pointer' : 'cursor-default'}`}>
-      <span className="text-xl md:text-2xl leading-none">{meld.rank}</span>
-      <span className="text-xs md:text-sm">×{meld.cards.length}</span>
+      <span className={`${tile.rank} leading-none`}>{meld.rank}</span>
+      <span className={tile.count}>×{meld.cards.length}</span>
       {wild > 0 && <span className="text-[9px] md:text-[10px] text-purple-700">{wild} wild</span>}
       {canasta && <span className="absolute -top-2 -right-2 text-[9px] bg-game-gold text-game-bg rounded-full px-1.5">{natural ? 500 : 300}</span>}
     </button>
   );
 }
 
-function MeldArea({ title, melds, redThrees, onMeldClick, extra, freshRank }) {
+function MeldArea({ title, melds, redThrees, onMeldClick, extra, freshRank, ours = false }) {
   return (
     <div className="card-panel p-2">
       <div className="flex items-center justify-between text-xs text-white/60 mb-1">
         <span className="font-semibold text-white/80">{title}</span>
         <span>{redThrees > 0 && `Red 3s: ${'🔴'.repeat(redThrees)}`} {extra}</span>
       </div>
-      <div className="flex flex-wrap gap-2 min-h-[3rem] md:min-h-[5rem] items-center">
+      <div className={`flex flex-wrap gap-2 items-center ${ours ? 'min-h-[3rem] md:min-h-24' : 'min-h-[2.5rem] md:min-h-16'}`}>
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
-        {melds.map(m => <MeldTile key={m.rank} meld={m} onClick={onMeldClick ? () => onMeldClick(m) : undefined} highlight={!!onMeldClick} fresh={m.rank === freshRank} />)}
+        {melds.map(m => <MeldTile key={m.rank} meld={m} ours={ours} onClick={onMeldClick ? () => onMeldClick(m) : undefined} highlight={!!onMeldClick} fresh={m.rank === freshRank} />)}
       </div>
     </div>
   );
@@ -178,7 +185,7 @@ export function CanastaTable({ view, names, onAction, onExit, error, subtitle, r
         </div>
       </div>
 
-      <MeldArea title="Our melds" melds={view.melds[0]} redThrees={view.redThrees[0].length}
+      <MeldArea ours title="Our melds" melds={view.melds[0]} redThrees={view.redThrees[0].length}
         freshRank={fresh?.team === 0 ? fresh.rank : null}
         extra={!view.initialDone[0] && view.melds[0].length ? `(${meldedValue(view, 0)} of ${ourNeed})` : ''}
         onMeldClick={yourTurn && view.phase === 'play' && selected.length ? m => meld(m.rank) : undefined} />
