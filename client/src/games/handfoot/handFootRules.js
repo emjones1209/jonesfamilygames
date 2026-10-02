@@ -129,9 +129,10 @@ function addTo(meld, cards) {
 }
 
 /**
- * Put cards on one of the side's melds: `target` if given, else the unfinished
- * meld of `rank`, else a new meld — or, for cards too few for a meld of their
- * own, a book of that rank.
+ * Put cards on one of the side's melds: `target` if given, else the side's meld
+ * of `rank` (the unfinished one, else the finished book), else a new meld.
+ * Jones family rules: a side never starts a second meld of a rank it already has
+ * — unless the cards can't go on it (see below).
  */
 function placeCards(s, team, rank, cards, target = null) {
   if (target != null) {
@@ -141,19 +142,18 @@ function placeCards(s, team, rank, cards, target = null) {
     addTo(meld, cards);
     return;
   }
-  const open = openMeld(s, team, rank);
+  const existing = openMeld(s, team, rank) ?? s.melds[team].find(m => m.rank === rank && isBook(m));
   const ownMeld = cards.filter(isNatural).length >= 2 && cards.length >= 3;
-  // Cards join the side's unfinished meld of their rank (even if that takes it past 7 — books
-  // keep growing)…
-  if (open) {
+  // Cards join the side's meld of their rank, finished book or not (books keep growing)…
+  if (existing) {
     try {
-      return addTo(open, cards);
+      return addTo(existing, cards);
     } catch (e) {
-      if (!ownMeld) throw e;             // …unless they can't (a wild card too many): then they start their own
+      // …unless they can't (a wild card on a clean book, or one wild card too many): then,
+      // if they make a meld of their own, they start one
+      if (!ownMeld) throw e;
     }
   }
-  const book = s.melds[team].find(m => m.rank === rank && isBook(m));
-  if (!ownMeld && book) return addTo(book, cards);
   if (!cards.some(isNatural)) throw new Error('Wild cards can only be added to a meld you already have.');
   checkMeld(cards);
   s.melds[team].push({ rank, cards: [...cards] });

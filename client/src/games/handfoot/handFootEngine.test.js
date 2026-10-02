@@ -242,6 +242,41 @@ describe('Jones family rules', () => {
     expect(isBook(s.melds[0][0])).toBe(true);
   });
 
+  it('taking the pile adds to the book you already have of that rank (Jones family rules)', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = [{ rank: '9', cards: Array.from({ length: 7 }, (_, i) => card('9', 'clubs', 5 + i)) }];
+    s.discard = [card('4', 'clubs'), card('5', 'clubs'), card('6', 'clubs'), card('7', 'clubs'), card('9', 'spades')];
+    s.hands[0] = [card('9'), card('9', 'diamonds'), card('K')];
+    s = rulesAct(s, { type: 'takePile', ids: ['9-hearts-1', '9-diamonds-1'] });
+    expect(s.melds[0]).toHaveLength(1);                           // no second meld of 9s
+    expect(s.melds[0][0].cards).toHaveLength(10);                 // the book of 7 + the 9 on the pile + your two
+    expect(isClean(s.melds[0][0])).toBe(true);
+  });
+
+  it('melding three of a rank you have a book of adds them to the book', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = [{ rank: 'K', cards: Array.from({ length: 7 }, (_, i) => card('K', 'clubs', 5 + i)) }];
+    s = rulesAct(s, { type: 'draw' });
+    s.hands[0] = [card('K'), card('K', 'spades'), card('K', 'diamonds'), card('5')];
+    s = rulesAct(s, { type: 'meld', ids: ['K-hearts-1', 'K-spades-1', 'K-diamonds-1'] });
+    expect(s.melds[0].map(m => m.cards.length)).toEqual([10]);
+  });
+
+  it('cards with a wild card start their own meld rather than spoil a clean book', () => {
+    let s = dealRound({ dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = [{ rank: 'K', cards: Array.from({ length: 7 }, (_, i) => card('K', 'clubs', 5 + i)) }];
+    s = rulesAct(s, { type: 'draw' });
+    s.hands[0] = [card('K'), card('K', 'spades'), card('2', 'clubs'), card('2', 'spades'), card('5')];
+    s = rulesAct(s, { type: 'meld', ids: ['K-hearts-1', 'K-spades-1', '2-clubs-1'] });
+    expect(s.melds[0].map(m => m.cards.length)).toEqual([7, 3]);
+    expect(isClean(s.melds[0][0])).toBe(true);
+    // A lone wild card still can't go on the clean book
+    expect(() => rulesAct(s, { type: 'meld', ids: ['2-spades-1'], target: 0 })).toThrow(/clean book/);
+  });
+
   it('melding cards of a rank you already have a meld of adds them to it', () => {
     let s = dealRound({ dealer: 3 });
     s.initialDone[0] = true;
