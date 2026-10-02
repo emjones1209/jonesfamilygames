@@ -134,8 +134,9 @@ describe('Hand and Foot rules', () => {
     s = { ...s, turn: 0, phase: 'play', hands: s.hands.map((h, i) => (i === 0 ? [card('7')] : h)) };
     expect(booksToGo(s, 0)).toEqual({ clean: 0, dirty: 1 });
     expect(() => rulesAct(s, { type: 'discard', id: '7-hearts-1' })).toThrow(/2 clean books and 3 dirty books/);
-    // With a third dirty book, discarding the last card goes out
+    // With a third dirty book — and your partner's permission (Jones family rules) — discarding the last card goes out
     s.melds[0].push(dirty('10'));
+    s = rulesAct(rulesAct(s, { type: 'askOut' }), { type: 'answerOut', yes: true });
     const out = rulesAct(s, { type: 'discard', id: '7-hearts-1' });
     expect(out.phase).toBe('over');
     expect(out.outBy).toBe(0);
@@ -148,6 +149,63 @@ describe('Hand and Foot rules', () => {
 describe('Jones family rules', () => {
   const clean = (rank, n = 1) => ({ rank, cards: Array.from({ length: 7 }, (_, i) => card(rank, 'spades', 10 * n + i)) });
   const dirty = (rank, n = 1) => ({ rank, cards: [...Array.from({ length: 5 }, (_, i) => card(rank, 'clubs', 10 * n + i)), card('2', 'clubs', 10 * n), card('JK', 'joker', 10 * n)] });
+  /** Seat 0 to play, in their foot, with the books to go out and `hand` left. */
+  const readyToGoOut = (hand, players = 4) => {
+    const s = newGame({ players, dealer: players - 1 });
+    s.initialDone[0] = true;
+    s.melds[0] = [clean('K'), clean('J'), dirty('A'), dirty('Q'), dirty('10')];
+    s.inFoot[0] = true;
+    s.feet[0] = [];
+    s.hands[0] = hand;
+    return { ...s, phase: 'play', turn: 0 };
+  };
+
+  it('partners need permission to go out: ask, and your partner answers', () => {
+    let s = readyToGoOut([card('7'), card('5')]);
+    expect(() => act(s, { type: 'meld', seat: 0, ids: ['7-hearts-1'], rank: '7' })).toThrow();
+    expect(() => act({ ...s, hands: [[card('7')], ...s.hands.slice(1)] }, { type: 'discard', seat: 0, id: '7-hearts-1' }))
+      .toThrow(/Ask your partner/);
+    s = act(s, { type: 'askOut', seat: 0 });
+    expect(waitingFor(s)).toBe(2);                                  // now it's the partner's move
+    expect(() => act(s, { type: 'discard', seat: 0, id: '7-hearts-1' })).toThrow(/Waiting for your partner/);
+    expect(() => act(s, { type: 'answerOut', seat: 1, yes: true })).toThrow(/Only their partner/);
+    s = act(s, { type: 'answerOut', seat: 2, yes: true });
+    expect(s.moves[0]).toMatchObject({ kind: 'answerOut', seat: 2, yes: true, asker: 0 });
+    expect(waitingFor(s)).toBe(0);
+    s = act(s, { type: 'discard', seat: 0, id: '5-hearts-1' });
+    s = act({ ...s, turn: 0, phase: 'play', outAsk: 'yes' }, { type: 'discard', seat: 0, id: '7-hearts-1' });
+    expect(s.result.outBy).toBe(0);
+  });
+
+  it('a "no" holds for the rest of that turn (and melding your last cards needs a yes too)', () => {
+    let s = readyToGoOut([card('7'), card('7', 'spades'), card('7', 'clubs'), card('5')]);
+    s = act(act(s, { type: 'askOut', seat: 0 }), { type: 'answerOut', seat: 2, yes: false });
+    expect(() => act(s, { type: 'askOut', seat: 0 })).toThrow(/already asked/);
+    // Melding the 7s would leave one card, which you couldn't discard without going out
+    expect(() => act(s, { type: 'meld', seat: 0, ids: ['7-hearts-1', '7-spades-1', '7-clubs-1'] })).toThrow(/not yet.*keep at least 2/);
+    s = act(s, { type: 'discard', seat: 0, id: '5-hearts-1' });
+    expect(s.turn).toBe(1);
+    expect(s.outAsk).toBe(null);                                    // next turn, ask again
+  });
+
+  it('three players (each for themselves) go out without asking', () => {
+    const s = readyToGoOut([card('7')], 3);
+    expect(() => act(s, { type: 'askOut', seat: 0 })).toThrow(/Only partners/);
+    expect(act(s, { type: 'discard', seat: 0, id: '7-hearts-1' }).result.outBy).toBe(0);
+  });
+
+  it('a computer player asks before going out, and a computer partner answers', () => {
+    // Seat 0 (a robot here) could go out by discarding its last card: it asks first
+    let s = readyToGoOut([card('7')]);
+    expect(robotAction(s, 0, 'hard')).toMatchObject({ type: 'askOut', seat: 0 });
+    s = act(s, { type: 'askOut', seat: 0 });
+    // The partner says no while it's still on its hand (its foot would count against the side)…
+    s = { ...s, inFoot: [true, false, false, false] };
+    expect(robotAction(s, 2, 'hard')).toEqual({ type: 'answerOut', seat: 2, yes: false });
+    // …and yes once it's in its foot with little left in its hand
+    s = { ...s, inFoot: [true, false, true, false], hands: s.hands.map((h, i) => (i === 2 ? [card('4'), card('5')] : h)) };
+    expect(robotAction(s, 2, 'hard')).toEqual({ type: 'answerOut', seat: 2, yes: true });
+  });
 
   it('an extra clean book counts as a dirty one for going out', () => {
     const s = dealRound();

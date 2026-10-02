@@ -13,7 +13,7 @@
  */
 import {
   act, topOfPile, openMeld, teamOf, minimumFor, booksToGo, canGoOut, meldedValue,
-  isWild, isNatural, isBlackThree, isRedThree, isBook, valueOf, cardValue, BOOK, MAX_WILD,
+  isWild, isNatural, isBlackThree, isRedThree, isBook, valueOf, cardValue, BOOK, MAX_WILD, GOING_OUT,
 } from './handFootRules.js';
 
 const attempt = (s, action) => { try { return act(s, action); } catch { return null; } };
@@ -50,6 +50,20 @@ function turnWorks(s, plan) {
   let cur = s;
   for (const step of plan) { cur = attempt(cur, step); if (!cur) return false; }
   return plan.length > 0 && cur.phase !== 'play';
+}
+
+// ── Answering "may I go out?" ─────────────────────────────────────────────────
+/**
+ * A partner's answer when asked (Jones family rules). Going out ends the hand,
+ * and whatever is still in our hand counts against us — and a foot we haven't
+ * reached is a lot of points. So: not while we're still on our hand (unless the
+ * stock is nearly gone anyway), and only if what we're holding costs less than
+ * going out earns. Easy always says yes.
+ */
+export function chooseAnswer(s, seat, level) {
+  if (level === 'easy' || s.stock.length < 12) return true;
+  if (!s.inFoot[seat]) return false;
+  return valueOf(s.hands[seat]) <= GOING_OUT;          // (a red 3 alone counts 300)
 }
 
 // ── Melding and discarding ───────────────────────────────────────────────────

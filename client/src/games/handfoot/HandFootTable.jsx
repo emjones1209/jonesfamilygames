@@ -17,7 +17,6 @@ import {
   act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, bookCount, booksToGo, canGoOut,
   isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE, MIN_PILE,
 } from './handFootRules';
-import { waitingFor } from './handFootEngine';
 
 const BG = 'from-game-bg to-cyan-900';
 const SUIT = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
@@ -98,6 +97,10 @@ function describe(m, names) {
         : `${v('melds', 'meld')} ${plural(m.count, m.rank)}.`}${foot}`;
     case 'discard': return `${v('discards', 'discard')} the ${label(m.card)}.${foot}`;
     case 'undo': return `${v('takes', 'take')} back ${you ? 'your' : 'their'} melds.`;
+    case 'askOut': return `${v('asks', 'ask')} ${(m.seat + 2) % 4 === 0 ? 'you' : names[(m.seat + 2) % 4]}: “May I go out?”`;
+    case 'answerOut': return m.yes
+      ? `${v('says', 'say')} yes — ${m.asker === 0 ? 'you may go out!' : `${names[m.asker]} may go out.`}`
+      : `${v('says', 'say')} not yet — ${m.asker === 0 ? 'no going out this turn.' : `${names[m.asker]} can't go out this turn.`}`;
     default: return '';
   }
 }
@@ -121,7 +124,11 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const hand = sortHand(view.hands[0]);
   const selected = picked.filter(id => hand.some(c => c.id === id));   // (cards that have left your hand drop out)
   const playing = view.phase === 'draw' || view.phase === 'play';
-  const yourTurn = playing && waitingFor(view) === 0;
+  // Your own turn (not while you're waiting for your partner's answer about going out)…
+  const yourTurn = playing && view.turn === 0 && view.outAsk !== 'asking';
+  // …or your partner is asking you if they may go out (Jones family rules)
+  const answering = playing && partners && view.turn === 2 && view.outAsk === 'asking';
+  const partnerName = names[(view.turn + 2) % 4];
   const act = a => { onAction({ ...a, seat: 0 }); setNote(null); };
 
   const toggle = id => setSelected(sel => (sel.includes(id) ? sel.filter(x => x !== id) : [...sel.filter(x => hand.some(c => c.id === x)), id]));
@@ -147,7 +154,9 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const toGo = booksToGo(view, 0);
   const booksLeft = [toGo.clean && `${toGo.clean} clean`, toGo.dirty && `${toGo.dirty} dirty`].filter(Boolean).join(' + ');
   const redThrees = hand.filter(isRedThree).length;
-  const hint = !playing ? '' : !yourTurn ? `${names[view.turn]} is playing…`
+  const hint = !playing ? '' : answering ? ''
+    : view.outAsk === 'asking' ? `${view.turn === 0 ? 'You ask' : `${names[view.turn]} asks`} ${partnerName} about going out…`
+      : !yourTurn ? `${names[view.turn]} is playing…`
     : view.phase === 'draw'
       ? (view.discard.length < MIN_PILE
         ? `Tap the stock to draw 2. (The pile can be picked up once it has ${MIN_PILE} cards.)`
@@ -249,6 +258,23 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         })}
       </div>
 
+      {/* Going out needs your partner's say-so (Jones family rules) */}
+      {view.turn === 0 && view.outAsk && playing && (
+        <p className={`text-center text-sm font-semibold ${view.outAsk === 'yes' ? 'text-green-300' : view.outAsk === 'no' ? 'text-red-300' : 'text-amber-300 animate-pulse'}`}>
+          {view.outAsk === 'asking' ? `Waiting for ${partnerName} to answer…`
+            : view.outAsk === 'yes' ? `✅ ${partnerName} says yes — you may go out!` : `✋ ${partnerName} says not yet — no going out this turn.`}
+        </p>
+      )}
+      {answering ? (
+        <div className="card-panel p-4 border-2 border-game-gold text-center flex flex-col gap-3 self-center w-full max-w-sm">
+          <p className="text-white text-lg font-bold">{names[view.turn]} asks: “May I go out?”</p>
+          <p className="text-white/60 text-xs">Going out ends the hand: cards still in your hand (and a foot you haven&apos;t reached) count against your team.</p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="gold" onClick={() => act({ type: 'answerOut', yes: true })}>Yes, go out</Button>
+            <Button variant="ghost" onClick={() => act({ type: 'answerOut', yes: false })}>Not yet</Button>
+          </div>
+        </div>
+      ) : (
       <div className="flex justify-center gap-2 flex-wrap">
         {view.phase === 'draw' || !yourTurn ? (
           <>
@@ -265,7 +291,11 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         {yourTurn && selected.length > 0 && (
           <Button variant="ghost" onClick={() => setSelected([])}>✕ Unselect {selected.length === 1 ? 'card' : `all ${selected.length}`}</Button>
         )}
+        {yourTurn && partners && view.inFoot[0] && !view.outAsk && (
+          <Button variant="secondary" onClick={() => act({ type: 'askOut' })}>🙋 Ask to go out</Button>
+        )}
       </div>
+      )}
       <p className="text-center text-white/50 text-xs">{hint}</p>
       {overlay}
       <TurnUpright game="Hand and Foot" />
