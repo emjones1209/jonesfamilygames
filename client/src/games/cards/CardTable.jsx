@@ -80,7 +80,7 @@ export function CardTable({
     // Sideways: three columns (header and left seat | partner and trick | score and right seat), hand below
     const sideSeat = sides[2] ? seat(2) : seat(2, null);   // the partner's hidden hand is left out for height
     return (
-      <div className={`min-h-[100dvh] bg-gradient-to-br ${bgClass} px-3 py-1 flex flex-col select-none`}>
+      <div className={`min-h-screen bg-gradient-to-br ${bgClass} px-3 py-1 flex flex-col select-none`}>
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] gap-2 flex-1">
           <div className="flex flex-col min-w-0">
             <div className="flex items-center gap-1 min-w-0">{back}{rulesButton}{titleText}</div>
@@ -101,7 +101,7 @@ export function CardTable({
   }
 
   return (
-    <div className={`min-h-[100dvh] bg-gradient-to-br ${bgClass} p-3 flex flex-col select-none`}>
+    <div className={`min-h-screen bg-gradient-to-br ${bgClass} p-3 flex flex-col select-none`}>
       <header className="flex items-center justify-between mb-2 gap-2">
         <div className="flex items-center gap-1 min-w-0">
           {back}
