@@ -8,7 +8,7 @@ import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
 import { RulesButton } from '../../components/RulesButton';
 import { sortHand } from '../cards/tricks';
-import { CardTable } from '../cards/CardTable';
+import { CardTable, Wide } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
 import { ResultPanel } from '../cards/GameSetup';
 import { BAG_LIMIT, NIL } from './spadesRules';
@@ -32,16 +32,16 @@ export function SpadesTable({ view, names, onAction, onExit, error, subtitle, re
   if (view.phase === 'bidding') {
     const partnerBid = view.bids[2];
     return (
-      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 flex flex-col items-center gap-4`}>
+      <div className={`min-h-screen bg-gradient-to-br ${BG} p-5 short:p-2 flex flex-col items-center gap-4 short:gap-1.5`}>
         <div className="self-stretch flex items-center justify-between">
           <button onClick={onExit} className="text-white/50 hover:text-white text-sm min-h-[44px] px-2">← Back</button>
           <RulesButton game="spades" title="Spades" />
         </div>
-        <div className="text-white/60 text-sm">{scoreLine} · Bags {view.bags[0]}/{BAG_LIMIT}</div>
-        <h2 className="text-2xl font-bold text-white">Bidding</h2>
+        <div className="text-white/60 text-sm short:-mt-11">{scoreLine} · Bags {view.bags[0]}/{BAG_LIMIT}</div>
+        <h2 className="text-2xl short:text-lg font-bold text-white">Bidding</h2>
         <div className="grid grid-cols-4 gap-2 w-full max-w-md">
           {names.map((name, seat) => (
-            <div key={seat} className={`rounded-xl p-2 text-center ${seat === view.bidTurn ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/5'}`}>
+            <div key={seat} className={`rounded-xl p-2 short:p-1 short:flex short:items-center short:justify-center short:gap-2 text-center ${seat === view.bidTurn ? 'bg-game-gold/20 border border-game-gold' : 'bg-white/5'}`}>
               <div className="text-white/60 text-xs truncate">{name}{seat === view.dealer ? ' (dealer)' : ''}{reactions[seat] ? ` ${reactions[seat]}` : ''}</div>
               <div className="text-white font-bold">{bidLabel(view.bids[seat])}</div>
             </div>
@@ -56,15 +56,15 @@ export function SpadesTable({ view, names, onAction, onExit, error, subtitle, re
               How many tricks will you win?
               {partnerBid != null && <> {names[2]} (your partner) bid <b className="text-game-gold">{bidLabel(partnerBid)}</b>.</>}
             </p>
-            <div className="grid grid-cols-7 gap-2 max-w-md">
+            <div className="grid grid-cols-7 short:grid-cols-[repeat(14,minmax(0,1fr))] gap-2 max-w-md short:max-w-2xl">
               {Array.from({ length: 14 }, (_, n) => (
                 <button key={n} onClick={() => onAction({ type: 'bid', seat: 0, bid: n })}
-                  className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl min-w-[44px] active:scale-95">
+                  className="bg-white/10 hover:bg-white/20 text-white font-bold py-3 short:py-2 rounded-xl min-w-[44px] active:scale-95">
                   {n === 0 ? 'Nil' : n}
                 </button>
               ))}
             </div>
-            <p className="text-white/30 text-xs text-center max-w-sm">
+            <p className="text-white/30 text-xs text-center max-w-sm short:hidden">
               Nil = win no tricks at all: +100 if you do, −100 if you don't.
             </p>
           </>
@@ -85,13 +85,13 @@ export function SpadesTable({ view, names, onAction, onExit, error, subtitle, re
   return (
     <>
       <CardTable
-        title={`Spades${subtitle ? ` · ${subtitle}` : ''}`}
+        title={<>Spades{subtitle && <Wide> · {subtitle}</Wide>}</>}
         rules={{ game: 'spades', title: 'Spades' }}
         onBack={onExit}
         scoreLine={
           <>
-            <div className="text-white/90 font-semibold">This hand: Us {tricks[0]}/{bid[0]} · Them {tricks[1]}/{bid[1]} tricks</div>
-            <div className="text-white/50">Game: {scoreLine}</div>
+            <div className="text-white/90 font-semibold"><Wide>This hand: </Wide>Us {tricks[0]}/{bid[0]} · Them {tricks[1]}/{bid[1]}<Wide> tricks</Wide></div>
+            <div className="text-white/50"><Wide>Game: </Wide>{scoreLine}</div>
           </>
         }
         names={names}

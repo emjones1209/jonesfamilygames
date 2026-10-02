@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      screens: {
+        // A phone turned sideways: wide but very short
+        short: { raw: '(orientation: landscape) and (max-height: 500px)' },
+      },
       colors: {
         primary: {
           50:  '#f0fdf4',

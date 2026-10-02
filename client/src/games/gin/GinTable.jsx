@@ -11,6 +11,8 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
 import { RulesButton } from '../../components/RulesButton';
+import { Wide } from '../../components/Wide';
+import { useMediaQuery, SHORT_SCREEN } from '../../utils/useMediaQuery';
 import { SUIT_SYMBOLS } from '../../utils/cardEngine';
 import { HiddenHand } from '../cards/CardTable';
 import { bestMelds, isRun, order, sumValue, KNOCK_LIMIT, GAME_TARGET, HAND_BONUS, GAME_BONUS } from './ginRules';
@@ -58,6 +60,7 @@ function describe(move, names) {
  */
 export function GinTable({ view, names, onAction, onExit, error, subtitle, reactions = {}, overlay, gameOverActions }) {
   const [selectedId, setSelectedId] = useState(null);
+  const short = useMediaQuery(SHORT_SCREEN);    // a phone turned sideways: smaller piles
   const mine = view.hands[0];
   const arrangement = useMemo(() => laidOut(bestMelds(mine)), [mine]);
   const myTurn = waitingFor(view) === 0;
@@ -96,22 +99,23 @@ export function GinTable({ view, names, onAction, onExit, error, subtitle, react
   };
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${BG} p-3 flex flex-col select-none`}>
-      <header className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-1">
+    <div className={`min-h-[100dvh] bg-gradient-to-br ${BG} p-3 short:py-1 flex flex-col select-none`}>
+      <header className="flex items-center justify-between mb-2 short:mb-0 gap-2">
+        <div className="flex items-center gap-1 shrink-0">
           <button onClick={onExit} className="p-2 text-white/50 hover:text-white min-h-[44px] min-w-[44px]" aria-label="Back to games">
             <ArrowLeft size={20} />
           </button>
           <RulesButton game="gin" title="Gin Rummy" />
         </div>
-        <div className="text-white/80 text-sm font-semibold">Gin Rummy{subtitle ? ` · ${subtitle}` : ''}</div>
-        <div className="text-white/60 text-xs text-right">
+        <div className="text-white/80 text-sm font-semibold min-w-0 truncate">Gin Rummy{subtitle && <Wide> · {subtitle}</Wide>}</div>
+        <div className="text-white/60 text-[11px] md:text-xs text-right leading-snug shrink-0">
           <div className="text-white/90 font-semibold">{names[0]} {view.scores[0]} · {names[1]} {view.scores[1]}</div>
           <div>first to {GAME_TARGET}</div>
         </div>
       </header>
 
-      {/* The other player */}
+      {/* The other player, then the stock and pile — side by side on a phone turned sideways */}
+      <div className="flex-1 flex flex-col short:flex-row short:items-center short:justify-center short:gap-8">
       <div className="flex flex-col items-center gap-1">
         <div className={`text-xs px-2 py-0.5 rounded-full ${waitingFor(view) === 1 ? 'bg-game-gold text-game-bg font-bold' : 'text-white/60'}`}>
           {names[1]}{view.dealer === 1 ? ' (dealer)' : ''}{reactions[1] ? ` ${reactions[1]}` : ''}
@@ -120,23 +124,25 @@ export function GinTable({ view, names, onAction, onExit, error, subtitle, react
       </div>
 
       {/* Stock and pile */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 py-3">
+      <div className="flex-1 short:flex-none flex flex-col short:flex-row items-center justify-center gap-3 short:gap-6 py-3 short:py-1">
         <div className="flex items-end gap-6">
           <div className="flex flex-col items-center gap-1">
             <div onClick={canDrawStock ? () => act({ type: 'draw', from: 'stock' }) : undefined}
               className={`rounded-xl ${canDrawStock ? 'cursor-pointer ring-4 ring-game-gold animate-pulse' : ''}`}>
-              <PlayingCard card={{ id: 'stock', faceUp: false }} faceDown size="md" />
+              <PlayingCard card={{ id: 'stock', faceUp: false }} faceDown size={short ? 'sm' : 'md'} />
             </div>
             <span className="text-white/40 text-xs">Stock ({view.stock.length})</span>
           </div>
           <div className="flex flex-col items-center gap-1">
             <div onClick={canTakePile ? () => act({ type: 'draw', from: 'discard' }) : undefined}
               className={`rounded-xl ${canTakePile ? 'cursor-pointer ring-4 ring-game-gold' : ''}`}>
-              {top ? <PlayingCard card={{ ...top, faceUp: true }} size="md" /> : <div className="w-14 h-20 md:w-20 md:h-[7.5rem] rounded-2xl border-2 border-dashed border-white/20" />}
+              {top ? <PlayingCard card={{ ...top, faceUp: true }} size={short ? 'sm' : 'md'} />
+                : <div className={`${short ? 'w-10 h-16' : 'w-14 h-20 md:w-20 md:h-[7.5rem]'} rounded-2xl border-2 border-dashed border-white/20`} />}
             </div>
             <span className="text-white/40 text-xs">Pile</span>
           </div>
         </div>
+        <div className="flex flex-col items-center gap-3 short:gap-1 short:max-w-xs">
         <p className="text-white/60 text-sm text-center min-h-[1.25rem]">{error || (view.lastMove?.seat === 1 ? describe(view.lastMove, names) : '')}</p>
         <p className={`text-center font-semibold ${myTurn ? 'text-game-gold' : 'text-white/50 animate-pulse'}`}>{prompt}</p>
         {myTurn && phase === 'firstTake' && (
@@ -145,10 +151,12 @@ export function GinTable({ view, names, onAction, onExit, error, subtitle, react
             <Button variant="ghost" onClick={() => act({ type: 'pass' })}>Pass</Button>
           </div>
         )}
+        </div>
+      </div>
       </div>
 
       {/* Your hand, in melds */}
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-2 short:gap-1">
         <div className="text-white/70 text-sm text-center">
           Deadwood: <span className={`font-bold ${arrangement.deadwood.length ? 'text-white' : 'text-green-400'}`}>{sumValue(arrangement.deadwood)}</span>
           {selected && (
@@ -167,7 +175,7 @@ export function GinTable({ view, names, onAction, onExit, error, subtitle, react
             <div className="flex flex-wrap justify-center gap-0.5 p-1">{arrangement.deadwood.map(renderCard)}</div>
           )}
         </div>
-        <div className="flex gap-3 min-h-[48px] items-center">
+        <div className="flex gap-3 min-h-[48px] short:min-h-0 items-center">
           {myTurn && phase === 'discard' && (
             <>
               {bigGin && <Button variant="gold" onClick={() => act({ type: 'knock', cardId: null })}>Big Gin! 🎉</Button>}

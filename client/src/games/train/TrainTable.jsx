@@ -12,6 +12,8 @@ import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, RotateCw } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { RulesButton } from '../../components/RulesButton';
+import { Wide, Narrow } from '../../components/Wide';
+import { TurnUpright } from '../../components/TurnUpright';
 import { ResultPanel } from '../cards/GameSetup';
 import { legalMoves, openEnd, MEXICAN, engineFor } from './trainRules';
 
@@ -22,13 +24,13 @@ const PIP_COLOR = ['', 'text-sky-600', 'text-green-600', 'text-red-600', 'text-a
 /** A domino, laid sideways: [a | b]. */
 export function Domino({ a, b, small = false, selected = false, dim = false, onClick }) {
   const half = n => (
-    <span className={`flex-1 flex items-center justify-center font-black ${PIP_COLOR[n]} ${small ? 'text-sm md:text-lg' : 'text-xl md:text-2xl'}`}>
+    <span className={`flex-1 flex items-center justify-center font-black ${PIP_COLOR[n]} ${small ? 'text-sm md:text-lg' : 'text-lg md:text-2xl'}`}>
       {n === 0 ? '' : n}
     </span>
   );
   return (
     <div onClick={onClick}
-      className={`${small ? 'w-12 h-7 md:w-16 md:h-9' : 'w-20 h-11 md:w-24 md:h-14'} shrink-0 flex items-stretch rounded-lg bg-stone-50 border-2 select-none
+      className={`${small ? 'w-12 h-7 md:w-16 md:h-9' : 'w-16 h-10 md:w-24 md:h-14'} shrink-0 flex items-stretch rounded-lg bg-stone-50 border-2 select-none
         ${selected ? 'border-yellow-400 -translate-y-2 shadow-lg shadow-yellow-400/40' : 'border-stone-400'}
         ${dim ? 'opacity-50' : ''} ${onClick ? 'cursor-pointer' : ''} transition-transform`}>
       {half(a)}
@@ -205,7 +207,7 @@ export function TrainTable({ view, names, onAction, onExit, error, subtitle, rea
           <RulesButton game="train" title="Mexican Train" />
         </div>
         <div className="text-white/80 text-sm font-semibold text-center">
-          Round {view.round + 1} of {view.rounds}{subtitle ? ` · ${subtitle}` : ''}
+          Round {view.round + 1} of {view.rounds}{subtitle && <Wide> · {subtitle}</Wide>}
         </div>
         <div className="text-white/60 text-xs text-right">Boneyard: {view.boneyard.length}</div>
       </header>
@@ -214,7 +216,7 @@ export function TrainTable({ view, names, onAction, onExit, error, subtitle, rea
       <div className="flex justify-center gap-2 flex-wrap text-xs">
         {names.map((name, seat) => (
           <div key={seat} className={`px-3 py-1 rounded-full ${view.turn === seat && playing ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white/70'}`}>
-            {name} · {view.hands[seat].length} tiles · {view.totals[seat]} pts{reactions[seat] ? ` ${reactions[seat]}` : ''}
+            {name} · {view.hands[seat].length} tile{view.hands[seat].length === 1 ? '' : 's'} · {view.totals[seat]} pts{reactions[seat] ? ` ${reactions[seat]}` : ''}
           </div>
         ))}
       </div>
@@ -228,22 +230,30 @@ export function TrainTable({ view, names, onAction, onExit, error, subtitle, rea
           const canTarget = targets.has(i);
           const hovered = canTarget && drag?.train === i;
           const pending = view.pendingDouble === i;
+          // The newest tiles (the open end is what matters): the last 5, or 3 on phones
           const shown = train.tiles.slice(-5);
-          const hidden = train.tiles.length - shown.length;
+          const hiddenWide = train.tiles.length - shown.length;
+          const hiddenPhone = train.tiles.length - Math.min(3, train.tiles.length);
           return (
             <div key={i} data-train={i} role="button" onClick={canTarget && selected ? () => playOn(selected, i) : undefined}
-              className={`flex items-center gap-2 rounded-xl px-2 py-1 text-left min-h-[3rem] transition-colors
+              className={`flex items-center gap-2 rounded-xl px-2 py-1 text-left min-h-[2.5rem] md:min-h-[3rem] transition-colors
                 ${hovered ? 'bg-game-gold/40 ring-4 ring-game-gold' : canTarget ? 'bg-game-gold/20 ring-2 ring-game-gold cursor-pointer' : 'bg-white/5'}
                 ${pending ? 'ring-2 ring-red-400' : ''}`}>
-              <span className="w-28 md:w-36 shrink-0 text-xs md:text-sm text-white/80">
-                {train.owner === MEXICAN ? '🚂 Mexican Train' : train.owner === 0 ? 'Your train' : `${names[train.owner]}'s train`}
+              <span className="w-14 md:w-36 shrink-0 text-xs md:text-sm text-white/80 leading-tight">
+                {train.owner === MEXICAN ? <>🚂 Mexican<Wide> Train</Wide></>
+                  : train.owner === 0 ? <><Wide>Your train</Wide><Narrow>You</Narrow></> : <>{names[train.owner]}<Wide>&apos;s train</Wide></>}
                 {train.owner !== MEXICAN && train.open && <span title="Open to everyone"> 🚩</span>}
               </span>
-              <span className="flex items-center gap-1 flex-1 min-w-0 overflow-hidden">
-                {hidden > 0 && <span className="text-white/40 text-xs">+{hidden}</span>}
-                {shown.map(t => <Domino key={t.id} a={t.a} b={t.b} small />)}
+              {/* On phones the tiles line up against "needs …", so if space runs short it's the
+                  oldest tile that's cut off, never the open end */}
+              <span className="flex items-center justify-end md:justify-start gap-1 flex-1 min-w-0 overflow-hidden">
+                {hiddenPhone > 0 && <span className="md:hidden text-white/40 text-xs">+{hiddenPhone}</span>}
+                {hiddenWide > 0 && <span className="hidden md:inline text-white/40 text-xs">+{hiddenWide}</span>}
+                {shown.map((t, k) => (
+                  <span key={t.id} className={k < shown.length - 3 ? 'hidden md:block' : ''}><Domino a={t.a} b={t.b} small /></span>
+                ))}
               </span>
-              <span className={`shrink-0 text-xs md:text-sm rounded-full px-2 py-0.5 ${pending ? 'bg-red-500 text-white' : 'bg-white/10 text-white/70'}`}>
+              <span className={`shrink-0 text-[11px] md:text-sm rounded-full px-2 py-0.5 ${pending ? 'bg-red-500 text-white' : 'bg-white/10 text-white/70'}`}>
                 {pending ? `cover ${openEnd(view, i)}` : `needs ${openEnd(view, i)}`}
               </span>
             </div>
@@ -254,7 +264,7 @@ export function TrainTable({ view, names, onAction, onExit, error, subtitle, rea
       <p className={`text-center text-sm min-h-[1.25rem] ${message.error ? 'text-red-300' : 'text-amber-300'}`}>{message.text}</p>
 
       {/* Your tiles */}
-      <div className="flex flex-wrap justify-center gap-2 pt-3">
+      <div className="flex flex-wrap justify-center gap-2 pt-2 md:pt-3">
         {hand.map(t => (
           <div key={t.id} data-tile={t.id} className={`relative touch-none cursor-grab ${drag?.id === t.id ? 'opacity-25' : ''}`}
             onPointerDown={e => onTileDown(e, t.id)}>
@@ -284,6 +294,7 @@ export function TrainTable({ view, names, onAction, onExit, error, subtitle, rea
       </div>
       <p className="text-center text-white/50 text-xs">{hint}</p>
       {overlay}
+      <TurnUpright game="Mexican Train" />
 
       {!playing && last && (
         <ResultPanel>

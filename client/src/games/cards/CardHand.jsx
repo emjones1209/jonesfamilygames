@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { PlayingCard } from '../../components/PlayingCard';
+import { useMediaQuery, PHONE_UPRIGHT } from '../../utils/useMediaQuery';
 
 const defaultRender = (card, { selected, disabled, onClick, size }) => (
   <PlayingCard card={{ ...card, faceUp: true }} size={size} selected={selected} disabled={disabled} onClick={onClick} />
@@ -13,13 +14,18 @@ export function CardHand({
   cards,
   legal = [],            // cards playable now (empty when it isn't your turn)
   onPlay,
-  size = 'sm',
+  size: askedSize = 'sm',
   renderCard = defaultRender,
   label,
-  wrap = false,
+  wrap: askedWrap,
   hints = { selected: 'Tap again to play', active: 'Your turn — pick a card' },
 }) {
   const [selectedId, setSelectedId] = useState(null);
+  // On a phone held upright one row of 13 cards is a squeeze: lay a normal-sized
+  // hand out in rows of slightly bigger cards instead (iPads keep the single row)
+  const phone = useMediaQuery(PHONE_UPRIGHT) && askedSize === 'sm';
+  const size = phone ? 'hand' : askedSize;
+  const wrap = askedWrap ?? phone;
   const active = legal.length > 0;
   // Forget a selection that is no longer playable (e.g. the turn moved on)
   const selected = active && legal.some(c => c.id === selectedId) ? selectedId : null;

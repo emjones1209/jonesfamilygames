@@ -8,7 +8,7 @@ import { Button } from '../../components/Button';
 import { PlayingCard } from '../../components/PlayingCard';
 import { RulesButton } from '../../components/RulesButton';
 import { sortHand, nextSeat } from '../cards/tricks';
-import { CardTable } from '../cards/CardTable';
+import { CardTable, Wide } from '../cards/CardTable';
 import { CardHand } from '../cards/CardHand';
 import { ResultPanel } from '../cards/GameSetup';
 import { DENOMINATIONS, PASS, bidHigher, bidLevel, bidDenom, currentBid, BRIDGE_SUIT_ORDER } from './bridgeRules';
@@ -59,26 +59,27 @@ export function BridgeTable({ view, names, onAction, onExit, error, subtitle, re
   if (view.phase === 'bidding') {
     const high = currentBid(view.auction);
     return (
-      <div className={`min-h-screen bg-gradient-to-br ${BG} p-4 flex flex-col items-center gap-3`}>
+      <div className={`min-h-screen bg-gradient-to-br ${BG} p-4 short:p-2 flex flex-col items-center gap-3 short:gap-1.5`}>
         <div className="self-stretch flex items-center justify-between">
           <button onClick={onExit} className="text-white/50 hover:text-white text-sm min-h-[44px] px-2">← Back</button>
           <RulesButton game="bridge" title="Bridge" />
         </div>
-        <div className="text-white/60 text-sm">{scoreText} · {names[view.dealer]} dealt{subtitle ? ` · ${subtitle}` : ''}</div>
-        <h2 className="text-2xl font-bold text-white">Bidding</h2>
+        <div className="text-white/60 text-sm short:-mt-11">{scoreText} · {names[view.dealer]} dealt{subtitle ? ` · ${subtitle}` : ''}</div>
+        <h2 className="text-2xl short:hidden font-bold text-white">Bidding</h2>
         <AuctionGrid auction={view.auction} dealer={view.dealer} names={names.map((n, i) => `${n}${reactions[i] ? ` ${reactions[i]}` : ''}`)} />
         <div className="flex flex-wrap justify-center gap-1 max-w-2xl">
           {myHand.map(card => <PlayingCard key={card.id} card={{ ...card, faceUp: true }} size="sm" />)}
         </div>
         {choosing === 0 ? (
-          <div className="w-full max-w-md">
-            <div className="grid grid-cols-5 gap-1">
+          <div className="w-full max-w-md short:max-w-2xl">
+            {/* (Two levels to a row on a phone turned sideways) */}
+            <div className="grid grid-cols-5 short:grid-cols-10 gap-1">
               {[1, 2, 3, 4, 5, 6, 7].flatMap(level => DENOMINATIONS.map(d => {
                 const bid = `${level}${d}`;
                 const ok = bidHigher(bid, high);
                 return (
                   <button key={bid} disabled={!ok} onClick={() => onAction({ type: 'bid', seat: 0, bid })}
-                    className={`py-2 rounded-lg text-sm font-bold min-h-[40px] ${ok ? `bg-white/10 hover:bg-white/20 ${DENOM_COLOR[d]}` : 'bg-white/5 text-white/15'}`}>
+                    className={`py-2 short:py-1 rounded-lg text-sm font-bold min-h-[40px] short:min-h-[32px] ${ok ? `bg-white/10 hover:bg-white/20 ${DENOM_COLOR[d]}` : 'bg-white/5 text-white/15'}`}>
                     {level}{DENOM_SYMBOL[d]}
                   </button>
                 );
@@ -125,7 +126,7 @@ export function BridgeTable({ view, names, onAction, onExit, error, subtitle, re
     <>
       {table ? (
         <CardTable
-          title={contract ? `${bidText(contract.bid)} by ${names[contract.declarer]}${subtitle ? ` · ${subtitle}` : ''}` : 'Bridge'}
+          title={contract ? <>{bidText(contract.bid)} by {names[contract.declarer]}{subtitle && <Wide> · {subtitle}</Wide>}</> : 'Bridge'}
           scoreLine={`${declarerTricks(view)}/${contract ? contract.level + 6 : 0} tricks · ${scoreText}`}
           names={long.map((n, s) => (s === dummy ? `${names[s]} (dummy)` : n))}
           table={table}
