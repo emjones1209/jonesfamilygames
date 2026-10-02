@@ -19,8 +19,9 @@
  * - A meld is 3 or more cards of one rank, with more natural cards than wild
  *   ones (Jones family rules) and at most 3 wild. Seven cards make a book:
  *   clean (no wild cards) 500, dirty 300. Books can keep growing (Jones family
- *   rules), though never with a wild card on a clean book; a new meld of the
- *   same rank can be started too.
+ *   rules), though never with a wild card on a clean book. Cards go on the
+ *   side's meld or book of their rank, never a second one (Jones family rules)
+ *   — unless they can't go on it (a wild card for a clean book).
  * - A side's first meld each hand must total at least 50, 90, 120 then 150
  *   points (by round), all laid in one turn.
  * - Used up your hand? Pick up your foot (straight away if you melded your
@@ -28,12 +29,16 @@
  * - You go out from your foot, once your side has 2 clean books and 3 dirty
  *   ones (Jones family rules; a third clean book counts as a dirty one):
  *   +100 and the hand ends. It also ends if the stock runs out.
+ * - With partners you need your partner's permission to go out (Jones family
+ *   rules): ask "may I go out?" during your turn; a "no" holds for that turn.
  *
  * `act(state, action)` returns the next state (for the player whose turn it
  * is) or throws an Error whose message explains why the move isn't allowed:
  *   { type: 'draw' }  { type: 'takePile', ids }  { type: 'meld', ids, rank?, target? }
  *   (`target`: which of the side's melds to add to, by position — e.g. a book)
  *   { type: 'undo' }  { type: 'discard', id }
+ *   { type: 'askOut' }  "may I go out?" (partners only)
+ *   { type: 'answerOut', yes }  the partner's answer (made by the partner, not the player whose turn it is)
  */
 import { shuffle } from '../../utils/cardEngine.js';
 
@@ -57,6 +62,7 @@ export const nextSeat = (s, seat) => (seat + 1) % s.players;
 /** "your team has" with partners, "you have" when playing alone (for messages). */
 const yours = s => (s.players === 4 ? 'your team has' : 'you have');
 const BOOKS_NEEDED = '2 clean books and 3 dirty books';
+export const partnerOf = (s, seat) => (seat + 2) % s.players;   // (four players only)
 
 // ── Cards ────────────────────────────────────────────────────────────────────
 export function makeDeck(decks = 5) {
@@ -100,6 +106,14 @@ export const canGoOut = (s, team) => {
   const b = bookCount(s, team);
   return b.clean >= CLEAN_TO_GO_OUT && b.clean + b.dirty >= BOOKS_TO_GO_OUT;
 };
+/** Why the player whose turn it is can't go out right now (null if they can). */
+function whyNotOut(s, team) {
+  if (!canGoOut(s, team)) return `You can't go out until ${yours(s)} ${BOOKS_NEEDED}`;
+  if (s.players === 4 && s.outAsk !== 'yes') {
+    return s.outAsk === 'no' ? 'Your partner said not yet, so you can\'t go out this turn' : 'Ask your partner if you may go out first';
+  }
+  return null;
+}
 /** Books still needed before the side can go out: { clean, dirty }. */
 export function booksToGo(s, team) {
   const b = bookCount(s, team);
@@ -129,9 +143,10 @@ function addTo(meld, cards) {
 }
 
 /**
- * Put cards on one of the side's melds: `target` if given, else the unfinished
- * meld of `rank`, else a new meld — or, for cards too few for a meld of their
- * own, a book of that rank.
+ * Put cards on one of the side's melds: `target` if given, else the side's meld
+ * of `rank` (the unfinished one, else the finished book), else a new meld.
+ * Jones family rules: a side never starts a second meld of a rank it already has
+ * — unless the cards can't go on it (see below).
  */
 function placeCards(s, team, rank, cards, target = null) {
   if (target != null) {
@@ -141,19 +156,18 @@ function placeCards(s, team, rank, cards, target = null) {
     addTo(meld, cards);
     return;
   }
-  const open = openMeld(s, team, rank);
+  const existing = openMeld(s, team, rank) ?? s.melds[team].find(m => m.rank === rank && isBook(m));
   const ownMeld = cards.filter(isNatural).length >= 2 && cards.length >= 3;
-  // Cards join the side's unfinished meld of their rank (even if that takes it past 7 — books
-  // keep growing)…
-  if (open) {
+  // Cards join the side's meld of their rank, finished book or not (books keep growing)…
+  if (existing) {
     try {
-      return addTo(open, cards);
+      return addTo(existing, cards);
     } catch (e) {
-      if (!ownMeld) throw e;             // …unless they can't (a wild card too many): then they start their own
+      // …unless they can't (a wild card on a clean book, or one wild card too many): then,
+      // if they make a meld of their own, they start one
+      if (!ownMeld) throw e;
     }
   }
-  const book = s.melds[team].find(m => m.rank === rank && isBook(m));
-  if (!ownMeld && book) return addTo(book, cards);
   if (!cards.some(isNatural)) throw new Error('Wild cards can only be added to a meld you already have.');
   checkMeld(cards);
   s.melds[team].push({ rank, cards: [...cards] });
@@ -178,6 +192,7 @@ export function dealRound({ players = 4, round = 0, dealer = players - 1, scores
     turnStart: null,                     // snapshot for Undo
     discardLog: [],                      // [{ seat, card }] (for the computer players)
     outBy: null,
+    outAsk: null,                        // partners: has the player whose turn it is asked to go out? null | asking | yes | no
   };
   for (let seat = 0; seat < players; seat++) {
     s.hands[seat] = s.stock.splice(-PILE_SIZE);
@@ -215,7 +230,19 @@ export function checkPileTake(s, seat, ids = []) {
 export function act(s, action) {
   if (s.phase === 'over') throw new Error('The hand is over.');
   const seat = s.turn, team = teamOf(s, seat);
+  if (s.outAsk === 'asking' && action.type !== 'answerOut') throw new Error('Waiting for your partner to answer.');
   switch (action.type) {
+    case 'askOut': {
+      if (s.players !== 4) throw new Error('Only partners need to ask to go out.');
+      if (!s.inFoot[seat]) throw new Error('You can only go out from your foot.');
+      if (s.outAsk) throw new Error('You\'ve already asked this turn.');
+      return { ...s, outAsk: 'asking' };
+    }
+
+    case 'answerOut':
+      if (s.outAsk !== 'asking') throw new Error('Nobody has asked to go out.');
+      return { ...s, outAsk: action.yes ? 'yes' : 'no' };
+
     case 'draw': {
       if (s.phase !== 'draw') throw new Error('You\'ve already drawn this turn.');
       if (!s.stock.length) return endHand(clone(s), null);
@@ -260,9 +287,8 @@ export function act(s, action) {
       placeCards(next, team, rank, cards, target);
       const left = next.hands[seat].length;
       if (left === 0 && !next.inFoot[seat]) return pickUpFoot(next, seat);   // straight on with your foot
-      if (next.inFoot[seat] && !canGoOut(next, team) && left < 2) {
-        throw new Error(`You can't go out until ${yours(s)} ${BOOKS_NEEDED}, so keep at least 2 cards.`);
-      }
+      const why = next.inFoot[seat] && left < 2 && whyNotOut(next, team);
+      if (why) throw new Error(`${why}, so keep at least 2 cards.`);
       if (left === 0) {                                          // went out by melding every card
         checkMinimum(next, team);
         next.initialDone[team] = true;
@@ -296,9 +322,8 @@ export function act(s, action) {
       checkMinimum(next, team);
       if (next.melds[team].length) next.initialDone[team] = true;
       next.hands[seat] = next.hands[seat].filter(c => c !== card);
-      if (!next.hands[seat].length && next.inFoot[seat] && !canGoOut(next, team)) {
-        throw new Error(`You can't go out until ${yours(s)} ${BOOKS_NEEDED}.`);
-      }
+      const why = !next.hands[seat].length && next.inFoot[seat] && whyNotOut(next, team);
+      if (why) throw new Error(`${why}.`);
       next.discard.push(card);
       next.discardLog.push({ seat, card });
       if (!next.hands[seat].length) {
@@ -308,6 +333,7 @@ export function act(s, action) {
       next.turn = nextSeat(s, seat);
       next.phase = 'draw';
       next.turnStart = null;
+      next.outAsk = null;
       return next;
     }
 

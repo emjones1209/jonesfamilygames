@@ -99,7 +99,7 @@ export function GinTable({ view, names, onAction, onExit, error, subtitle, react
   };
 
   return (
-    <div className={`min-h-[100dvh] bg-gradient-to-br ${BG} p-3 short:py-1 flex flex-col select-none`}>
+    <div className={`min-h-screen bg-gradient-to-br ${BG} p-3 short:py-1 flex flex-col select-none`}>
       <header className="flex items-center justify-between mb-2 short:mb-0 gap-2">
         <div className="flex items-center gap-1 shrink-0">
           <button onClick={onExit} className="p-2 text-white/50 hover:text-white min-h-[44px] min-w-[44px]" aria-label="Back to games">

@@ -11,15 +11,17 @@
  * name the acting seat (see handFootRules.js):
  *   { type: 'draw', seat }  { type: 'takePile', seat, ids }  { type: 'meld', seat, ids, rank?, target? }
  *   { type: 'undo', seat }  { type: 'discard', seat, id }
+ *   { type: 'askOut', seat }  "may I go out?" — then it's the partner's move:
+ *   { type: 'answerOut', seat, yes }  (Jones family rules: partners need permission to go out)
  *   { type: 'nextHand' }    { type: 'newGame' }
  *
  * A computer player plans its whole turn at once but plays it a step at a
  * time: the rest of the plan waits in `robotPlan`, which nobody is ever sent.
  */
-import { dealRound, act as rulesAct, scoreHand, teamOf, nextSeat, topOfPile, isNatural, ROUNDS, TAKE } from './handFootRules.js';
-import { chooseDraw, choosePlay } from './handFootAI.js';
+import { dealRound, act as rulesAct, scoreHand, teamOf, nextSeat, partnerOf, topOfPile, isNatural, ROUNDS, TAKE } from './handFootRules.js';
+import { chooseDraw, choosePlay, chooseAnswer } from './handFootAI.js';
 
-const MOVES = ['draw', 'takePile', 'meld', 'undo', 'discard'];
+const MOVES = ['draw', 'takePile', 'meld', 'undo', 'discard', 'askOut'];
 
 function deal({ players, scores, history }, round, dealer) {
   return { ...dealRound({ players, round, dealer, scores }), history, moves: [], robotPlan: null, result: null, winners: null };
@@ -30,8 +32,12 @@ export function newGame({ players = 4, dealer = players - 1 } = {}) {
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────────
-/** The seat whose move it is (null between hands). Phases: draw | play | handOver | gameOver. */
-export const waitingFor = s => (s.phase === 'draw' || s.phase === 'play' ? s.turn : null);
+/**
+ * The seat whose move it is (null between hands): the player whose turn it is —
+ * or, while they're asking to go out, their partner. Phases: draw | play | handOver | gameOver.
+ */
+export const waitingFor = s => (s.phase !== 'draw' && s.phase !== 'play' ? null
+  : s.outAsk === 'asking' ? partnerOf(s, s.turn) : s.turn);
 
 /** What a move did, for "Phoebe takes the pile (7 cards) with the 9s!" */
 function describe(before, after, seat, a) {
@@ -49,12 +55,20 @@ function describe(before, after, seat, a) {
       return { seat, kind: 'meld', rank, count: cards.length, book, onBook: !!meld && !book && meld.cards.length - cards.length >= 7, foot };
     }
     case 'discard': return { seat, kind: 'discard', card: before.hands[seat].find(c => c.id === a.id), foot };
+    case 'answerOut': return { seat, kind: 'answerOut', yes: !!a.yes, asker: before.turn };
     default: return { seat, kind: a.type };
   }
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
 export function act(s, a) {
+  if (a.type === 'answerOut') {
+    if (s.phase !== 'draw' && s.phase !== 'play') throw new Error('The hand is over.');
+    if (s.outAsk !== 'asking') throw new Error('Nobody has asked to go out.');
+    if (s.players !== 4 || a.seat !== partnerOf(s, s.turn)) throw new Error('Only their partner can answer that.');
+    const next = rulesAct(s, { type: 'answerOut', yes: !!a.yes });
+    return { ...next, moves: [describe(s, next, a.seat, a), ...s.moves].slice(0, 2) };
+  }
   if (MOVES.includes(a.type)) {
     if (s.phase !== 'draw' && s.phase !== 'play') throw new Error('The hand is over.');
     if (a.seat !== s.turn) throw new Error('It\'s not your turn.');
@@ -96,9 +110,21 @@ function finishHand(s) {
 // ── Computer players ─────────────────────────────────────────────────────────
 const works = (s, step) => { try { rulesAct(s, step); return true; } catch { return false; } };
 
-/** The next step of a computer player's turn (it must be their turn). */
+/** Would this turn's plan go out, if the partner said yes? */
+function wouldGoOut(s, seat, level) {
+  let cur = { ...s, outAsk: 'yes' };
+  for (const step of choosePlay(cur, level)) {
+    try { cur = rulesAct(cur, step); } catch { return false; }
+  }
+  return cur.phase === 'over' && cur.outBy === seat;
+}
+
+/** The next step of a computer player's turn (or its answer, when its partner asks to go out). */
 export function robotAction(s, seat, level) {
+  if (s.outAsk === 'asking') return { type: 'answerOut', seat, yes: chooseAnswer(s, seat, level) };
   if (s.phase === 'draw') return { ...chooseDraw(s, level), seat };
+  // Partners ask before going out (Jones family rules)
+  if (s.players === 4 && !s.outAsk && s.inFoot[seat] && wouldGoOut(s, seat, level)) return { type: 'askOut', seat };
   let steps = s.robotPlan?.seat === seat ? s.robotPlan.steps : null;
   if (!steps?.length || !works(s, steps[0])) steps = choosePlay(s, level);     // plan (or re-plan) the turn
   if (!steps.length) return { type: 'undo', seat };        // no way to finish (after taking the pile): put it back and draw
@@ -138,7 +164,7 @@ export function rotate(s, seat) {
     melds: teams(s.melds), initialDone: teams(s.initialDone), scores: teams(s.scores),
     history: s.history.map(teams),
     discardLog: s.discardLog.map(d => ({ ...d, seat: r(d.seat) })),
-    moves: s.moves.map(m => ({ ...m, seat: r(m.seat) })),
+    moves: s.moves.map(m => ({ ...m, seat: r(m.seat), ...(m.asker != null && { asker: r(m.asker) }) })),
     result: s.result && { res: teams(s.result.res), outBy: r(s.result.outBy) },
     winners: s.winners && s.winners.map(side).sort(),
   };

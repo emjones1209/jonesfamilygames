@@ -10,35 +10,36 @@ import { Button } from '../components/Button';
 import { useAuth } from '../context/AuthContext';
 import { getSocket, request } from '../utils/socket';
 import { inviteText, shareInvite } from '../utils/share';
-import { rotate as rotateRook } from '../games/rook/rookEngine';
+import { rotate as rotateRook, waitingFor as waitingRook } from '../games/rook/rookEngine';
 import { RookTable } from '../games/rook/RookTable';
-import { rotate as rotateGolf, HOLE_CHOICES } from '../games/golf6/golfEngine';
+import { rotate as rotateGolf, HOLE_CHOICES, waitingOn as waitingOnGolf } from '../games/golf6/golfEngine';
 import { GolfTable } from '../games/golf6/GolfTable';
-import { rotate as rotateTrain, unrotateAction as unrotateTrain, ROUND_CHOICES } from '../games/train/trainEngine';
+import { rotate as rotateTrain, unrotateAction as unrotateTrain, ROUND_CHOICES, waitingFor as waitingTrain } from '../games/train/trainEngine';
 import { TrainTable } from '../games/train/TrainTable';
-import { rotate as rotateHearts } from '../games/hearts/heartsEngine';
+import { rotate as rotateHearts, waitingOn as waitingOnHearts } from '../games/hearts/heartsEngine';
 import { HeartsTable } from '../games/hearts/HeartsTable';
-import { rotate as rotateSpades } from '../games/spades/spadesEngine';
+import { rotate as rotateSpades, waitingFor as waitingSpades } from '../games/spades/spadesEngine';
 import { TARGET_CHOICES } from '../games/spades/spadesRules';
 import { SpadesTable } from '../games/spades/SpadesTable';
-import { rotate as rotateBridge } from '../games/bridge/bridgeEngine';
+import { rotate as rotateBridge, waitingFor as waitingBridge } from '../games/bridge/bridgeEngine';
 import { BridgeTable } from '../games/bridge/BridgeTable';
-import { rotate as rotateCanasta } from '../games/canasta/canastaEngine';
+import { rotate as rotateCanasta, waitingFor as waitingCanasta } from '../games/canasta/canastaEngine';
 import { CanastaTable } from '../games/canasta/CanastaTable';
-import { rotate as rotateDice } from '../games/dice/diceEngine';
+import { rotate as rotateDice, waitingFor as waitingDice } from '../games/dice/diceEngine';
 import { DiceTable } from '../games/dice/DiceTable';
-import { rotate as rotateHandFoot } from '../games/handfoot/handFootEngine';
+import { rotate as rotateHandFoot, waitingFor as waitingHandFoot } from '../games/handfoot/handFootEngine';
 import { HandFootTable } from '../games/handfoot/HandFootTable';
-import { rotate as rotateEuchre } from '../games/euchre/euchreEngine';
+import { rotate as rotateEuchre, waitingFor as waitingEuchre } from '../games/euchre/euchreEngine';
 import { EuchreTable } from '../games/euchre/EuchreTable';
-import { rotate as rotateGin } from '../games/gin/ginEngine';
+import { rotate as rotateGin, waitingFor as waitingGin } from '../games/gin/ginEngine';
 import { GinTable } from '../games/gin/GinTable';
-import { rotate as rotateCheckers, unrotateAction as unrotateCheckers } from '../games/checkers/checkersEngine';
+import { rotate as rotateCheckers, unrotateAction as unrotateCheckers, waitingFor as waitingCheckers } from '../games/checkers/checkersEngine';
 import { CheckersTable } from '../games/checkers/CheckersTable';
-import { rotate as rotateChess } from '../games/chess/chessEngine';
+import { rotate as rotateChess, waitingFor as waitingChess } from '../games/chess/chessEngine';
 import { ChessTable } from '../games/chess/ChessTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
 import { ReactionBursts, ReactionPicker, REACTION_MS } from '../components/Reactions';
+import { TurnAlert, TurnSoundToggle } from '../components/TurnAlert';
 
 const REACTIONS = ['👍', '😂', '😮', '😬', '🥺', '🤦', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
 const PARTNERS = 'Seats 1 & 3 are partners, and so are seats 2 & 4.';
@@ -82,6 +83,23 @@ const GAMES = {
     name: 'Five Dice', Table: DiceTable, rotate: rotateDice, minSeats: 2,
     seatNote: '2 to 4 players. Empty seats are left out when the game starts.',
   },
+};
+// The seats each game is waiting on (several at once in some games, e.g. everyone
+// passing in Hearts), so the table can tell you when it's your turn
+const WAITING = {
+  rook: v => [waitingRook(v)],
+  golf: waitingOnGolf,
+  train: v => [waitingTrain(v)],
+  hearts: waitingOnHearts,
+  spades: v => [waitingSpades(v)],
+  bridge: v => [waitingBridge(v)],
+  canasta: v => [waitingCanasta(v)],
+  dice: v => [waitingDice(v)],
+  handfoot: v => [waitingHandFoot(v)],
+  euchre: v => [waitingEuchre(v)],
+  gin: v => [waitingGin(v)],
+  checkers: v => [waitingCheckers(v)],
+  chess: v => [waitingChess(v)],
 };
 const LEVELS = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
 const remember = code => { try { localStorage.setItem(LAST_TABLE_KEY, code); } catch { /* private mode */ } };
@@ -166,7 +184,8 @@ export default function TablePage() {
   // Reactions: a button that springs open the choices, and big bursts for everyone's latest ones
   const reactionBar = (
     <ReactionPicker choices={REACTIONS} open={picker} onToggle={() => setPicker(p => !p)}
-      onPick={r => { send('mp:react', { emoji: r }); setPicker(false); }} />
+      onPick={r => { send('mp:react', { emoji: r }); setPicker(false); }}
+      extra={table.status === 'playing' && <TurnSoundToggle />} />
   );
   const toasts = (
     <ReactionBursts reactions={reactions} you={you} players={n}
@@ -302,13 +321,14 @@ export default function TablePage() {
   });
   const shown = {};
   for (const r of reactions) shown[(r.seat - you + n) % n] = r.emoji;
+  const yourTurn = (WAITING[table.game]?.(table.view) ?? []).includes(you);
 
   return (
     <game.Table view={view} names={names} error={error} reactions={shown}
       // The server fills in your real seat; anything counted from your seat is turned back first
       onAction={action => send('mp:action', { action: game.unrotate ? game.unrotate(action, you, n) : action })}
       onExit={() => navigate('/')}
-      overlay={<>{banner}{toasts}{reactionBar}</>}
+      overlay={<>{banner}<TurnAlert active={yourTurn} />{toasts}{reactionBar}</>}
       gameOverActions={
         <div className="flex gap-3">
           <Button variant="ghost" className="flex-1" onClick={leave}>Leave</Button>

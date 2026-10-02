@@ -325,8 +325,10 @@ for (const [game, robots] of tablesToPlay) {
       const mine = engine.waitingOn ? engine.waitingOn(v).includes(t.you) : engine.waitingFor(v) === t.you;
       if (!mine || done(v)) return;
       // Canasta, Hand and Foot: just draw and throw a card away; the rest: play as a robot would, from what we can see
-      const action = game === 'canasta' || game === 'handfoot'
-        ? (v.phase === 'draw' ? { type: 'draw' } : { type: 'discard', id: v.hands[t.you][0].id })
+      // (Hand and Foot: a partner asking "may I go out?" gets a yes)
+      const action = game === 'handfoot' && v.outAsk === 'asking' ? { type: 'answerOut', yes: true }
+        : game === 'canasta' || game === 'handfoot'
+          ? (v.phase === 'draw' ? { type: 'draw' } : { type: 'discard', id: v.hands[t.you][0].id })
         : engine.robotAction(v, t.you, 'medium');
       // Hearts: the others' passes arrive before ours is counted, so only pass once a hand
       // (In Euchre, "pass" is a bid, and you may pass in both rounds)

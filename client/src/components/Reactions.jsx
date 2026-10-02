@@ -102,7 +102,8 @@ export function ReactionBursts({ reactions, you, players, nameOf }) {
 }
 
 /** The 😊 button and the choices it springs open. */
-export function ReactionPicker({ choices, open, onToggle, onPick }) {
+/** `extra` goes at the bottom of the choices (e.g. a setting). */
+export function ReactionPicker({ choices, open, onToggle, onPick, extra }) {
   return (
     <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">
       <AnimatePresence>
@@ -119,6 +120,7 @@ export function ReactionPicker({ choices, open, onToggle, onPick }) {
                 {isWords(r) ? <WithEmoji text={r} /> : <Emoji char={r} className="block w-10 h-10 md:w-11 md:h-11 mx-auto" />}
               </motion.button>
             ))}
+            {extra}
           </motion.div>
         )}
       </AnimatePresence>
