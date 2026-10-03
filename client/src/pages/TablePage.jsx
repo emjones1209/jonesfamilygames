@@ -125,6 +125,7 @@ export default function TablePage() {
     const socket = getSocket();
     const join = async () => {
       const res = await request('mp:join', { code });
+      if (res?.offline) return;                                   // no answer: join again when we reconnect
       if (res?.error) { setMissing(res.error); forget(); return; }
       remember(code);
       // Switched on "tell me when someone arrives" before? Then do so at this table too
@@ -141,11 +142,13 @@ export default function TablePage() {
       clearTimeout(errorTimer.current);
       errorTimer.current = setTimeout(() => setError(''), 4000);
     };
+    const onClosed = c => { if (c.code === code) { setMissing('The host closed this table.'); forget(); } };
     const onConnect = () => { setConnected(true); join(); };      // (re)join every time we (re)connect
     const onDisconnect = () => setConnected(false);
     socket.on('mp:table', onTable);
     socket.on('mp:reaction', onReaction);
     socket.on('mp:error', onError);
+    socket.on('mp:closed', onClosed);
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     if (socket.connected) join(); else socket.connect();
@@ -153,6 +156,7 @@ export default function TablePage() {
       socket.off('mp:table', onTable);
       socket.off('mp:reaction', onReaction);
       socket.off('mp:error', onError);
+      socket.off('mp:closed', onClosed);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
     };
@@ -160,6 +164,10 @@ export default function TablePage() {
 
   const send = (event, data) => getSocket().emit(event, data);
   const leave = () => { send('mp:leave'); forget(); navigate('/'); };
+  // The host stepping away from the lobby keeps the table open for guests still to come
+  // (it stays on the home screen, to come back to); closing it ends it for everyone
+  const stepAway = () => { send('mp:leave'); navigate('/'); };
+  const closeTable = () => { send('mp:leave', { close: true }); forget(); navigate('/'); };
 
   if (missing) {
     return (
@@ -220,8 +228,8 @@ export default function TablePage() {
       <div className="min-h-screen bg-gradient-to-br from-game-bg to-indigo-950 p-5">
         {banner}
         <div className="max-w-md mx-auto flex flex-col gap-4">
-          <button onClick={leave} className="flex items-center gap-2 text-white/50 hover:text-white self-start min-h-[44px]">
-            <ArrowLeft size={18} /> Leave table
+          <button onClick={isHost ? stepAway : leave} className="flex items-center gap-2 text-white/50 hover:text-white self-start min-h-[44px]">
+            <ArrowLeft size={18} /> {isHost ? 'Back (the table stays open)' : 'Leave table'}
           </button>
           <div className="text-center">
             <h1 className="game-title text-3xl">{game.name} table</h1>
@@ -291,6 +299,10 @@ export default function TablePage() {
                 {needed > 0 ? `Waiting for ${needed} more (or add robots)`
                   : filled < n ? `Start with ${filled} players` : 'Start the game'}
               </Button>
+              <p className="text-white/40 text-xs text-center">
+                Going back keeps this table open for a few hours, so people you&apos;ve invited can still join. It&apos;ll be on your home screen.
+              </p>
+              <button onClick={closeTable} className="text-red-300/80 hover:text-red-300 text-sm min-h-[40px]">Close this table</button>
             </div>
           ) : (
             <div className="text-center flex flex-col gap-2">

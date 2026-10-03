@@ -394,3 +394,67 @@ test('someone who asked to be told is notified when a guest arrives while they a
   back.socket.emit('mp:watch', { on: false });
   await until(() => back.table.seats[0].watching === false);
 });
+
+test('the host going back to play something else keeps the table open; closing it ends it for everyone', async () => {
+  const host = player(31, 'Emily');
+  await until(() => host.socket.connected);
+  const { code } = await host.emit('mp:create', { game: 'golf' });
+  await until(() => host.table);
+
+  // Emily sends the code and goes off to play something else
+  host.socket.emit('mp:leave');
+  await new Promise(r => setTimeout(r, 30));
+  assert.ok(tables.tables.has(code));
+
+  // 45 minutes later her friend types the code in: the table's still there, and Emily's seat
+  const friend = player(32, 'Sam');
+  await until(() => friend.socket.connected);
+  assert.deepEqual(await friend.emit('mp:join', { code }), { ok: true, code });
+  await until(() => friend.table?.seats[1]?.name === 'Sam');
+  assert.equal(friend.table.seats[0].name, 'Emily');
+  assert.equal(friend.table.seats[0].connected, false);       // shown as away
+
+  // A guest who leaves gives up their seat (the table stays)
+  friend.socket.emit('mp:leave');
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(tables.tables.get(code).seats[1], null);
+
+  // Emily comes back, her friend rejoins — and then she closes the table: he's told
+  const back = player(31, 'Emily');
+  await until(() => back.socket.connected);
+  await back.emit('mp:join', { code });
+  await until(() => back.table?.you === 0 && back.table.seats[0].connected);
+  const sam = player(32, 'Sam');
+  const closed = [];
+  sam.socket.on('mp:closed', c => closed.push(c.code));
+  await until(() => sam.socket.connected);
+  await sam.emit('mp:join', { code });
+  await until(() => back.table.seats.filter(Boolean).length === 2);
+  back.socket.emit('mp:leave', { close: true });
+  await until(() => closed.length === 1);
+  assert.deepEqual(closed, [code]);
+  assert.equal(tables.tables.has(code), false);
+  assert.match((await sam.emit('mp:join', { code })).error, /No table with that code/);
+});
+
+test('a bad message never brings the server down', async () => {
+  const p = player(41, 'Prankster');
+  await until(() => p.socket.connected);
+  const { code } = await p.emit('mp:create', { game: 'hearts' });
+  await until(() => p.table);
+  // Every event, with nothing (a browser sends null), and with nonsense
+  const events = ['mp:join', 'mp:sit', 'mp:stand', 'mp:robot', 'mp:level', 'mp:option', 'mp:swap', 'mp:watch',
+    'mp:start', 'mp:action', 'mp:react', 'mp:leave'];
+  for (const e of events) {
+    p.socket.emit(e, null);
+    p.socket.emit(e, 42);
+    p.socket.emit(e, { seat: 'x', action: { type: 'play', cardId: {} } });
+  }
+  await new Promise(r => setTimeout(r, 50));
+  // Still answering: a newcomer can open and join tables
+  const q = player(42, 'Newcomer');
+  await until(() => q.socket.connected);
+  const res = await q.emit('mp:create', { game: 'gin' });
+  assert.match(res.code, /^[A-Z]{4}$/);
+  assert.ok(tables.tables.has(code));                 // (and leaving with nothing said kept the host's table open)
+});

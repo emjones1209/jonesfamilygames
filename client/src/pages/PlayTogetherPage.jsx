@@ -26,7 +26,7 @@ export const LAST_TABLE_KEY = 'lastTable';
 export default function PlayTogetherPage() {
   const navigate = useNavigate();
   const [code, setCode] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState('');               // shown next to what was tapped: { where: 'join' | 'open', text }
   const [busy, setBusy] = useState(false);
 
   const open = async game => {
@@ -34,18 +34,18 @@ export default function PlayTogetherPage() {
     const res = await request('mp:create', { game });
     setBusy(false);
     if (res?.code) navigate(`/together/${res.code}`);
-    else setError(res?.error ?? 'Couldn\'t open a table — try again.');
+    else setError({ where: 'open', text: res?.error ?? 'Couldn\'t open a table — try again.' });
   };
 
   const join = async e => {
     e.preventDefault();
     const c = code.trim().toUpperCase();
-    if (c.length !== 4) { setError('Table codes are 4 letters.'); return; }
+    if (c.length !== 4) { setError({ where: 'join', text: 'Table codes are 4 letters.' }); return; }
     setBusy(true); setError('');
     const res = await request('mp:join', { code: c });
     setBusy(false);
     if (res?.ok) navigate(`/together/${res.code}`);
-    else setError(res?.error ?? 'Couldn\'t join — try again.');
+    else setError({ where: 'join', text: res?.error ?? 'Couldn\'t join — try again.' });
   };
 
   return (
@@ -68,7 +68,9 @@ export default function PlayTogetherPage() {
           <input value={code} onChange={e => setCode(e.target.value.toUpperCase().slice(0, 4))}
             placeholder="CODE" autoCapitalize="characters" autoCorrect="off" spellCheck={false} inputMode="text"
             className="text-center text-3xl tracking-[0.5em] font-bold uppercase rounded-xl bg-white/10 text-white py-3 placeholder:text-white/20" />
-          <Button variant="gold" type="submit" disabled={busy}>Join</Button>
+          <Button variant="gold" type="submit" disabled={busy}>{busy ? 'Joining…' : 'Join'}</Button>
+          {/* (Right under the button, so it's seen on a phone — not at the bottom of the page) */}
+          {error?.where === 'join' && <p role="alert" className="text-red-300 text-center">{error.text}</p>}
         </form>
 
         <div className="card-panel flex flex-col gap-3">
@@ -80,7 +82,7 @@ export default function PlayTogetherPage() {
           ))}
         </div>
 
-        {error && <p className="text-red-300 text-center">{error}</p>}
+        {error?.where === 'open' && <p role="alert" className="text-red-300 text-center">{error.text}</p>}
       </div>
     </div>
   );

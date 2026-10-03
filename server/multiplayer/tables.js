@@ -21,7 +21,9 @@
  *                                                 with a minimum, enough of them; empty seats are dropped)
  *   mp:action { action }                          a move in the game
  *   mp:react  { emoji }                           a quick reaction everyone sees
- *   mp:leave                                      leave the table
+ *   mp:leave  { close }                           leave the table. The host leaving the lobby keeps it open
+ *                                                 (and their seat) for guests still to come, unless `close`
+ *   (to everyone at a closed table: mp:closed)
  *   mp:watch  { on }                              notify me (on my phone) when someone arrives while I'm away
  * To each player:
  *   mp:table  { code, game, status, hostId, level, options, you, seats, view }
@@ -207,10 +209,20 @@ function createTables(io, {
 
   io.on('connection', socket => {
     const user = socket.user;
+    // A message that makes a handler throw (a bad payload from a buggy or out-of-date app, say)
+    // is logged and ignored: it must never bring the server — and everyone's games — down
+    // (A browser sends null for "no details": treated as none, so each handler's defaults apply)
+    const on = (event, handler) => socket.on(event, (data, ...rest) => {
+      try {
+        handler(data ?? undefined, ...rest);
+      } catch (e) {
+        console.error(`Table event ${event} failed:`, e);
+      }
+    });
     const current = () => tables.get(socket.data.code);
     const fail = (ack, message) => (typeof ack === 'function' ? ack({ error: message }) : socket.emit('mp:error', { message }));
 
-    socket.on('mp:create', ({ game } = {}, ack) => {
+    on('mp:create', ({ game } = {}, ack) => {
       if (!GAMES[game]) return fail(ack, 'That game can\'t be played together yet.');
       const code = newCode();
       const table = {
@@ -226,7 +238,7 @@ function createTables(io, {
       broadcast(table);
     });
 
-    socket.on('mp:join', ({ code } = {}, ack) => {
+    on('mp:join', ({ code } = {}, ack) => {
       const table = tables.get(String(code ?? '').toUpperCase().trim());
       if (!table) return fail(ack, 'No table with that code — check the letters and try again.');
       if (socket.data.code && socket.data.code !== table.code) socket.leave(socket.data.code);
@@ -249,14 +261,14 @@ function createTables(io, {
       if (arriving) announce(table, user);
     });
 
-    socket.on('mp:watch', ({ on } = {}) => {
+    on('mp:watch', ({ on } = {}) => {
       const table = current();
       if (!table || seatOf(table, user.id) < 0) return;
       if (on) table.watchers.add(user.id); else table.watchers.delete(user.id);
       broadcast(table);
     });
 
-    socket.on('mp:sit', ({ seat } = {}) => {
+    on('mp:sit', ({ seat } = {}) => {
       const table = current();
       if (!table || !Number.isInteger(seat) || seat < 0 || seat >= table.seats.length) return;
       const target = table.seats[seat];
@@ -273,7 +285,7 @@ function createTables(io, {
       schedule(table);
     });
 
-    socket.on('mp:stand', () => {
+    on('mp:stand', () => {
       const table = current();
       if (!table || !inLobby(table)) return;
       const mine = seatOf(table, user.id);
@@ -281,7 +293,7 @@ function createTables(io, {
       broadcast(table);
     });
 
-    socket.on('mp:robot', ({ seat, on } = {}) => {
+    on('mp:robot', ({ seat, on } = {}) => {
       const table = current();
       if (!table || !inLobby(table) || seatOf(table, user.id) < 0) return;
       if (!Number.isInteger(seat) || seat < 0 || seat >= table.seats.length) return;
@@ -290,7 +302,7 @@ function createTables(io, {
       broadcast(table);
     });
 
-    socket.on('mp:swap', ({ from, to } = {}) => {
+    on('mp:swap', ({ from, to } = {}) => {
       const table = current();
       if (!table || !inLobby(table) || table.hostId !== user.id) return;
       const ok = x => Number.isInteger(x) && x >= 0 && x < table.seats.length;
@@ -299,14 +311,14 @@ function createTables(io, {
       broadcast(table);
     });
 
-    socket.on('mp:level', ({ level } = {}) => {
+    on('mp:level', ({ level } = {}) => {
       const table = current();
       if (!table || table.hostId !== user.id || !LEVELS.includes(level)) return;
       table.level = level;
       broadcast(table);
     });
 
-    socket.on('mp:option', ({ key, value } = {}) => {
+    on('mp:option', ({ key, value } = {}) => {
       const table = current();
       const option = table && GAMES[table.game].options?.[key];
       if (!option || !inLobby(table) || table.hostId !== user.id || !option.values.includes(value)) return;
@@ -314,7 +326,7 @@ function createTables(io, {
       broadcast(table);
     });
 
-    socket.on('mp:start', () => {
+    on('mp:start', () => {
       const table = current();
       if (!table || !inLobby(table) || table.hostId !== user.id) return;
       const { minSeats, engine } = GAMES[table.game];
@@ -329,7 +341,7 @@ function createTables(io, {
       schedule(table);
     });
 
-    socket.on('mp:action', ({ action } = {}) => {
+    on('mp:action', ({ action } = {}) => {
       const table = current();
       if (!table || table.status !== 'playing' || !action) return;
       const seat = seatOf(table, user.id);
@@ -346,7 +358,7 @@ function createTables(io, {
       }
     });
 
-    socket.on('mp:react', ({ emoji } = {}) => {
+    on('mp:react', ({ emoji } = {}) => {
       const table = current();
       if (!table || !REACTIONS.includes(emoji)) return;
       const seat = seatOf(table, user.id);
@@ -356,23 +368,41 @@ function createTables(io, {
       io.to(table.code).emit('mp:reaction', { seat, emoji });
     });
 
-    socket.on('mp:leave', () => {
+    on('mp:leave', options => {
+      const close = !!options?.close;              // (a browser sends null when there's nothing to say)
       const table = current();
       if (!table) return;
       const seat = seatOf(table, user.id);
+      const hosting = inLobby(table) && table.hostId === user.id;
+      if (hosting && close) {
+        // The host closes the table: everyone still there is told
+        clearTimeout(table.timer);
+        tables.delete(table.code);
+        io.to(table.code).emit('mp:closed', { code: table.code });
+        io.in(table.code).socketsLeave(table.code);
+        for (const s of io.sockets.sockets.values()) if (s.data.code === table.code) s.data.code = null;
+        return;
+      }
+      socket.leave(table.code);
+      socket.data.code = null;
+      if (hosting) {
+        // Stepping away from a table you've invited people to: it stays open, and so does your
+        // seat, so a guest who turns up later can still join (and you can be told they have)
+        if (seat >= 0 && !present(table, user.id)) table.seats[seat].connected = false;
+        broadcast(table);
+        return;
+      }
       if (seat >= 0) {
         if (inLobby(table)) table.seats[seat] = null;
         else Object.assign(table.seats[seat], { connected: false, away: true });   // a robot plays for you
       }
       table.watchers.delete(user.id);
-      socket.leave(table.code);
-      socket.data.code = null;
       if (inLobby(table) && !table.seats.some(s => s?.type === 'human')) { tables.delete(table.code); return; }
       broadcast(table);
       schedule(table);
     });
 
-    socket.on('disconnect', () => {
+    on('disconnect', () => {
       const table = current();
       if (!table) return;
       const seat = seatOf(table, user.id);
