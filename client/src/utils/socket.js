@@ -34,5 +34,14 @@ export function getSocket() {
   return socket;
 }
 
-/** Send an event and wait for the server's reply. */
-export const request = (event, data) => new Promise(resolve => getSocket().emit(event, data, resolve));
+export const OFFLINE = 'Couldn\'t reach the game server — check your internet connection and try again.';
+
+/**
+ * Send an event and wait for the server's reply. If none comes (the device
+ * can't reach the server), give up after `ms` with `{ error, offline: true }`
+ * rather than waiting for ever.
+ */
+export const request = (event, data, ms = 10000) => new Promise(resolve => {
+  const timer = setTimeout(() => resolve({ error: OFFLINE, offline: true }), ms);
+  getSocket().emit(event, data, reply => { clearTimeout(timer); resolve(reply); });
+});
