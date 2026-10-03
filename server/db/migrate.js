@@ -74,6 +74,25 @@ async function migrate() {
       )
     `);
 
+    // Devices to send notifications to (see notify/push.js)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        endpoint   TEXT UNIQUE NOT NULL,
+        p256dh     TEXT NOT NULL,
+        auth       TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS app_settings (
+        name  TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    `);
+
     await client.query('COMMIT');
     console.log('✅ Database migrations complete');
   } catch (err) {

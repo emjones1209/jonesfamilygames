@@ -32,6 +32,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - Easy / Medium / Hard AI opponents
 - Dad jokes between levels 😄
 - PWA — installable to iPad home screen
+- "Tell me when someone arrives": send an invite, close the app, and get a notification when your guest joins the table (Web Push; on iPhone/iPad the app must be added to the Home Screen)
 
 ## Tech Stack
 - **Frontend**: React + Vite + Tailwind CSS

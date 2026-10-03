@@ -24,6 +24,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Shows notifications from the server (someone's arrived at your table)
+        importScripts: ['push-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {

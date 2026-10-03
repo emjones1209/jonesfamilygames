@@ -15,12 +15,13 @@ const engine = require('../../client/src/games/rook/rookEngine.js');
 
 let server, io, tables, url;
 const clients = [];
+const notices = [];       // the notifications that would have gone to people's phones
 
 before(async () => {
   server = http.createServer();
   io = new Server(server);
   io.use(socketAuth);
-  tables = createTables(io, { robotMs: 2, collectMs: 2, awayMs: 60 });
+  tables = createTables(io, { robotMs: 2, collectMs: 2, awayMs: 60, notify: (userIds, message) => notices.push({ userIds, message }) });
   await new Promise(resolve => server.listen(0, resolve));
   url = `http://localhost:${server.address().port}`;
 });
@@ -342,3 +343,54 @@ for (const [game, robots] of tablesToPlay) {
     assert.deepEqual(me.errors, []);
   });
 }
+
+test('someone who asked to be told is notified when a guest arrives while they are away', async () => {
+  const host = player(21, 'Mom');
+  await until(() => host.socket.connected);
+  const { code } = await host.emit('mp:create', { game: 'spades' });
+  await until(() => host.table);
+  host.socket.emit('mp:watch', { on: true });
+  await until(() => host.table.seats[0].watching === true);
+  const sent = () => notices.filter(n => n.message.url === `/together/${code}`);
+
+  // While Mom is still at the table, she sees her guest arrive for herself
+  const aunt = player(22, 'Aunt Jo');
+  await until(() => aunt.socket.connected);
+  await aunt.emit('mp:join', { code });
+  await until(() => host.table.seats[1]?.name === 'Aunt Jo');
+  assert.equal(sent().length, 0);
+  aunt.socket.disconnect();
+
+  // Mom sends an invitation and closes the app: her seat is kept for her
+  host.socket.disconnect();
+  await new Promise(r => setTimeout(r, 30));
+  assert.ok(tables.tables.has(code));
+
+  // Grandpa follows the link later: Mom gets one notification…
+  const grandpa = player(23, 'Grandpa');
+  await until(() => grandpa.socket.connected);
+  await grandpa.emit('mp:join', { code });
+  await until(() => sent().length === 1);
+  assert.deepEqual(sent()[0].userIds, [21]);
+  assert.equal(sent()[0].message.title, 'Grandpa is ready to play Spades!');
+  assert.equal(grandpa.table.seats[0].watching, true);       // so he can see Mom's been told
+
+  // …and not another each time his iPad wakes up and reconnects
+  grandpa.socket.disconnect();
+  const again = player(23, 'Grandpa');
+  await until(() => again.socket.connected);
+  await again.emit('mp:join', { code });
+  await until(() => again.table?.you === 2);
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(sent().length, 1);
+
+  // Mom taps the notification and is back in her seat
+  const back = player(21, 'Mom');
+  await until(() => back.socket.connected);
+  await back.emit('mp:join', { code });
+  await until(() => back.table?.you === 0);
+
+  // She can switch it off again
+  back.socket.emit('mp:watch', { on: false });
+  await until(() => back.table.seats[0].watching === false);
+});
