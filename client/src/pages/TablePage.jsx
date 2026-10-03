@@ -40,6 +40,8 @@ import { ChessTable } from '../games/chess/ChessTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
 import { ReactionBursts, ReactionPicker, REACTION_MS } from '../components/Reactions';
 import { TurnAlert, TurnSoundToggle } from '../components/TurnAlert';
+import { NotifyToggle } from '../components/NotifyToggle';
+import { stillNotifying } from '../utils/push';
 
 const REACTIONS = ['👍', '😂', '😮', '😬', '🥺', '🤦', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
 const PARTNERS = 'Seats 1 & 3 are partners, and so are seats 2 & 4.';
@@ -123,7 +125,10 @@ export default function TablePage() {
     const socket = getSocket();
     const join = async () => {
       const res = await request('mp:join', { code });
-      if (res?.error) { setMissing(res.error); forget(); } else remember(code);
+      if (res?.error) { setMissing(res.error); forget(); return; }
+      remember(code);
+      // Switched on "tell me when someone arrives" before? Then do so at this table too
+      if (await stillNotifying()) socket.emit('mp:watch', { on: true });
     };
     const onTable = t => { if (t.code === code) setTable(t); };
     const onReaction = r => {
@@ -174,7 +179,8 @@ export default function TablePage() {
   const n = table.seats.length;
   const you = table.you;
   const isHost = table.hostId === user?.id;
-  const seatName = seat => (!seat ? 'Empty seat' : seat.type === 'robot' ? `🤖 ${seat.name}` : seat.name + (seat.away ? ' (robot playing)' : !seat.connected ? ' (reconnecting…)' : ''));
+  const seatName = seat => (!seat ? 'Empty seat' : seat.type === 'robot' ? `🤖 ${seat.name}`
+    : seat.name + (seat.away ? ' (robot playing)' : !seat.connected ? (table.status === 'lobby' ? ' (away)' : ' (reconnecting…)') : ''));
   const banner = !connected && (
     <div className="fixed top-safe left-0 right-0 z-50 bg-amber-500 text-game-bg text-center text-sm font-semibold py-1">
       Reconnecting…
@@ -194,7 +200,8 @@ export default function TablePage() {
 
   // ── Lobby ────────────────────────────────────────────────────────────────
   if (table.status === 'lobby') {
-    const host = table.seats.find(s => s?.userId === table.hostId)?.name ?? 'the host';
+    const hostSeat = table.seats.find(s => s?.userId === table.hostId);
+    const host = hostSeat?.name ?? 'the host';
     const filled = table.seats.filter(Boolean).length;
     const needed = (game.minSeats ?? n) - filled;
     const option = game.option;
@@ -227,6 +234,10 @@ export default function TablePage() {
             {shared === 'copied' && <p className="text-game-gold text-sm mt-2">Invitation copied — paste it into a message.</p>}
             {shared === 'failed' && <p className="text-red-300 text-sm mt-2">Couldn't share from here — send them the code instead.</p>}
           </div>
+
+          {you != null && (
+            <NotifyToggle watching={table.seats[you]?.watching} onChange={on => send('mp:watch', { on })} />
+          )}
 
           <div className="card-panel flex flex-col gap-2">
             <p className="text-white/50 text-xs">{game.seatNote}</p>
@@ -282,9 +293,16 @@ export default function TablePage() {
               </Button>
             </div>
           ) : (
-            <p className="text-white/60 text-center">
-              Waiting for {host} to start the game… (robots play at {table.level}{option ? `; ${chosenText}` : ''})
-            </p>
+            <div className="text-center flex flex-col gap-2">
+              {hostSeat && !hostSeat.connected && (
+                <p className="text-game-gold">
+                  {host} has stepped away{hostSeat.watching ? ' — they\'ve been sent a notification that you\'re here.' : '.'}
+                </p>
+              )}
+              <p className="text-white/60">
+                Waiting for {host} to start the game… (robots play at {table.level}{option ? `; ${chosenText}` : ''})
+              </p>
+            </div>
           )}
           {error && <p className="text-red-300 text-center">{error}</p>}
         </div>

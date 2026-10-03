@@ -22,9 +22,15 @@
  *   mp:action { action }                          a move in the game
  *   mp:react  { emoji }                           a quick reaction everyone sees
  *   mp:leave                                      leave the table
+ *   mp:watch  { on }                              notify me (on my phone) when someone arrives while I'm away
  * To each player:
  *   mp:table  { code, game, status, hostId, level, options, you, seats, view }
  *   mp:reaction { seat, emoji }
+ *
+ * Notifications: someone who sends an invitation and puts their iPad down can
+ * ask to be told when a guest turns up. `notify(userIds, message)` (see
+ * notify/push.js) is called for them when someone arrives at the table and
+ * they aren't there.
  */
 // seats: the table's size; minSeats: fewest players a game can start with (else every seat)
 // moves: a player's own moves; tableMoves: moves anyone at the table can make (e.g. deal again)
@@ -107,6 +113,8 @@ function createTables(io, {
   collectMs = 1400,       // how long a finished trick stays on the table
   awayMs = 30000,         // a disconnected player's robot stand-in takes over after this
   idleMs = 3 * 60 * 60 * 1000,
+  notify = () => {},
+  notifyAgainMs = 15 * 60 * 1000,   // iPads reconnect all the time: only tell of the same guest again after this
 } = {}) {
   const tables = new Map();       // code → table
 
@@ -118,6 +126,26 @@ function createTables(io, {
   };
 
   const seatOf = (table, userId) => table.seats.findIndex(s => s && s.type === 'human' && s.userId === userId);
+
+  /** Is this user at the table on any device or tab (other than `except`)? */
+  const present = (table, userId, except = null) => [...(io.sockets.adapter.rooms.get(table.code) ?? [])]
+    .some(id => id !== except && io.sockets.sockets.get(id)?.user.id === userId);
+
+  /** Someone has just arrived: tell the people who asked to know and aren't here. */
+  function announce(table, user) {
+    const now = Date.now();
+    if (now - (table.notified.get(user.id) ?? -Infinity) < notifyAgainMs) return;
+    const away = [...table.watchers].filter(id => id !== user.id && !present(table, id));
+    if (!away.length) return;
+    table.notified.set(user.id, now);
+    const game = GAMES[table.game].name;
+    Promise.resolve(notify(away, {
+      title: `${user.displayName} is ready to play ${game}!`,
+      body: `They're at table ${table.code}. Tap to join them.`,
+      url: `/together/${table.code}`,
+      tag: `table-${table.code}`,
+    })).catch(e => console.error('Notify failed:', e.message));
+  }
 
   /** Send every player at the table their own picture of it. */
   function broadcast(table) {
@@ -141,6 +169,7 @@ function createTables(io, {
           userId: seat.userId ?? null,
           connected: seat.type === 'robot' || seat.connected,
           away: !!seat.away,
+          watching: seat.type === 'human' && table.watchers.has(seat.userId),
         }),
         view: table.state && you >= 0 ? engine.viewFor(table.state, you) : null,
       });
@@ -187,6 +216,7 @@ function createTables(io, {
       const table = {
         code, game, hostId: user.id, status: 'lobby', level: 'hard', options: defaultOptions(game), state: null, timer: null,
         seats: Array(GAMES[game].seats).fill(null), lastActive: Date.now(), lastReaction: new Map(),
+        watchers: new Set(), notified: new Map(),
       };
       table.seats[0] = { type: 'human', userId: user.id, name: user.displayName, connected: true };
       tables.set(code, table);
@@ -200,6 +230,7 @@ function createTables(io, {
       const table = tables.get(String(code ?? '').toUpperCase().trim());
       if (!table) return fail(ack, 'No table with that code — check the letters and try again.');
       if (socket.data.code && socket.data.code !== table.code) socket.leave(socket.data.code);
+      const arriving = !present(table, user.id);
       socket.join(table.code);
       socket.data.code = table.code;
       const seat = seatOf(table, user.id);
@@ -215,6 +246,14 @@ function createTables(io, {
       ack?.({ ok: true, code: table.code });
       broadcast(table);
       schedule(table);
+      if (arriving) announce(table, user);
+    });
+
+    socket.on('mp:watch', ({ on } = {}) => {
+      const table = current();
+      if (!table || seatOf(table, user.id) < 0) return;
+      if (on) table.watchers.add(user.id); else table.watchers.delete(user.id);
+      broadcast(table);
     });
 
     socket.on('mp:sit', ({ seat } = {}) => {
@@ -325,6 +364,7 @@ function createTables(io, {
         if (inLobby(table)) table.seats[seat] = null;
         else Object.assign(table.seats[seat], { connected: false, away: true });   // a robot plays for you
       }
+      table.watchers.delete(user.id);
       socket.leave(table.code);
       socket.data.code = null;
       if (inLobby(table) && !table.seats.some(s => s?.type === 'human')) { tables.delete(table.code); return; }
@@ -338,9 +378,7 @@ function createTables(io, {
       const seat = seatOf(table, user.id);
       if (seat < 0) return;
       // Still connected on another device or tab? Then nothing changes
-      const stillHere = [...(io.sockets.adapter.rooms.get(table.code) ?? [])]
-        .some(id => id !== socket.id && io.sockets.sockets.get(id)?.user.id === user.id);
-      if (stillHere) return;
+      if (present(table, user.id, socket.id)) return;
       const s = table.seats[seat];
       s.connected = false;
       // Give them a little while to come back (an iPad waking up, say) before a robot steps in
