@@ -236,6 +236,7 @@ export function act(s, action) {
       if (s.players !== 4) throw new Error('Only partners need to ask to go out.');
       if (!s.inFoot[seat]) throw new Error('You can only go out from your foot.');
       if (s.outAsk) throw new Error('You\'ve already asked this turn.');
+      if (!canGoOut(s, team)) throw new Error(`You can't ask to go out until ${yours(s)} ${BOOKS_NEEDED}.`);
       return { ...s, outAsk: 'asking' };
     }
 

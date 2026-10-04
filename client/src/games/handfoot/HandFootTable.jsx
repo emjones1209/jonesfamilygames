@@ -318,7 +318,8 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         {yourTurn && selected.length > 0 && (
           <Button variant="ghost" onClick={() => setSelected([])}>✕ Unselect {selected.length === 1 ? 'card' : `all ${selected.length}`}</Button>
         )}
-        {yourTurn && partners && view.inFoot[0] && !view.outAsk && (
+        {/* (only once your side has all the books it needs to go out) */}
+        {yourTurn && partners && view.inFoot[0] && canOut && !view.outAsk && (
           <Button variant="secondary" onClick={() => act({ type: 'askOut' })}>🙋 Ask to go out</Button>
         )}
       </div>

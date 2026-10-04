@@ -188,6 +188,12 @@ describe('Jones family rules', () => {
     expect(s.outAsk).toBe(null);                                    // next turn, ask again
   });
 
+  it('you can only ask to go out once your side has all its books', () => {
+    const s = readyToGoOut([card('7'), card('5')]);
+    s.melds[0] = s.melds[0].slice(0, 4);                          // one impure book short
+    expect(() => act(s, { type: 'askOut', seat: 0 })).toThrow(/can't ask to go out until/);
+  });
+
   it('three players (each for themselves) go out without asking', () => {
     const s = readyToGoOut([card('7')], 3);
     expect(() => act(s, { type: 'askOut', seat: 0 })).toThrow(/Only partners/);
