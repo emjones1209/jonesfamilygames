@@ -33,6 +33,8 @@ import { rotate as rotateEuchre, waitingFor as waitingEuchre } from '../games/eu
 import { EuchreTable } from '../games/euchre/EuchreTable';
 import { rotate as rotateGin, waitingFor as waitingGin } from '../games/gin/ginEngine';
 import { GinTable } from '../games/gin/GinTable';
+import { rotate as rotateCribbage, waitingOn as waitingOnCribbage } from '../games/cribbage/cribbageEngine';
+import { CribbageTable } from '../games/cribbage/CribbageTable';
 import { rotate as rotateCheckers, unrotateAction as unrotateCheckers, waitingFor as waitingCheckers } from '../games/checkers/checkersEngine';
 import { CheckersTable } from '../games/checkers/CheckersTable';
 import { rotate as rotateChess, waitingFor as waitingChess } from '../games/chess/chessEngine';
@@ -69,6 +71,7 @@ const GAMES = {
   canasta: { name: 'Canasta', Table: CanastaTable, rotate: rotateCanasta, seatNote: PARTNERS, teams: true },
   euchre: { name: 'Euchre', Table: EuchreTable, rotate: rotateEuchre, seatNote: PARTNERS, teams: true },
   gin: { name: 'Gin Rummy', Table: GinTable, rotate: rotateGin, seatNote: 'Two players, head to head.' },
+  cribbage: { name: 'Cribbage', Table: CribbageTable, rotate: rotateCribbage, seatNote: 'Two players, head to head. Seat 2 deals first (their crib).' },
   checkers: {
     name: 'Checkers', Table: CheckersTable, rotate: rotateCheckers, unrotate: unrotateCheckers,
     seatNote: 'Two players. Seat 1 plays Black and moves first; colours swap each game.',
@@ -100,6 +103,7 @@ const WAITING = {
   handfoot: v => [waitingHandFoot(v)],
   euchre: v => [waitingEuchre(v)],
   gin: v => [waitingGin(v)],
+  cribbage: waitingOnCribbage,
   checkers: v => [waitingCheckers(v)],
   chess: v => [waitingChess(v)],
 };

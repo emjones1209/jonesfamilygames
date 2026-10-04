@@ -288,6 +288,7 @@ const engines = {
   gin: require('../../client/src/games/gin/ginEngine.js'),
   checkers: require('../../client/src/games/checkers/checkersEngine.js'),
   chess: require('../../client/src/games/chess/chessEngine.js'),
+  cribbage: require('../../client/src/games/cribbage/cribbageEngine.js'),
 };
 
 /** Cards this view shows from hands other than `you`'s (Bridge's dummy is allowed once it's on the table). */
@@ -296,6 +297,8 @@ function peeked(game, v, you) {
   // Gin shows both hands once someone knocks
   if (game === 'gin') return !['handOver', 'gameOver'].includes(v.phase) && (v.hands[1 - you].some(Boolean) || v.stock.some(Boolean));
   if (game === 'dice' || game === 'checkers' || game === 'chess') return false;   // nothing is hidden
+  // Cribbage: the other hand, the crib and the deck stay hidden until the show
+  if (game === 'cribbage') return !['show', 'gameOver'].includes(v.phase) && (v.hands[1 - you].some(Boolean) || v.crib.some(Boolean) || v.deck.some(Boolean));
   if (v.robotPlan) return true;
   const hands = v.table ? v.table.hands : v.hands;
   const dummy = game === 'bridge' && engines.bridge.dummyShown(v) ? v.contract.dummy : -1;
@@ -304,8 +307,8 @@ function peeked(game, v, you) {
   return (game === 'canasta' || game === 'handfoot') && v.stock.some(Boolean);
 }
 
-let nextId = 40;
-const tablesToPlay = [...Object.keys(engines).map(game => [game, ['dice', 'gin', 'checkers', 'chess'].includes(game) ? [1] : [1, 2, 3]]), ['handfoot', [1, 2]]];
+let nextId = 40;          // (ids from 40 up; the tests below use 100+ so they never clash)
+const tablesToPlay = [...Object.keys(engines).map(game => [game, ['dice', 'gin', 'checkers', 'chess', 'cribbage'].includes(game) ? [1] : [1, 2, 3]]), ['handfoot', [1, 2]]];
 for (const [game, robots] of tablesToPlay) {
   test(`a person and ${robots.length} robot${robots.length > 1 ? 's' : ''} play ${game}`, async () => {
     const me = player(nextId++, 'Aunt Jo');
@@ -317,7 +320,7 @@ for (const [game, robots] of tablesToPlay) {
     assert.deepEqual(me.table.seats.filter(Boolean).slice(1).map(s => s.name), ['Phoebe', 'Xavier', 'Heraldo'].slice(0, robots.length));
 
     const engine = engines[game];
-    const done = v => (game === 'dice' ? v.phase === 'gameOver' : ['handOver', 'gameOver'].includes(v.phase));
+    const done = v => (game === 'dice' ? v.phase === 'gameOver' : ['handOver', 'gameOver', 'show'].includes(v.phase));
     let sawSomething = false, passedHand = -1;
     me.socket.on('mp:table', t => setTimeout(() => {
       const v = t.view;
@@ -438,7 +441,7 @@ test('the host going back to play something else keeps the table open; closing i
 });
 
 test('a bad message never brings the server down', async () => {
-  const p = player(41, 'Prankster');
+  const p = player(141, 'Prankster');
   await until(() => p.socket.connected);
   const { code } = await p.emit('mp:create', { game: 'hearts' });
   await until(() => p.table);
@@ -452,7 +455,7 @@ test('a bad message never brings the server down', async () => {
   }
   await new Promise(r => setTimeout(r, 50));
   // Still answering: a newcomer can open and join tables
-  const q = player(42, 'Newcomer');
+  const q = player(142, 'Newcomer');
   await until(() => q.socket.connected);
   const res = await q.emit('mp:create', { game: 'gin' });
   assert.match(res.code, /^[A-Z]{4}$/);
@@ -460,10 +463,10 @@ test('a bad message never brings the server down', async () => {
 });
 
 test('"Rejoin your table" comes from the server, so it works on any device you sign in on', async () => {
-  const dad = player(51, 'Dad');
+  const dad = player(151, 'Dad');
   await until(() => dad.socket.connected);
   assert.deepEqual(await dad.emit('mp:mine', null), { tables: [] });
-  const mom = player(52, 'Mom');
+  const mom = player(152, 'Mom');
   await until(() => mom.socket.connected);
   const { code } = await mom.emit('mp:create', { game: 'handfoot' });
   await dad.emit('mp:join', { code });
@@ -474,12 +477,12 @@ test('"Rejoin your table" comes from the server, so it works on any device you s
 
   // Dad takes a break and plays Solitaire on his iPad's home-screen app (a different device, as far as the app knows)
   dad.socket.disconnect();
-  const ipad = player(51, 'Dad');
+  const ipad = player(151, 'Dad');
   await until(() => ipad.socket.connected);
   assert.deepEqual(await ipad.emit('mp:mine', null), { tables: [{ code, game: 'handfoot', name: 'Hand and Foot', status: 'playing' }] });
 
   // Someone who isn't at the table isn't offered it
-  const aunt = player(53, 'Aunt Jo');
+  const aunt = player(153, 'Aunt Jo');
   await until(() => aunt.socket.connected);
   assert.deepEqual(await aunt.emit('mp:mine', null), { tables: [] });
 });
