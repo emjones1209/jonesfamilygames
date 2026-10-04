@@ -15,7 +15,7 @@ import { TurnUpright } from '../../components/TurnUpright';
 import { ResultPanel } from '../cards/GameSetup';
 import {
   act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, bookCount, booksToGo, canGoOut,
-  isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE, MIN_PILE,
+  isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE, MIN_PILE, RANK_ORDER,
 } from './handFootRules';
 
 const BG = 'from-game-bg to-cyan-900';
@@ -44,7 +44,7 @@ const TILE = {
   theirs: { box: 'w-11 h-14 md:w-12 md:h-16', rank: 'text-base md:text-lg', count: 'text-[10px] md:text-[11px]' },
 };
 
-/** One meld: its rank and size; a finished book is red (clean) or black (dirty). */
+/** One meld: its rank and size; a finished book is red (pure: no wild cards) or black (impure). */
 function MeldTile({ meld, onClick, fresh, ours }) {
   const tile = TILE[ours ? 'ours' : 'theirs'];
   const wild = meld.cards.filter(isWild).length;
@@ -69,12 +69,16 @@ function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, extr
       <div className="flex items-center justify-between text-xs text-white/60 mb-1 gap-2">
         <span className="font-semibold text-white/80">{title}</span>
         <span className="text-right">
-          Books: {books.clean} clean · {books.dirty} dirty {extra}
+          Books: {books.clean} pure · {books.dirty} impure {extra}
         </span>
       </div>
       <div className={`flex flex-wrap gap-1.5 items-center ${ours ? 'min-h-[3rem] md:min-h-24' : 'min-h-[2.5rem] md:min-h-16'}`}>
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
-        {melds.map((m, i) => (
+        {/* Highest rank first (A, K, Q … 4), not in the order they were laid down; `i` stays
+            the meld's place in the side's list, which is how moves name it */}
+        {melds.map((m, i) => ({ m, i }))
+          .sort((a, b) => RANK_ORDER.indexOf(a.m.rank) - RANK_ORDER.indexOf(b.m.rank) || a.i - b.i)
+          .map(({ m, i }) => (
           <MeldTile key={`${m.rank}-${i}`} meld={m} ours={ours} fresh={!isBook(m) && m.rank === freshRank}
             onClick={onMeldClick && canTake(i) ? () => onMeldClick(m, i) : undefined} />
         ))}
@@ -152,7 +156,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const ourBooks = bookCount(view, 0);
   const canOut = canGoOut(view, 0);
   const toGo = booksToGo(view, 0);
-  const booksLeft = [toGo.clean && `${toGo.clean} clean`, toGo.dirty && `${toGo.dirty} dirty`].filter(Boolean).join(' + ');
+  const booksLeft = [toGo.clean && `${toGo.clean} pure`, toGo.dirty && `${toGo.dirty} impure`].filter(Boolean).join(' + ');
   const redThrees = hand.filter(isRedThree).length;
   const hint = !playing ? '' : answering ? ''
     : view.outAsk === 'asking' ? `${view.turn === 0 ? 'You ask' : `${names[view.turn]} asks`} ${partnerName} about going out…`
@@ -319,8 +323,8 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
             <thead><tr className="text-white/40 text-xs"><th />{view.scores.map((_, side) => <th key={side} className="truncate max-w-[5rem]">{sideName(side)}</th>)}</tr></thead>
             <tbody>
               {[
-                ['Clean books', r => r.clean * CLEAN_BOOK],
-                ['Dirty books', r => r.dirty * DIRTY_BOOK],
+                ['Pure books', r => r.clean * CLEAN_BOOK],
+                ['Impure books', r => r.dirty * DIRTY_BOOK],
                 ['Red 3s caught', r => r.redThrees],
                 ['Going out', r => r.goingOut],
                 ['Cards melded', r => r.cards],

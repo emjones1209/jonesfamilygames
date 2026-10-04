@@ -71,7 +71,7 @@ describe('Hand and Foot rules', () => {
     expect(s.melds[0][0].cards).toHaveLength(8);
     expect(isClean(s.melds[0][0])).toBe(true);
     // No wild cards on a clean book…
-    expect(() => rulesAct(s, { type: 'meld', ids: ['JK-joker-2'], target: 0 })).toThrow(/clean book/);
+    expect(() => rulesAct(s, { type: 'meld', ids: ['JK-joker-2'], target: 0 })).toThrow(/pure book/);
     // …but a dirty book takes one (up to 3 wild, never more wild than natural)
     s = rulesAct(s, { type: 'meld', ids: ['2-spades-1'], target: 1 });
     expect(s.melds[0][1].cards).toHaveLength(8);
@@ -133,7 +133,7 @@ describe('Hand and Foot rules', () => {
     s.melds[0].push({ rank: 'J', cards: Array.from({ length: 7 }, (_, i) => card('J', 'spades', i + 1)) }, dirty('A'), dirty('Q'));
     s = { ...s, turn: 0, phase: 'play', hands: s.hands.map((h, i) => (i === 0 ? [card('7')] : h)) };
     expect(booksToGo(s, 0)).toEqual({ clean: 0, dirty: 1 });
-    expect(() => rulesAct(s, { type: 'discard', id: '7-hearts-1' })).toThrow(/2 clean books and 3 dirty books/);
+    expect(() => rulesAct(s, { type: 'discard', id: '7-hearts-1' })).toThrow(/2 pure books and 3 impure books/);
     // With a third dirty book — and your partner's permission (Jones family rules) — discarding the last card goes out
     s.melds[0].push(dirty('10'));
     s = rulesAct(rulesAct(s, { type: 'askOut' }), { type: 'answerOut', yes: true });
@@ -332,7 +332,7 @@ describe('Jones family rules', () => {
     expect(s.melds[0].map(m => m.cards.length)).toEqual([7, 3]);
     expect(isClean(s.melds[0][0])).toBe(true);
     // A lone wild card still can't go on the clean book
-    expect(() => rulesAct(s, { type: 'meld', ids: ['2-spades-1'], target: 0 })).toThrow(/clean book/);
+    expect(() => rulesAct(s, { type: 'meld', ids: ['2-spades-1'], target: 0 })).toThrow(/pure book/);
   });
 
   it('melding cards of a rank you already have a meld of adds them to it', () => {

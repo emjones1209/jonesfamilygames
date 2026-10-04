@@ -61,7 +61,7 @@ export const seatsOf = (s, side) => Array.from({ length: s.players }, (_, i) => 
 export const nextSeat = (s, seat) => (seat + 1) % s.players;
 /** "your team has" with partners, "you have" when playing alone (for messages). */
 const yours = s => (s.players === 4 ? 'your team has' : 'you have');
-const BOOKS_NEEDED = '2 clean books and 3 dirty books';
+const BOOKS_NEEDED = '2 pure books and 3 impure books';     // (the Joneses' names for clean and dirty)
 export const partnerOf = (s, seat) => (seat + 2) % s.players;   // (four players only)
 
 // ── Cards ────────────────────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ function checkMeld(cards) {
 /** Add cards to a meld (or a book — but no wild cards on a clean book). */
 function addTo(meld, cards) {
   if (isBook(meld) && isClean(meld) && cards.some(isWild)) {
-    throw new Error('Wild cards can\'t go on a clean book — it would make it dirty (300 instead of 500).');
+    throw new Error('Wild cards can\'t go on a pure book — it would make it impure (300 instead of 500).');
   }
   const all = [...meld.cards, ...cards];
   checkMeld(all);
