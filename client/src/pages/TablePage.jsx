@@ -35,6 +35,8 @@ import { rotate as rotateGin, waitingFor as waitingGin } from '../games/gin/ginE
 import { GinTable } from '../games/gin/GinTable';
 import { rotate as rotateCribbage, waitingOn as waitingOnCribbage } from '../games/cribbage/cribbageEngine';
 import { CribbageTable } from '../games/cribbage/CribbageTable';
+import { rotate as rotatePinochle, waitingOn as waitingOnPinochle } from '../games/pinochle/pinochleEngine';
+import { PinochleTable } from '../games/pinochle/PinochleTable';
 import { rotate as rotateCheckers, unrotateAction as unrotateCheckers, waitingFor as waitingCheckers } from '../games/checkers/checkersEngine';
 import { CheckersTable } from '../games/checkers/CheckersTable';
 import { rotate as rotateChess, waitingFor as waitingChess } from '../games/chess/chessEngine';
@@ -71,6 +73,7 @@ const GAMES = {
   canasta: { name: 'Canasta', Table: CanastaTable, rotate: rotateCanasta, seatNote: PARTNERS, teams: true },
   euchre: { name: 'Euchre', Table: EuchreTable, rotate: rotateEuchre, seatNote: PARTNERS, teams: true },
   gin: { name: 'Gin Rummy', Table: GinTable, rotate: rotateGin, seatNote: 'Two players, head to head.' },
+  pinochle: { name: 'Pinochle', Table: PinochleTable, rotate: rotatePinochle, seatNote: PARTNERS, teams: true },
   cribbage: { name: 'Cribbage', Table: CribbageTable, rotate: rotateCribbage, seatNote: 'Two players, head to head. Seat 2 deals first (their crib).' },
   checkers: {
     name: 'Checkers', Table: CheckersTable, rotate: rotateCheckers, unrotate: unrotateCheckers,
@@ -103,6 +106,7 @@ const WAITING = {
   handfoot: v => [waitingHandFoot(v)],
   euchre: v => [waitingEuchre(v)],
   gin: v => [waitingGin(v)],
+  pinochle: waitingOnPinochle,
   cribbage: waitingOnCribbage,
   checkers: v => [waitingCheckers(v)],
   chess: v => [waitingChess(v)],

@@ -75,6 +75,10 @@ const GAMES = {
     name: 'Gin Rummy', seats: 2, engine: load('gin/ginEngine'), pace: 1.2,
     moves: ['draw', 'pass', 'discard', 'knock'], tableMoves: ['nextHand', 'newGame'],
   },
+  pinochle: {
+    name: 'Pinochle', seats: 4, engine: load('pinochle/pinochleEngine'),
+    moves: ['bid', 'trump', 'pass', 'passBack', 'ready', 'play'], tableMoves: ['nextHand', 'newGame'],
+  },
   cribbage: {
     name: 'Cribbage', seats: 2, engine: load('cribbage/cribbageEngine'),
     moves: ['discard', 'play'], tableMoves: ['nextHand', 'newGame'],

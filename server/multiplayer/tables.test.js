@@ -289,6 +289,7 @@ const engines = {
   checkers: require('../../client/src/games/checkers/checkersEngine.js'),
   chess: require('../../client/src/games/chess/chessEngine.js'),
   cribbage: require('../../client/src/games/cribbage/cribbageEngine.js'),
+  pinochle: require('../../client/src/games/pinochle/pinochleEngine.js'),
 };
 
 /** Cards this view shows from hands other than `you`'s (Bridge's dummy is allowed once it's on the table). */

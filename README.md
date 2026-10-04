@@ -13,6 +13,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - ♦️ Euchre
 - 🎴 Gin Rummy
 - 🎯 Cribbage
+- 💍 Pinochle
 - ♣️ Canasta (classic partnership)
 - 🦶 Hand and Foot (partnership, five decks)
 - 🚂 Mexican Train dominoes
@@ -154,7 +155,7 @@ One person opens a table from **Play Together** and shares its 4-letter code
 (or taps **Share invite** to send a link through the phone's share sheet — someone
 who isn't signed in is brought back to the table after signing in);
 empty seats can be filled with robots (Phoebe, Xavier and Heraldo). Every game
-with computer players can be played together: Rook, Spades, Canasta, Bridge and
+with computer players can be played together: Rook, Spades, Pinochle, Canasta, Bridge and
 Hearts (4 players), Hand and Foot (3 each for themselves, or 4 as partners), and 6-Card Golf (1, 3 or 9 holes), Mexican Train (4, 7 or
 13 rounds) and Five Dice (2–4 players), and head to head Gin Rummy, Cribbage,
 Checkers and Chess. Spades tables can play to 200, 300 or
