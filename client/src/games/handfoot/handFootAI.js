@@ -155,9 +155,13 @@ export function choosePlay(s, level) {
       const wilds = hand().filter(isWild).sort((a, b) => cardValue(a) - cardValue(b));
       if (!wilds.length) return;
       const out = goingOut() || racing();
+      // While our side still needs pure books, a meld that's still pure is one of them in the
+      // making: a wild card would spoil it (Jones family rules need 2 pure books to go out)
+      const needPure = booksToGo(cur, team).clean > 0;
       // The meld closest to a book that can take wild cards
       const targets = cur.melds[team]
         .filter(m => !isBook(m) && (out || m.cards.length >= 4))
+        .filter(m => !needPure || m.cards.some(isWild))
         .filter(m => m.cards.filter(isWild).length < MAX_WILD)
         .sort((a, b) => b.cards.length - a.cards.length);
       const target = targets[0];

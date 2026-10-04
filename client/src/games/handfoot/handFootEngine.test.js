@@ -194,6 +194,35 @@ describe('Jones family rules', () => {
     expect(act(s, { type: 'discard', seat: 0, id: '7-hearts-1' }).result.outBy).toBe(0);
   });
 
+  /** Let the computer player in seat 0 play out its turn (it has drawn); returns the state after. */
+  const robotTurn = s => {
+    for (let i = 0; i < 40 && s.turn === 0 && s.phase === 'play'; i++) s = act(s, robotAction(s, 0, 'hard'));
+    return s;
+  };
+  const sixAces = () => ({ rank: 'A', cards: Array.from({ length: 6 }, (_, i) => card('A', 'clubs', 30 + i)) });
+  const phoebesTurn = melds => {
+    const s = newGame({ players: 4, dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = melds;
+    s.hands[0] = [card('2', 'clubs', 9), card('9'), card('6', 'spades'), card('4', 'diamonds')];
+    return { ...s, phase: 'play', turn: 0 };
+  };
+
+  it('a computer partner won\'t spoil a pure meld with a wild card while the side still needs pure books', () => {
+    // Phoebe has a wild card and the side's 6 pure aces want one more card — but a wild would make them impure
+    const after = robotTurn(phoebesTurn([sixAces()]));
+    const aces = after.melds[0].find(m => m.rank === 'A');
+    expect(aces.cards).toHaveLength(6);
+    expect(isClean(aces)).toBe(true);
+  });
+
+  it('…but once the side has its 2 pure books, a wild card can finish a book', () => {
+    const after = robotTurn(phoebesTurn([sixAces(), clean('K', 5), clean('J', 6)]));
+    const aces = after.melds[0].find(m => m.rank === 'A');
+    expect(aces.cards).toHaveLength(7);
+    expect(isClean(aces)).toBe(false);
+  });
+
   it('a computer player asks before going out, and a computer partner answers', () => {
     // Seat 0 (a robot here) could go out by discarding its last card: it asks first
     let s = readyToGoOut([card('7')]);
