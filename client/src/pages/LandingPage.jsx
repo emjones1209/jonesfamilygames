@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
+import { request } from '../utils/socket';
 import { avatarEmoji } from '../utils/avatars';
 
 const GAMES = [
@@ -32,8 +34,25 @@ const GAMES = [
 export default function LandingPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  let lastTable = null;
-  try { lastTable = localStorage.getItem(LAST_TABLE_KEY); } catch { /* private mode */ }
+  // "Rejoin your table": the server knows which tables you have a seat at, whichever device or
+  // app you joined from (an iPad's Home Screen app and Safari don't share what they remember).
+  // Until it answers — or if it can't be reached — fall back to the table this device remembers.
+  const [mine, setMine] = useState(null);        // [{ code, name }] once the server has answered
+  useEffect(() => {
+    let live = true;
+    request('mp:mine', null, 5000).then(res => {
+      if (!live || !res?.tables) return;
+      setMine(res.tables);
+      try {
+        if (res.tables.length) localStorage.setItem(LAST_TABLE_KEY, res.tables[0].code);
+        else localStorage.removeItem(LAST_TABLE_KEY);             // (that table has closed)
+      } catch { /* private mode */ }
+    });
+    return () => { live = false; };
+  }, []);
+  let remembered = null;
+  try { remembered = localStorage.getItem(LAST_TABLE_KEY); } catch { /* private mode */ }
+  const rejoin = mine ? mine[0] : remembered && { code: remembered };
 
   const container = {
     hidden: {},
@@ -104,11 +123,11 @@ export default function LandingPage() {
               <span className="block text-white/60 text-xs">Card games, dominoes and dice with the family, each on your own iPad</span>
             </span>
           </button>
-          {lastTable && (
-            <button onClick={() => navigate(`/together/${lastTable}`)}
+          {rejoin && (
+            <button onClick={() => navigate(`/together/${rejoin.code}`)}
               className="sm:w-56 bg-game-gold/20 border border-game-gold rounded-3xl p-4 text-left active:scale-95 transition-transform">
               <span className="block text-game-gold font-bold">Rejoin your table</span>
-              <span className="block text-white/60 text-xs">Code {lastTable}</span>
+              <span className="block text-white/60 text-xs">{rejoin.name ? `${rejoin.name} · ` : ''}Code {rejoin.code}</span>
             </button>
           )}
         </div>

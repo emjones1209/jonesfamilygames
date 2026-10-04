@@ -458,3 +458,28 @@ test('a bad message never brings the server down', async () => {
   assert.match(res.code, /^[A-Z]{4}$/);
   assert.ok(tables.tables.has(code));                 // (and leaving with nothing said kept the host's table open)
 });
+
+test('"Rejoin your table" comes from the server, so it works on any device you sign in on', async () => {
+  const dad = player(51, 'Dad');
+  await until(() => dad.socket.connected);
+  assert.deepEqual(await dad.emit('mp:mine', null), { tables: [] });
+  const mom = player(52, 'Mom');
+  await until(() => mom.socket.connected);
+  const { code } = await mom.emit('mp:create', { game: 'handfoot' });
+  await dad.emit('mp:join', { code });
+  for (const seat of [2, 3]) mom.socket.emit('mp:robot', { seat, on: true });
+  await until(() => mom.table?.seats.filter(Boolean).length === 4);
+  mom.socket.emit('mp:start');
+  await until(() => dad.table?.status === 'playing');
+
+  // Dad takes a break and plays Solitaire on his iPad's home-screen app (a different device, as far as the app knows)
+  dad.socket.disconnect();
+  const ipad = player(51, 'Dad');
+  await until(() => ipad.socket.connected);
+  assert.deepEqual(await ipad.emit('mp:mine', null), { tables: [{ code, game: 'handfoot', name: 'Hand and Foot', status: 'playing' }] });
+
+  // Someone who isn't at the table isn't offered it
+  const aunt = player(53, 'Aunt Jo');
+  await until(() => aunt.socket.connected);
+  assert.deepEqual(await aunt.emit('mp:mine', null), { tables: [] });
+});
