@@ -14,6 +14,8 @@ const GAMES = [
   { id: 'spades', name: 'Spades', emoji: '♠️', note: '4 players · partners' },
   { id: 'euchre', name: 'Euchre', emoji: '♦️', note: '4 players · partners' },
   { id: 'gin', name: 'Gin Rummy', emoji: '🎴', note: '2 players' },
+  { id: 'pinochle', name: 'Pinochle', emoji: '💍', note: '4 players · partners' },
+  { id: 'cribbage', name: 'Cribbage', emoji: '🎯', note: '2 players' },
   { id: 'checkers', name: 'Checkers', emoji: '⚫', note: '2 players' },
   { id: 'chess', name: 'Chess', emoji: '♟️', note: '2 players' },
   { id: 'canasta', name: 'Canasta', emoji: '♣️', note: '4 players · partners' },
