@@ -25,6 +25,7 @@
  *                                                 (and their seat) for guests still to come, unless `close`
  *   (to everyone at a closed table: mp:closed)
  *   mp:watch  { on }                              notify me (on my phone) when someone arrives while I'm away
+ *   mp:mine                    → ack { tables }   the open tables I have a seat at, latest first (for "Rejoin your table")
  * To each player:
  *   mp:table  { code, game, status, hostId, level, options, you, seats, view }
  *   mp:reaction { seat, emoji }
@@ -259,6 +260,16 @@ function createTables(io, {
       broadcast(table);
       schedule(table);
       if (arriving) announce(table, user);
+    });
+
+    // The tables this person has a seat at, on whatever device they joined from
+    on('mp:mine', (_, ack) => {
+      if (typeof ack !== 'function') return;
+      const mine = [...tables.values()]
+        .filter(table => seatOf(table, user.id) >= 0)
+        .sort((a, b) => b.lastActive - a.lastActive)
+        .map(table => ({ code: table.code, game: table.game, name: GAMES[table.game].name, status: table.status }));
+      ack({ tables: mine });
     });
 
     on('mp:watch', ({ on } = {}) => {

@@ -71,7 +71,7 @@ describe('Hand and Foot rules', () => {
     expect(s.melds[0][0].cards).toHaveLength(8);
     expect(isClean(s.melds[0][0])).toBe(true);
     // No wild cards on a clean book…
-    expect(() => rulesAct(s, { type: 'meld', ids: ['JK-joker-2'], target: 0 })).toThrow(/clean book/);
+    expect(() => rulesAct(s, { type: 'meld', ids: ['JK-joker-2'], target: 0 })).toThrow(/pure book/);
     // …but a dirty book takes one (up to 3 wild, never more wild than natural)
     s = rulesAct(s, { type: 'meld', ids: ['2-spades-1'], target: 1 });
     expect(s.melds[0][1].cards).toHaveLength(8);
@@ -133,7 +133,7 @@ describe('Hand and Foot rules', () => {
     s.melds[0].push({ rank: 'J', cards: Array.from({ length: 7 }, (_, i) => card('J', 'spades', i + 1)) }, dirty('A'), dirty('Q'));
     s = { ...s, turn: 0, phase: 'play', hands: s.hands.map((h, i) => (i === 0 ? [card('7')] : h)) };
     expect(booksToGo(s, 0)).toEqual({ clean: 0, dirty: 1 });
-    expect(() => rulesAct(s, { type: 'discard', id: '7-hearts-1' })).toThrow(/2 clean books and 3 dirty books/);
+    expect(() => rulesAct(s, { type: 'discard', id: '7-hearts-1' })).toThrow(/2 pure books and 3 impure books/);
     // With a third dirty book — and your partner's permission (Jones family rules) — discarding the last card goes out
     s.melds[0].push(dirty('10'));
     s = rulesAct(rulesAct(s, { type: 'askOut' }), { type: 'answerOut', yes: true });
@@ -192,6 +192,35 @@ describe('Jones family rules', () => {
     const s = readyToGoOut([card('7')], 3);
     expect(() => act(s, { type: 'askOut', seat: 0 })).toThrow(/Only partners/);
     expect(act(s, { type: 'discard', seat: 0, id: '7-hearts-1' }).result.outBy).toBe(0);
+  });
+
+  /** Let the computer player in seat 0 play out its turn (it has drawn); returns the state after. */
+  const robotTurn = s => {
+    for (let i = 0; i < 40 && s.turn === 0 && s.phase === 'play'; i++) s = act(s, robotAction(s, 0, 'hard'));
+    return s;
+  };
+  const sixAces = () => ({ rank: 'A', cards: Array.from({ length: 6 }, (_, i) => card('A', 'clubs', 30 + i)) });
+  const phoebesTurn = melds => {
+    const s = newGame({ players: 4, dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = melds;
+    s.hands[0] = [card('2', 'clubs', 9), card('9'), card('6', 'spades'), card('4', 'diamonds')];
+    return { ...s, phase: 'play', turn: 0 };
+  };
+
+  it('a computer partner won\'t spoil a pure meld with a wild card while the side still needs pure books', () => {
+    // Phoebe has a wild card and the side's 6 pure aces want one more card — but a wild would make them impure
+    const after = robotTurn(phoebesTurn([sixAces()]));
+    const aces = after.melds[0].find(m => m.rank === 'A');
+    expect(aces.cards).toHaveLength(6);
+    expect(isClean(aces)).toBe(true);
+  });
+
+  it('…but once the side has its 2 pure books, a wild card can finish a book', () => {
+    const after = robotTurn(phoebesTurn([sixAces(), clean('K', 5), clean('J', 6)]));
+    const aces = after.melds[0].find(m => m.rank === 'A');
+    expect(aces.cards).toHaveLength(7);
+    expect(isClean(aces)).toBe(false);
   });
 
   it('a computer player asks before going out, and a computer partner answers', () => {
@@ -332,7 +361,7 @@ describe('Jones family rules', () => {
     expect(s.melds[0].map(m => m.cards.length)).toEqual([7, 3]);
     expect(isClean(s.melds[0][0])).toBe(true);
     // A lone wild card still can't go on the clean book
-    expect(() => rulesAct(s, { type: 'meld', ids: ['2-spades-1'], target: 0 })).toThrow(/clean book/);
+    expect(() => rulesAct(s, { type: 'meld', ids: ['2-spades-1'], target: 0 })).toThrow(/pure book/);
   });
 
   it('melding cards of a rank you already have a meld of adds them to it', () => {
