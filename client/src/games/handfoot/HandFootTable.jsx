@@ -15,7 +15,7 @@ import { TurnUpright } from '../../components/TurnUpright';
 import { ResultPanel } from '../cards/GameSetup';
 import {
   act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, bookCount, booksToGo, canGoOut,
-  isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE, MIN_PILE, RANK_ORDER,
+  isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE, MIN_PILE, RANK_ORDER, TAKE,
 } from './handFootRules';
 
 const BG = 'from-game-bg to-cyan-900';
@@ -120,6 +120,7 @@ function describe(m, names) {
 export function HandFootTable({ view, names, onAction, onExit, error, subtitle, reactions = {}, overlay, gameOverActions }) {
   const [picked, setSelected] = useState([]);                 // ids of your selected cards
   const [note, setNote] = useState(null);                     // a hint of yours, until the next move
+  const [peeking, setPeeking] = useState(false);              // looking at the top of the pile (Jones family rules)
   const n = view.players;
   const partners = n === 4;
   // Sides (a partnership, or one player): yours is 0; the others are named after their players
@@ -136,8 +137,11 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const act = a => { onAction({ ...a, seat: 0 }); setNote(null); };
 
   const toggle = id => setSelected(sel => (sel.includes(id) ? sel.filter(x => x !== id) : [...sel.filter(x => hand.some(c => c.id === x)), id]));
-  const drawCards = () => { if (yourTurn && view.phase === 'draw') act({ type: 'draw' }); };
-  const takePile = () => { if (yourTurn && view.phase === 'draw') { act({ type: 'takePile', ids: selected }); setSelected([]); } };
+  const drawCards = () => { if (yourTurn && view.phase === 'draw') { act({ type: 'draw' }); setPeeking(false); } };
+  const takePile = () => { if (yourTurn && view.phase === 'draw') { act({ type: 'takePile', ids: selected }); setSelected([]); setPeeking(false); } };
+  // Jones family rules: before choosing, you may look at the cards you'd get by taking the pile
+  const canPeek = yourTurn && view.phase === 'draw' && view.discard.length > 0;
+  const showPeek = peeking && canPeek;
   const meld = (rank, target) => { if (yourTurn && view.phase === 'play') { act({ type: 'meld', ids: selected, rank, target }); setSelected([]); } };
   const discard = () => {
     if (!yourTurn || view.phase !== 'play') return;
@@ -225,8 +229,24 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
           <div onClick={takePile} className={`rounded-xl ${fresh === 'pile' ? 'ring-4 ring-game-gold' : ''} ${yourTurn && view.phase === 'draw' ? 'cursor-pointer' : ''}`}>
             {top ? <HFCard card={top} /> : <div className={`${CARD_BOX.sm} rounded-xl border-2 border-dashed border-white/20`} />}
           </div>
+          {canPeek && (
+            <button onClick={() => setPeeking(p => !p)} aria-expanded={showPeek}
+              className="mt-1 text-xs text-white/70 hover:text-white bg-white/10 rounded-full px-3 min-h-[32px]">
+              👀 {showPeek ? 'Hide' : `Look at top ${Math.min(TAKE, view.discard.length)}`}
+            </button>
+          )}
         </div>
       </div>
+      {showPeek && (
+        <div className="card-panel p-2 self-center flex flex-col items-center gap-1">
+          <p className="text-white/60 text-xs text-center">
+            {view.discard.length >= TAKE ? `Taking the pile gets you these ${TAKE}` : 'The top of the pile'} — the top card is on the right
+          </p>
+          <div className="flex gap-1">
+            {view.discard.slice(-TAKE).map(c => <HFCard key={c.id} card={c} />)}
+          </div>
+        </div>
+      )}
 
       <MeldArea ours title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} books={ourBooks}
         freshRank={fresh?.team === 0 ? fresh.rank : null}

@@ -15,7 +15,7 @@
  *   one and a wild card (Jones family rules; even before your side's first
  *   meld — that meld then counts towards the minimum, and Undo puts the pile
  *   back). The pile can't be taken until it has at least 5 cards (Jones
- *   family rules). Then meld, and end by discarding one card.
+ *   family rules), and you may look at those 5 before choosing (Jones family rules). Then meld, and end by discarding one card.
  * - A meld is 3 or more cards of one rank, with more natural cards than wild
  *   ones (Jones family rules) and at most 3 wild. Seven cards make a book:
  *   clean (no wild cards) 500, dirty 300. Books can keep growing (Jones family
