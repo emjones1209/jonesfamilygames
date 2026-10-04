@@ -222,6 +222,32 @@ describe('Jones family rules', () => {
     expect(isClean(aces)).toBe(true);
   });
 
+  it('a computer player won\'t take the pile with a wild card that would spoil a pure meld', () => {
+    // Our side's 9s are pure; the pile's top is a 9, and Phoebe holds one 9 and a wild card
+    const s = newGame({ players: 4, dealer: 3 });
+    s.initialDone[0] = true;
+    s.melds[0] = [{ rank: '9', cards: Array.from({ length: 4 }, (_, i) => card('9', 'spades', 40 + i)) }];
+    s.hands[0] = [card('9', 'clubs', 9), card('2', 'clubs', 9), card('6', 'spades'), card('4', 'diamonds')];
+    s.discard = [card('5'), card('6'), card('7'), card('8'), card('Q'), card('9')];
+    const draw = { ...s, phase: 'draw', turn: 0 };
+    expect(robotAction(draw, 0, 'hard')).toMatchObject({ type: 'draw' });
+    // Once the side has its 2 pure books, it may
+    draw.melds = [[...s.melds[0], clean('K', 5), clean('J', 6)], s.melds[1]];
+    expect(robotAction(draw, 0, 'hard')).toMatchObject({ type: 'takePile', ids: ['9-clubs-9', '2-clubs-9'] });
+  });
+
+  it('…and a pair matching the pure meld it took from the pile goes on without a wild card', () => {
+    // Phoebe took the pile for her side's first meld (3 pure kings), and needs 50
+    const s = newGame({ players: 4, dealer: 3 });
+    s.melds[0] = [{ rank: 'K', cards: Array.from({ length: 3 }, (_, i) => card('K', 'spades', 40 + i)) }];
+    s.hands[0] = [card('K', 'clubs', 9), card('K', 'diamonds', 9), card('2', 'clubs', 9), card('5', 'spades'), card('7', 'diamonds')];
+    const after = robotTurn({ ...s, phase: 'play', turn: 0 });
+    const kings = after.melds[0].find(m => m.rank === 'K');
+    expect(kings.cards).toHaveLength(5);
+    expect(isClean(kings)).toBe(true);
+    expect(after.initialDone[0]).toBe(true);
+  });
+
   it('…but once the side has its 2 pure books, a wild card can finish a book', () => {
     const after = robotTurn(phoebesTurn([sixAces(), clean('K', 5), clean('J', 6)]));
     const aces = after.melds[0].find(m => m.rank === 'A');
