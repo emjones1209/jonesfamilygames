@@ -213,40 +213,43 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
           freshRank={fresh?.team === side ? fresh.rank : null} />
       ))}
 
-      {/* Stock and discard pile */}
-      <div className="flex justify-center items-end gap-6">
-        <div className="flex flex-col items-center">
-          <p className="text-white/40 text-xs mb-1">Stock ({view.stock.length})</p>
+      {/* Stock and discard pile. The layout never changes size as play goes on: the peek
+          button keeps its place even when it's hidden, and the top of the pile opens out to
+          the right of the pile (in space kept free for it) instead of pushing your hand down */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_minmax(0,1fr)] gap-x-6 items-end">
+        <div className="col-start-2 flex flex-col items-center">
+          <p className="text-white/40 text-xs mb-1 whitespace-nowrap">Stock {view.stock.length}</p>
           <div onClick={drawCards} className={yourTurn && view.phase === 'draw' ? 'cursor-pointer' : ''}>
             <PlayingCard card={{ id: 'stock', faceUp: false }} faceDown size="sm" />
           </div>
         </div>
         <div className="flex flex-col items-center">
-          <p className="text-white/40 text-xs mb-1">
-            Pile ({view.discard.length}){top && isBlackThree(top) && <span className="text-amber-300"> · blocked</span>}
-            {view.discard.length < MIN_PILE && <span className="text-white/30"> · needs {MIN_PILE}</span>}
-          </p>
+          <p className="text-white/40 text-xs mb-1 whitespace-nowrap">Pile {view.discard.length}</p>
           <div onClick={takePile} className={`rounded-xl ${fresh === 'pile' ? 'ring-4 ring-game-gold' : ''} ${yourTurn && view.phase === 'draw' ? 'cursor-pointer' : ''}`}>
             {top ? <HFCard card={top} /> : <div className={`${CARD_BOX.sm} rounded-xl border-2 border-dashed border-white/20`} />}
           </div>
-          {canPeek && (
-            <button onClick={() => setPeeking(p => !p)} aria-expanded={showPeek}
-              className="mt-1 text-xs text-white/70 hover:text-white bg-white/10 rounded-full px-3 min-h-[32px]">
-              👀 {showPeek ? 'Hide' : `Look at top ${Math.min(TAKE, view.discard.length)}`}
-            </button>
+        </div>
+        <div className="flex flex-col items-start min-w-0" aria-live="polite">
+          {showPeek && (
+            <>
+              <p className="text-white/60 text-[10px] md:text-xs mb-1 whitespace-nowrap">
+                {view.discard.length >= TAKE ? `You'd get these ${TAKE}` : 'Top cards'}
+              </p>
+              <div className="flex pl-7 md:pl-10">
+                {view.discard.slice(-TAKE).map(c => <div key={c.id} className="-ml-7 md:-ml-10"><HFCard card={c} /></div>)}
+              </div>
+            </>
           )}
         </div>
-      </div>
-      {showPeek && (
-        <div className="card-panel p-2 self-center flex flex-col items-center gap-1">
-          <p className="text-white/60 text-xs text-center">
-            {view.discard.length >= TAKE ? `Taking the pile gets you these ${TAKE}` : 'The top of the pile'} — the top card is on the right
-          </p>
-          <div className="flex gap-1">
-            {view.discard.slice(-TAKE).map(c => <HFCard key={c.id} card={c} />)}
-          </div>
+        <div className="col-span-4 flex justify-center items-center gap-2 mt-1 min-h-[32px] text-xs whitespace-nowrap">
+          {top && isBlackThree(top) && <span className="text-amber-300">Pile blocked</span>}
+          {view.discard.length < MIN_PILE && <span className="text-white/30">Pile needs {MIN_PILE}</span>}
+          <button onClick={() => setPeeking(p => !p)} aria-expanded={showPeek} disabled={!canPeek}
+            className={`text-white/70 hover:text-white bg-white/10 rounded-full px-3 min-h-[32px] ${canPeek ? '' : 'invisible'}`}>
+            {showPeek ? '🙈 Hide' : `👀 Look at top ${Math.min(TAKE, view.discard.length)}`}
+          </button>
         </div>
-      )}
+      </div>
 
       <MeldArea ours title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} books={ourBooks}
         freshRank={fresh?.team === 0 ? fresh.rank : null}
