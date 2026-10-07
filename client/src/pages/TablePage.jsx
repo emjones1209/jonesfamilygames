@@ -128,6 +128,7 @@ export default function TablePage() {
   const [moving, setMoving] = useState(null);           // the seat the host is moving (lobby)
   const [shared, setShared] = useState('');             // what happened to the last invite ('copied', 'failed')
   const errorTimer = useRef(null);
+  const [waiting, setWaiting] = useState([]);           // seats of missing players you chose to keep waiting for
 
   useEffect(() => {
     const socket = getSocket();
@@ -139,7 +140,11 @@ export default function TablePage() {
       // Switched on "tell me when someone arrives" before? Then do so at this table too
       if (await stillNotifying()) socket.emit('mp:watch', { on: true });
     };
-    const onTable = t => { if (t.code === code) setTable(t); };
+    const onTable = t => {
+      if (t.code !== code) return;
+      setTable(t);
+      setWaiting(w => w.filter(i => t.seats[i]?.gone));          // (back again: ask afresh next time)
+    };
     const onReaction = r => {
       const id = Math.random();
       setReactions(list => [...list, { ...r, id }]);
@@ -360,13 +365,31 @@ export default function TablePage() {
   const shown = {};
   for (const r of reactions) shown[(r.seat - you + n) % n] = r.emoji;
   const yourTurn = (WAITING[table.game]?.(table.view) ?? []).includes(you);
+  // Someone's been gone a while (a phone gone to sleep, say): you choose whether a robot
+  // plays for them until they come back, or keep waiting. (Once they're back — or someone
+  // else has chosen — this goes away; "keep waiting" lasts until they next go missing.)
+  const gone = table.seats.map((seat, i) => i).filter(i => i !== you && table.seats[i]?.gone);
+  const lost = gone.filter(i => !waiting.includes(i));
+  const standIn = lost.length > 0 && (
+    <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm card-panel border-2 border-amber-400 p-3 flex flex-col gap-2 shadow-xl">
+      {lost.map(i => (
+        <div key={i} className="flex flex-col gap-2">
+          <p className="text-white text-sm text-center">📵 <b>{table.seats[i].name}</b> has lost their connection.</p>
+          <div className="flex gap-2">
+            <Button variant="gold" className="flex-1" onClick={() => send('mp:standIn', { seat: i })}>🤖 Play for {table.seats[i].name}</Button>
+            <Button variant="ghost" className="flex-1" onClick={() => setWaiting(w => [...w, i])}>Keep waiting</Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <game.Table view={view} names={names} error={error} reactions={shown}
       // The server fills in your real seat; anything counted from your seat is turned back first
       onAction={action => send('mp:action', { action: game.unrotate ? game.unrotate(action, you, n) : action })}
       onExit={() => navigate('/')}
-      overlay={<>{banner}<TurnAlert active={yourTurn} />{toasts}{reactionBar}</>}
+      overlay={<>{banner}{standIn}<TurnAlert active={yourTurn} />{toasts}{reactionBar}</>}
       gameOverActions={
         <div className="flex gap-3">
           <Button variant="ghost" className="flex-1" onClick={leave}>Leave</Button>
