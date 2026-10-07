@@ -65,7 +65,7 @@ function MeldTile({ meld, onClick, fresh, ours }) {
 /**
  * Your side's points on the table, always in the same place (so nothing below it moves).
  * Until the side's first meld: the round's minimum, big, with how far the melds — and the
- * cards you've selected — get you towards it.
+ * cards you've selected — get you towards it. (Shown until every side has made its first meld.)
  */
 function MeldMeter({ need, laid, picked }) {
   if (!need) {
@@ -102,7 +102,7 @@ function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, poin
       <div className="flex items-center justify-between text-xs text-white/60 mb-1 gap-2">
         <span className="font-semibold text-white/80">{title}</span>
         <span className="text-right">
-          Books: {books.clean} pure · {books.dirty} impure · <span className="text-white/80 font-semibold">{points}</span> pts
+          Books: {books.clean} pure · {books.dirty} impure{points != null && <> · <span className="text-white/80 font-semibold">{points}</span> pts</>}
         </span>
       </div>
       {meter}
@@ -191,6 +191,8 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
     : null;
   const top = topOfPile(view);
   const need = view.initialDone[0] ? null : minimumFor(view);
+  // Once every side has made its first meld, the points meter has done its job: it goes away
+  const allDown = view.initialDone.every(Boolean);
   const ourBooks = bookCount(view, 0);
   const canOut = canGoOut(view, 0);
   const toGo = booksToGo(view, 0);
@@ -243,7 +245,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
 
       {opponents.map(side => (
         <MeldArea key={side} title={partners ? 'Their melds' : `${names[side]}'s melds`}
-          melds={view.melds[side]} books={bookCount(view, side)} points={meldedValue(view, side)}
+          melds={view.melds[side]} books={bookCount(view, side)} points={allDown ? null : meldedValue(view, side)}
           freshRank={fresh?.team === side ? fresh.rank : null} />
       ))}
 
@@ -287,8 +289,8 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
 
       <MeldArea ours title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} books={ourBooks}
         freshRank={fresh?.team === 0 ? fresh.rank : null}
-        points={meldedValue(view, 0)}
-        meter={<MeldMeter need={need} laid={meldedValue(view, 0)}
+        points={allDown ? null : meldedValue(view, 0)}
+        meter={!allDown && <MeldMeter need={need} laid={meldedValue(view, 0)}
           picked={yourTurn ? valueOf(hand.filter(c => selected.includes(c.id) && !isRedThree(c) && !isBlackThree(c))) : 0} />}
         onMeldClick={yourTurn && view.phase === 'play' && selected.length ? (m, i) => meld(m.rank, i) : undefined}
         canTake={canTake} />
