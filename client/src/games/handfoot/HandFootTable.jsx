@@ -14,7 +14,7 @@ import { Wide, Narrow } from '../../components/Wide';
 import { TurnUpright } from '../../components/TurnUpright';
 import { ResultPanel } from '../cards/GameSetup';
 import {
-  act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, bookCount, booksToGo, canGoOut,
+  act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, valueOf, bookCount, booksToGo, canGoOut,
   isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE, MIN_PILE, RANK_ORDER, TAKE,
 } from './handFootRules';
 
@@ -62,16 +62,50 @@ function MeldTile({ meld, onClick, fresh, ours }) {
   );
 }
 
+/**
+ * Your side's points on the table, always in the same place (so nothing below it moves).
+ * Until the side's first meld: the round's minimum, big, with how far the melds — and the
+ * cards you've selected — get you towards it.
+ */
+function MeldMeter({ need, laid, picked }) {
+  if (!need) {
+    return (
+      <div className="h-9 md:h-10 mb-1 flex items-center gap-2 text-sm md:text-base">
+        <span className="text-green-300 font-semibold">✅ First meld down</span>
+        <span className="text-white/70 ml-auto">Laid down <span className="text-white font-bold text-lg md:text-xl">{laid}</span> pts</span>
+      </div>
+    );
+  }
+  const total = laid + picked;
+  const pct = n => `${Math.min(100, (n / need) * 100)}%`;
+  return (
+    <div className="h-9 md:h-10 mb-1 flex flex-col justify-center gap-1">
+      <div className="flex items-baseline gap-2 text-sm md:text-base whitespace-nowrap">
+        <span className="text-game-gold font-bold">🎯 First meld: {need} pts</span>
+        <span className="ml-auto text-white/80">
+          <span className={`font-bold text-lg md:text-xl ${total >= need ? 'text-green-300' : 'text-white'}`}>{total}</span> / {need}
+          {picked > 0 && <span className="text-xs text-white/50"> (+{picked}<Wide> selected</Wide>)</span>}
+        </span>
+      </div>
+      <div className="relative h-1.5 rounded-full bg-white/10 overflow-hidden">
+        <div className="absolute inset-y-0 left-0 bg-white/30 transition-all" style={{ width: pct(total) }} />
+        <div className={`absolute inset-y-0 left-0 transition-all ${total >= need ? 'bg-green-400' : 'bg-game-gold'}`} style={{ width: pct(laid) }} />
+      </div>
+    </div>
+  );
+}
+
 /** `canTake(i)`: whether the selected cards may go on meld i (only those light up to be tapped). */
-function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, extra, freshRank, ours = false }) {
+function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, points, meter, freshRank, ours = false }) {
   return (
     <div className="card-panel p-2">
       <div className="flex items-center justify-between text-xs text-white/60 mb-1 gap-2">
         <span className="font-semibold text-white/80">{title}</span>
         <span className="text-right">
-          Books: {books.clean} pure · {books.dirty} impure {extra}
+          Books: {books.clean} pure · {books.dirty} impure · <span className="text-white/80 font-semibold">{points}</span> pts
         </span>
       </div>
+      {meter}
       <div className={`flex flex-wrap gap-1.5 items-center ${ours ? 'min-h-[3rem] md:min-h-24' : 'min-h-[2.5rem] md:min-h-16'}`}>
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
         {/* Highest rank first (A, K, Q … 4), not in the order they were laid down; `i` stays
@@ -192,7 +226,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         <div className="text-right text-[11px] md:text-xs leading-snug shrink-0 max-w-[55%] md:max-w-none">
           <div className="text-white/90 font-semibold">{view.scores.map((sc, side) => `${sideName(side)} ${sc}`).join(' · ')}</div>
           <div className="text-white/50">
-            {need ? <>First meld<Wide> needs</Wide> {need}</> : canOut ? <><Wide>You can go out from your foot</Wide><Narrow>You can go out</Narrow></>
+            {need ? <span className="text-game-gold font-semibold">First meld {need}</span> : canOut ? <><Wide>You can go out from your foot</Wide><Narrow>You can go out</Narrow></>
               : <><Wide>To go out: </Wide>{booksLeft} more book{toGo.clean + toGo.dirty === 1 ? '' : 's'}<Narrow> to go out</Narrow></>}
           </div>
         </div>
@@ -209,7 +243,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
 
       {opponents.map(side => (
         <MeldArea key={side} title={partners ? 'Their melds' : `${names[side]}'s melds`}
-          melds={view.melds[side]} books={bookCount(view, side)}
+          melds={view.melds[side]} books={bookCount(view, side)} points={meldedValue(view, side)}
           freshRank={fresh?.team === side ? fresh.rank : null} />
       ))}
 
@@ -253,7 +287,9 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
 
       <MeldArea ours title={partners ? 'Our melds' : 'Your melds'} melds={view.melds[0]} books={ourBooks}
         freshRank={fresh?.team === 0 ? fresh.rank : null}
-        extra={!view.initialDone[0] && view.melds[0].length ? `(${meldedValue(view, 0)} of ${need})` : ''}
+        points={meldedValue(view, 0)}
+        meter={<MeldMeter need={need} laid={meldedValue(view, 0)}
+          picked={yourTurn ? valueOf(hand.filter(c => selected.includes(c.id) && !isRedThree(c) && !isBlackThree(c))) : 0} />}
         onMeldClick={yourTurn && view.phase === 'play' && selected.length ? (m, i) => meld(m.rank, i) : undefined}
         canTake={canTake} />
 

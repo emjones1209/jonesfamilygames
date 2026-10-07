@@ -38,6 +38,7 @@
 // seats: the table's size; minSeats: fewest players a game can start with (else every seat)
 // moves: a player's own moves; tableMoves: moves anyone at the table can make (e.g. deal again)
 // pace: robots take this many times longer over each step (for games whose turns are several steps)
+// patience: a disconnected player gets this many times longer to come back before a robot plays for them
 const load = name => require(`../../client/src/games/${name}.js`);
 const GAMES = {
   rook: {
@@ -96,7 +97,7 @@ const GAMES = {
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],
   },
   handfoot: {
-    name: 'Hand and Foot', seats: 4, minSeats: 3, engine: load('handfoot/handFootEngine'), pace: 2,
+    name: 'Hand and Foot', seats: 4, minSeats: 3, engine: load('handfoot/handFootEngine'), pace: 2, patience: 20,   // (10 minutes)
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard', 'askOut', 'answerOut'], tableMoves: ['nextHand', 'newGame'],
   },
   dice: {
@@ -437,7 +438,7 @@ function createTables(io, {
         s.away = true;
         broadcast(table);
         schedule(table);
-      }, awayMs);
+      }, awayMs * (GAMES[table.game].patience ?? 1));
       broadcast(table);
     });
   });
