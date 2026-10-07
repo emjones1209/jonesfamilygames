@@ -111,10 +111,17 @@ test('three people and a robot play Rook together', async () => {
   mom.socket.emit('mp:start');
   await until(() => mom.table.status === 'playing');
 
-  // Somebody's iPad goes to sleep mid-hand: after a moment a robot plays for them…
+  // Somebody's iPad goes to sleep mid-hand: after a while the others may have a robot play for them…
   await until(() => mom.table.view.phase === 'playing' && mom.table.view.table.history.length >= 2);
+  me.socket.emit('mp:standIn', { seat: 2 });              // (not for yourself)
   me.socket.disconnect();
+  dad.socket.emit('mp:standIn', { seat: 2 });             // too soon: they've only just gone
+  await until(() => mom.table.seats[2].gone === true);
+  await new Promise(r => setTimeout(r, 50));
+  assert.equal(mom.table.seats[2].away, false);           // nobody plays for them until someone chooses to
+  dad.socket.emit('mp:standIn', { seat: 2 });
   await until(() => mom.table.seats[2].away === true);
+  assert.equal(mom.table.seats[2].gone, false);
   const handsBefore = mom.table.view.handNo;
   await until(() => mom.table.view.handNo > handsBefore || mom.table.view.phase === 'gameOver', 10000);
 

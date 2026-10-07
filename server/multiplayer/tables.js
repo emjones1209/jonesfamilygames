@@ -20,6 +20,8 @@
  *   mp:start                                      deal (host only, every seat filled — or, for games
  *                                                 with a minimum, enough of them; empty seats are dropped)
  *   mp:action { action }                          a move in the game
+ *   mp:standIn { seat }                           let a robot play for someone who's been gone a while
+ *                                                 (anyone still at the table may choose to, or wait)
  *   mp:react  { emoji }                           a quick reaction everyone sees
  *   mp:leave  { close }                           leave the table. The host leaving the lobby keeps it open
  *                                                 (and their seat) for guests still to come, unless `close`
@@ -38,7 +40,6 @@
 // seats: the table's size; minSeats: fewest players a game can start with (else every seat)
 // moves: a player's own moves; tableMoves: moves anyone at the table can make (e.g. deal again)
 // pace: robots take this many times longer over each step (for games whose turns are several steps)
-// patience: a disconnected player gets this many times longer to come back before a robot plays for them
 const load = name => require(`../../client/src/games/${name}.js`);
 const GAMES = {
   rook: {
@@ -97,7 +98,7 @@ const GAMES = {
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard'], tableMoves: ['nextHand', 'newGame'],
   },
   handfoot: {
-    name: 'Hand and Foot', seats: 4, minSeats: 3, engine: load('handfoot/handFootEngine'), pace: 2, patience: 20,   // (10 minutes)
+    name: 'Hand and Foot', seats: 4, minSeats: 3, engine: load('handfoot/handFootEngine'), pace: 2,
     moves: ['draw', 'takePile', 'meld', 'undo', 'discard', 'askOut', 'answerOut'], tableMoves: ['nextHand', 'newGame'],
   },
   dice: {
@@ -123,7 +124,7 @@ const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';        // no I, L or O (easily con
 function createTables(io, {
   robotMs = 900,          // pause before a robot moves
   collectMs = 1400,       // how long a finished trick stays on the table
-  awayMs = 30000,         // a disconnected player's robot stand-in takes over after this
+  awayMs = 60000,         // after this, the others may have a robot play for a disconnected player
   idleMs = 3 * 60 * 60 * 1000,
   notify = () => {},
   notifyAgainMs = 15 * 60 * 1000,   // iPads reconnect all the time: only tell of the same guest again after this
@@ -181,6 +182,7 @@ function createTables(io, {
           userId: seat.userId ?? null,
           connected: seat.type === 'robot' || seat.connected,
           away: !!seat.away,
+          gone: !!seat.gone && !seat.away,     // disconnected a while: the others may have a robot play for them
           watching: seat.type === 'human' && table.watchers.has(seat.userId),
         }),
         view: table.state && you >= 0 ? engine.viewFor(table.state, you) : null,
@@ -260,7 +262,7 @@ function createTables(io, {
         // Welcome back: take your seat again from the robot stand-in
         const s = table.seats[seat];
         clearTimeout(s.awayTimer);
-        Object.assign(s, { connected: true, away: false, name: user.displayName });
+        Object.assign(s, { connected: true, away: false, gone: false, name: user.displayName });
       } else if (inLobby(table)) {
         const empty = table.seats.findIndex(s => s === null);
         if (empty >= 0) table.seats[empty] = { type: 'human', userId: user.id, name: user.displayName, connected: true };
@@ -378,6 +380,19 @@ function createTables(io, {
       }
     });
 
+    // Someone's been gone a while: anyone still at the table may have a robot play for them
+    // (until they come back), or keep waiting
+    on('mp:standIn', ({ seat } = {}) => {
+      const table = current();
+      if (!table || table.status !== 'playing') return;
+      const me = seatOf(table, user.id);
+      const s = table.seats[seat];
+      if (me < 0 || me === seat || s?.type !== 'human' || !s.gone || s.connected || s.away) return;
+      s.away = true;
+      broadcast(table);
+      schedule(table);
+    });
+
     on('mp:react', ({ emoji } = {}) => {
       const table = current();
       if (!table || !REACTIONS.includes(emoji)) return;
@@ -431,14 +446,14 @@ function createTables(io, {
       if (present(table, user.id, socket.id)) return;
       const s = table.seats[seat];
       s.connected = false;
-      // Give them a little while to come back (an iPad waking up, say) before a robot steps in
+      // Give them a while to come back (an iPad waking up, say); after that, the others
+      // may choose to have a robot play for them — or keep waiting
       clearTimeout(s.awayTimer);
       s.awayTimer = setTimeout(() => {
         if (s.connected) return;
-        s.away = true;
+        s.gone = true;
         broadcast(table);
-        schedule(table);
-      }, awayMs * (GAMES[table.game].patience ?? 1));
+      }, awayMs);
       broadcast(table);
     });
   });
