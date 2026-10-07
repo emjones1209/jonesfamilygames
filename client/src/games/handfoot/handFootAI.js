@@ -12,7 +12,7 @@
  * beats medium by 1,100 to 1,800.)
  */
 import {
-  act, topOfPile, openMeld, teamOf, minimumFor, booksToGo, canGoOut, meldedValue,
+  act, topOfPile, openMeld, teamOf, isClean, minimumFor, booksToGo, canGoOut, meldedValue,
   isWild, isNatural, isBlackThree, isRedThree, isBook, valueOf, cardValue, BOOK, MAX_WILD, GOING_OUT,
 } from './handFootRules.js';
 
@@ -26,6 +26,16 @@ function groupHand(hand) {
   return { byRank, wilds };
 }
 
+/**
+ * Would a wild card of this rank spoil a pure meld? Wild cards join the side's open meld of
+ * their rank, and while the side still needs pure books (Jones family rules: 2 to go out) a
+ * pure meld is one of them in the making.
+ */
+function spoils(s, team, rank) {
+  const meld = openMeld(s, team, rank);
+  return !!meld && isClean(meld) && booksToGo(s, team).clean > 0;
+}
+
 // ── Drawing ──────────────────────────────────────────────────────────────────
 /**
  * Take the pile (with a pair matching its top card, or — Medium and Hard — one
@@ -36,7 +46,8 @@ export function chooseDraw(s, level) {
   const seat = s.turn, top = topOfPile(s);
   const { byRank, wilds } = groupHand(s.hands[seat]);
   let pair = top ? (byRank[top.rank] ?? []).slice(0, 2) : [];
-  if (pair.length === 1 && wilds.length && level !== 'easy') pair = [pair[0], wilds[0]];
+  // (Not with a wild card when it would join our pure meld of that rank while we still need pure books)
+  if (pair.length === 1 && wilds.length && level !== 'easy' && !spoils(s, teamOf(s, seat), top.rank)) pair = [pair[0], wilds[0]];
   const ids = pair.map(c => c.id);
   const taken = pair.length === 2 && attempt(s, { type: 'takePile', ids });
   if (!taken || (level === 'easy' && Math.random() >= 0.4)) return { type: 'draw' };
@@ -91,7 +102,10 @@ export function choosePlay(s, level) {
     const spare = [...wilds];
     for (const g of sets) { if (value >= minimumFor(cur)) break; plan.push(g); value += valueOf(g); }
     for (const g of pairs) {
-      if (value >= minimumFor(cur) || !spare.length) break;
+      if (value >= minimumFor(cur)) break;
+      // A pair that matches the meld we got by taking the pile goes on it as it is (a wild card would spoil it)
+      if (spoils(cur, team, g[0].rank)) { plan.push(g); value += valueOf(g); continue; }
+      if (!spare.length) continue;
       const meld = [...g, spare.shift()];
       plan.push(meld); value += valueOf(meld);
     }

@@ -18,7 +18,7 @@
  * A computer player plans its whole turn at once but plays it a step at a
  * time: the rest of the plan waits in `robotPlan`, which nobody is ever sent.
  */
-import { dealRound, act as rulesAct, scoreHand, teamOf, nextSeat, partnerOf, topOfPile, isNatural, ROUNDS, TAKE } from './handFootRules.js';
+import { dealRound, act as rulesAct, scoreHand, teamOf, canGoOut, nextSeat, partnerOf, topOfPile, isNatural, ROUNDS, TAKE } from './handFootRules.js';
 import { chooseDraw, choosePlay, chooseAnswer } from './handFootAI.js';
 
 const MOVES = ['draw', 'takePile', 'meld', 'undo', 'discard', 'askOut'];
@@ -110,13 +110,14 @@ function finishHand(s) {
 // ── Computer players ─────────────────────────────────────────────────────────
 const works = (s, step) => { try { rulesAct(s, step); return true; } catch { return false; } };
 
-/** Would this turn's plan go out, if the partner said yes? */
-function wouldGoOut(s, seat, level) {
+/** This turn's plan if the partner said yes — when it goes out (otherwise null). */
+function goingOutPlan(s, seat, level) {
+  const steps = choosePlay({ ...s, outAsk: 'yes' }, level);
   let cur = { ...s, outAsk: 'yes' };
-  for (const step of choosePlay(cur, level)) {
-    try { cur = rulesAct(cur, step); } catch { return false; }
+  for (const step of steps) {
+    try { cur = rulesAct(cur, step); } catch { return null; }
   }
-  return cur.phase === 'over' && cur.outBy === seat;
+  return cur.phase === 'over' && cur.outBy === seat ? steps : null;
 }
 
 /** The next step of a computer player's turn (or its answer, when its partner asks to go out). */
@@ -124,7 +125,12 @@ export function robotAction(s, seat, level) {
   if (s.outAsk === 'asking') return { type: 'answerOut', seat, yes: chooseAnswer(s, seat, level) };
   if (s.phase === 'draw') return { ...chooseDraw(s, level), seat };
   // Partners ask before going out (Jones family rules)
-  if (s.players === 4 && !s.outAsk && s.inFoot[seat] && wouldGoOut(s, seat, level)) return { type: 'askOut', seat };
+  // — which they may do only once the side has all its books, so books this turn finishes get made first
+  if (s.players === 4 && !s.outAsk && s.inFoot[seat]) {
+    const outPlan = goingOutPlan(s, seat, level);
+    if (outPlan && canGoOut(s, teamOf(s, seat))) return { type: 'askOut', seat };
+    if (outPlan && works(s, outPlan[0])) return { ...outPlan[0], seat, plan: [] };
+  }
   let steps = s.robotPlan?.seat === seat ? s.robotPlan.steps : null;
   if (!steps?.length || !works(s, steps[0])) steps = choosePlay(s, level);     // plan (or re-plan) the turn
   if (!steps.length) return { type: 'undo', seat };        // no way to finish (after taking the pile): put it back and draw
