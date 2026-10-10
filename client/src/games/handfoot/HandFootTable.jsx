@@ -4,7 +4,7 @@
  * with seat 2 when four play; with three, everyone plays for themselves.
  * Used by the single-player game and by play-together tables.
  */
-import { useState } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { PlayingCard } from '../../components/PlayingCard';
 import { CARD_BOX } from '../../components/cardSizes';
@@ -106,7 +106,7 @@ function MeldArea({ title, melds, books, onMeldClick, canTake = () => true, poin
         </span>
       </div>
       {meter}
-      <div className={`flex flex-wrap gap-1.5 items-center ${ours ? 'min-h-[3rem] md:min-h-24' : 'min-h-[2.5rem] md:min-h-16'}`}>
+      <div className={`flex flex-wrap gap-1.5 items-center ${ours ? 'min-h-[4.5rem] md:min-h-24' : 'min-h-[2.5rem] md:min-h-16'}`}>
         {melds.length === 0 && <span className="text-white/30 text-xs">No melds yet</span>}
         {/* Highest rank first (A, K, Q … 4), not in the order they were laid down; `i` stays
             the meld's place in the side's list, which is how moves name it */}
@@ -155,6 +155,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const [picked, setSelected] = useState([]);                 // ids of your selected cards
   const [note, setNote] = useState(null);                     // a hint of yours, until the next move
   const [peeking, setPeeking] = useState(false);              // looking at the top of the pile (Jones family rules)
+  const handRow = useRef(null);
   const n = view.players;
   const partners = n === 4;
   // Sides (a partnership, or one player): yours is 0; the others are named after their players
@@ -211,6 +212,16 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
     try { rulesAct(view, { type: 'meld', ids: selected, target: i }); return true; } catch { return false; }
   };
   const localNote = note && note.move === view.moves[0] ? note.text : null;
+  // Nothing below your hand moves during your turn: before you draw, the hand keeps room for
+  // the 2 cards to come (drawing and taking the pile both leave you 2 cards more), and it
+  // doesn't shrink back as you meld until your turn is over
+  const roomToDraw = yourTurn && view.phase === 'draw' ? 2 : 0;
+  useLayoutEffect(() => {
+    const el = handRow.current;
+    if (!el) return;
+    if (!yourTurn) { el.style.minHeight = ''; return; }
+    el.style.minHeight = `${el.offsetHeight}px`;
+  });
   const result = view.result;
 
   return (
@@ -296,7 +307,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
         canTake={canTake} />
 
       {/* The latest move, with the one before it underneath (fixed height, so nothing jumps) */}
-      <div className="text-center min-h-[2.5rem]">
+      <div className="text-center min-h-[2.5rem] md:min-h-[2.75rem]">
         <p className={`text-sm md:text-base font-semibold ${error || localNote ? 'text-red-300' : 'text-amber-300'}`}>
           {error || localNote || (playing ? describe(view.moves[0], names) : result && (result.outBy == null ? 'The stock has run out — the hand is over.' : `${names[result.outBy]} ${result.outBy === 0 ? 'go' : 'goes'} out!`))}
         </p>
@@ -304,7 +315,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
       </div>
 
       {/* Your hand (or foot): tap cards to select several */}
-      <p className="text-center text-white/50 text-xs">
+      <p className="text-center text-white/50 text-xs min-h-[2rem] md:min-h-0">
         {view.inFoot[0] ? '🦶 Playing your foot' : `✋ Playing your hand · your foot of ${view.feet[0].length} cards is waiting`}
         {redThrees > 0 && <span className="text-red-300"> · 🔴 {redThrees === 1 ? 'a red 3' : `${redThrees} red 3s`}: −{RED_THREE * redThrees} if you&apos;re caught with {redThrees === 1 ? 'it' : 'them'} — discard {redThrees === 1 ? 'it' : 'them'}!</span>}
       </p>
@@ -312,7 +323,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
           top edge shows, a bigger place to tap them again (the cards still overlap as before,
           so the card next to one stays easy to tap too) */}
       {/* (On phones the cards are smaller, so they overlap less: each one's suit still shows) */}
-      <div className="flex flex-wrap justify-center gap-y-3 pt-5 pl-3 md:pl-8">
+      <div ref={handRow} className="flex flex-wrap justify-center content-start gap-y-3 pt-5 pl-3 md:pl-8">
         {hand.map(c => {
           const isSelected = selected.includes(c.id);
           return (
@@ -321,14 +332,26 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
             </div>
           );
         })}
+        {Array.from({ length: roomToDraw }, (_, i) => (
+          <div key={`room-${i}`} aria-hidden className="-ml-3 md:-ml-8 invisible"><div className={CARD_BOX.sm} /></div>
+        ))}
       </div>
 
-      {/* Going out needs your partner's say-so (Jones family rules) */}
-      {view.turn === 0 && view.outAsk && playing && (
-        <p className={`text-center text-sm font-semibold ${view.outAsk === 'yes' ? 'text-green-300' : view.outAsk === 'no' ? 'text-red-300' : 'text-amber-300 animate-pulse'}`}>
-          {view.outAsk === 'asking' ? `Waiting for ${partnerName} to answer…`
-            : view.outAsk === 'yes' ? `✅ ${partnerName} says yes — you may go out!` : `✋ ${partnerName} says not yet — no going out this turn.`}
-        </p>
+      {/* Going out needs your partner's say-so (Jones family rules). This line keeps its place
+          (with partners) so the buttons under it never move */}
+      {partners && !answering && (
+        <div className="min-h-[36px] flex items-center justify-center">
+          {yourTurn && view.inFoot[0] && canOut && !view.outAsk ? (
+            // (only once your side has all the books it needs to go out)
+            <button onClick={() => act({ type: 'askOut' })}
+              className="text-sm font-semibold text-white bg-game-accent rounded-full px-4 min-h-[36px]">🙋 Ask to go out</button>
+          ) : view.turn === 0 && view.outAsk && playing && (
+            <p className={`text-center text-sm font-semibold ${view.outAsk === 'yes' ? 'text-green-300' : view.outAsk === 'no' ? 'text-red-300' : 'text-amber-300 animate-pulse'}`}>
+              {view.outAsk === 'asking' ? `Waiting for ${partnerName} to answer…`
+                : view.outAsk === 'yes' ? `✅ ${partnerName} says yes — you may go out!` : `✋ ${partnerName} says not yet — no going out this turn.`}
+            </p>
+          )}
+        </div>
       )}
       {answering ? (
         <div className="card-panel p-4 border-2 border-game-gold text-center flex flex-col gap-3 self-center w-full max-w-sm">
@@ -340,7 +363,9 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
           </div>
         </div>
       ) : (
-      <div className="flex justify-center gap-2 flex-wrap">
+      // Four places that never move: what's in them changes from drawing to playing, and
+      // Unselect keeps its place (hidden) when no cards are selected
+      <div className="grid grid-cols-4 gap-2 w-full max-w-xl self-center [&>*]:w-full [&>*]:px-1 [&>*]:text-sm md:[&>*]:text-base">
         {view.phase === 'draw' || !yourTurn ? (
           <>
             <Button variant="primary" disabled={!yourTurn || view.phase !== 'draw'} onClick={drawCards}>Draw 2</Button>
@@ -350,16 +375,11 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
           <>
             <Button variant="primary" disabled={!selected.length} onClick={() => meld()}>Meld</Button>
             <Button variant="gold" disabled={selected.length !== 1} onClick={discard}>Discard</Button>
-            <Button variant="ghost" onClick={undo}>Undo</Button>
           </>
         )}
-        {yourTurn && selected.length > 0 && (
-          <Button variant="ghost" onClick={() => setSelected([])}>✕ Unselect {selected.length === 1 ? 'card' : `all ${selected.length}`}</Button>
-        )}
-        {/* (only once your side has all the books it needs to go out) */}
-        {yourTurn && partners && view.inFoot[0] && canOut && !view.outAsk && (
-          <Button variant="secondary" onClick={() => act({ type: 'askOut' })}>🙋 Ask to go out</Button>
-        )}
+        <Button variant="ghost" disabled={!yourTurn || view.phase !== 'play'} onClick={undo}>Undo</Button>
+        <Button variant="ghost" disabled={!yourTurn || !selected.length} onClick={() => setSelected([])}
+          className={yourTurn && selected.length ? '' : 'invisible'}>✕ Unselect</Button>
       </div>
       )}
       <p className="text-center text-white/50 text-xs">{hint}</p>
