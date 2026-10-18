@@ -14,6 +14,10 @@ export function PlayingCard({
   size = 'md',
   faceDown = false,
   className = '',
+  // false: a selected card stays put and shows a thick green border inside its edge, with
+  // nothing drawn outside the card. (iPhones and iPads could leave the outline and glow of
+  // a lifted card behind on screen after it moved away, e.g. above Solitaire's pile.)
+  lift = true,
 }) {
   if (!card) return null;
 
@@ -37,17 +41,17 @@ export function PlayingCard({
     <motion.div
       className={`
         ${cardClasses(size)} bg-white border-2 flex flex-col justify-between p-1 select-none isolate
-        ${selected ? 'border-primary-500 shadow-lg shadow-primary-500/50' : 'border-gray-300'}
+        ${selected ? (lift ? 'border-primary-500 shadow-lg shadow-primary-500/50' : 'border-primary-500 ring-4 ring-inset ring-primary-500/70') : 'border-gray-300'}
         ${onClick && !disabled ? 'cursor-pointer hover:border-primary-400' : 'cursor-default'}
         ${disabled ? 'opacity-60' : ''}
         ${className}
       `}
       // A selected card lifts. (Done by the animation, not a translate class: the layout
       // animation below sets the transform itself, so a class would be overridden.)
-      animate={{ y: selected ? -8 : 0 }}
+      animate={lift ? { y: selected ? -8 : 0 } : undefined}
       whileTap={onClick && !disabled ? { scale: 0.95 } : {}}
       onClick={disabled ? undefined : onClick}
-      layout
+      layout={lift}
     >
       <div className={`${color} font-bold leading-none`}>{rank}</div>
       <div className={`${color} text-center text-[1.4em] leading-none`}>{symbol}</div>

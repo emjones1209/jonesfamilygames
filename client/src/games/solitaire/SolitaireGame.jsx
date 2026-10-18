@@ -71,7 +71,8 @@ function DraggableCard({ card, from, cards, selected, onSelect, size = 'sm' }) {
   return (
     <div ref={drag} style={{ opacity: isDragging ? 0.4 : 1 }}
          onClick={onSelect}>
-      <PlayingCard card={card} size={size} faceDown={!card.faceUp} selected={selected} />
+      {/* (Selected cards don't lift here: see `lift` in PlayingCard) */}
+      <PlayingCard card={card} size={size} faceDown={!card.faceUp} selected={selected} lift={false} />
     </div>
   );
 }
@@ -381,7 +382,7 @@ export default function SolitaireGame() {
               canDrop={canDropOnFoundation} onDrop={handleFoundationDrop}>
               <div onClick={() => handleFoundationClick(suit)} data-foundation={suit} className="cursor-pointer">
                 {top
-                  ? <PlayingCard card={top} size={size} />
+                  ? <PlayingCard card={top} size={size} lift={false} />
                   : <EmptyCardSlot size={size} label={symbols[suit]} />}
               </div>
             </DroppableFoundation>
