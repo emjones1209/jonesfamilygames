@@ -354,8 +354,12 @@ export default function SolitaireGame() {
         </div>
 
         {/* Waste */}
+        {/* (Keyed by card, so each card turned over is drawn afresh: reusing the last one's
+            element slid the new card down from where a selected card had lifted, and Safari
+            left a strip of the old card's green outline showing above it) */}
         {game.waste.length > 0
           ? <DraggableCard
+              key={game.waste[0].id}
               card={game.waste[0]}
               from={{ type: 'waste' }}
               cards={[game.waste[0]]}
