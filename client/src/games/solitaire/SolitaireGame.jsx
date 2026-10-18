@@ -8,6 +8,11 @@ import { PlayingCard, EmptyCardSlot } from '../../components/PlayingCard';
 import { Button } from '../../components/Button';
 import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
+import { autoStep, canAutoComplete } from './autoComplete';
+import { CardCascade } from './CardCascade';
+
+// The bouncing-cards finale is skipped for anyone who has asked their device for less motion
+const lessMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 // Aces are low in Solitaire (the shared table ranks them high for trick-taking games)
 const SOL_RANK = { ...RANK_VALUES, A: 1 };
@@ -108,6 +113,9 @@ export default function SolitaireGame() {
   const [history, setHistory] = useState([]);
   const [won, setWon] = useState(false);
   const [selected, setSelected] = useState(null); // { from, cards }
+  const [auto, setAuto] = useState(false);          // auto-complete playing the game out
+  const [cascading, setCascading] = useState(false); // the cards bouncing off the table after a win
+  const [spilled, setSpilled] = useState({});       // suit → cards that have bounced off its foundation
   const { size, height: cardH, step } = useCardLayout();
 
   const saveHistory = (g) => setHistory(h => [...h.slice(-20), JSON.stringify(g)]);
@@ -118,6 +126,7 @@ export default function SolitaireGame() {
       const total = Object.values(updated.foundations).reduce((s, f) => s + f.length, 0);
       if (total === 52) {
         setWon(true);
+        setCascading(!lessMotion());
         api.post('/scores', { game: 'solitaire', score: Math.max(0, 10000 - (updated.moves * 10)), durationS: Math.floor((Date.now() - updated.startTime) / 1000) }).catch(() => {});
       }
     }
@@ -255,7 +264,7 @@ export default function SolitaireGame() {
   const canDropOnFoundation = useCallback((card, suit) => canPlaceOnFoundation(card) && card.suit === suit, [game]);
 
   const undo = () => {
-    if (history.length === 0) return;
+    if (history.length === 0 || auto) return;
     const prev = JSON.parse(history[history.length - 1]);
     setHistory(h => h.slice(0, -1));
     setGame(prev);
@@ -267,7 +276,24 @@ export default function SolitaireGame() {
     setHistory([]);
     setSelected(null);
     setWon(false);
+    setAuto(false);
+    setCascading(false);
+    setSpilled({});
   };
+
+  // Auto-complete: once every card in the columns is face up, play the game out a card at a
+  // time (quickly, so you can watch it), drawing through the stock as needed
+  const startAuto = () => { saveHistory(game); setSelected(null); setAuto(true); };
+  useEffect(() => {
+    if (!auto) return;
+    const next = autoStep(game);
+    const t = setTimeout(() => {
+      if (!next) { setAuto(false); return; }
+      const { kind, ...g } = next;
+      update(g, kind === 'up');
+    }, next?.kind === 'draw' ? 60 : 110);
+    return () => clearTimeout(t);
+  }, [auto, game, update]);
 
   // Auto-move to foundation
   const autoMove = () => {
@@ -309,7 +335,7 @@ export default function SolitaireGame() {
         <div className="text-white font-semibold">Solitaire · {game.moves} moves</div>
         <div className="flex gap-2">
           <RulesButton game="solitaire" title="Solitaire" />
-          <button onClick={undo} disabled={!history.length} className="p-1 text-white/60 hover:text-white disabled:opacity-30">
+          <button onClick={undo} disabled={!history.length || auto} className="p-1 text-white/60 hover:text-white disabled:opacity-30">
             <Undo2 size={18} />
           </button>
           <button onClick={restart} className="p-1 text-white/60 hover:text-white">
@@ -344,12 +370,12 @@ export default function SolitaireGame() {
         {/* Foundations */}
         {SUITS.map(suit => {
           const pile = game.foundations[suit];
-          const top = pile[pile.length - 1];
+          const top = pile[pile.length - 1 - (spilled[suit] ?? 0)];   // (the finale bounces them off one by one)
           const symbols = { spades:'♠', hearts:'♥', diamonds:'♦', clubs:'♣' };
           return (
             <DroppableFoundation key={suit} suit={suit}
               canDrop={canDropOnFoundation} onDrop={handleFoundationDrop}>
-              <div onClick={() => handleFoundationClick(suit)} className="cursor-pointer">
+              <div onClick={() => handleFoundationClick(suit)} data-foundation={suit} className="cursor-pointer">
                 {top
                   ? <PlayingCard card={top} size={size} />
                   : <EmptyCardSlot size={size} label={symbols[suit]} />}
@@ -405,14 +431,27 @@ export default function SolitaireGame() {
         })}
       </div>
 
+      {/* Once every card in the columns is face up, the game can finish itself */}
       <div className="flex justify-center mt-4">
-        <Button variant="ghost" onClick={autoMove} className="text-sm">Auto-Move to Foundation ✨</Button>
+        {auto || won ? (
+          <Button variant="ghost" disabled className="text-sm">✨ Finishing…</Button>
+        ) : canAutoComplete(game) ? (
+          <Button variant="gold" onClick={startAuto} className="text-sm animate-pulse">✨ Auto-complete</Button>
+        ) : (
+          <Button variant="ghost" onClick={autoMove} className="text-sm">Auto-Move to Foundation ✨</Button>
+        )}
       </div>
+
+      {cascading && (
+        <CardCascade foundations={game.foundations}
+          onLaunch={suit => setSpilled(sp => ({ ...sp, [suit]: (sp[suit] ?? 0) + 1 }))}
+          onDone={() => setCascading(false)} />
+      )}
 
 
       {/* Win modal */}
       <AnimatePresence>
-        {won && (
+        {won && !cascading && (
           <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <motion.div className="card-panel text-center max-w-sm w-full"

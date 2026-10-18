@@ -13,7 +13,7 @@ export const TUTORIALS = {
     { emoji: '📐', heading: 'Tableau Rules', body: 'Build columns in descending order, alternating red/black colors. Only Kings may be placed on empty columns.' },
     { emoji: '👆', heading: 'Moving Cards', body: 'Tap a card to select it (highlighted), then tap the card or empty space you want to move it onto. Tap a selected card again to send it up to its foundation. Or drag-and-drop cards directly!' },
     { emoji: '🃏', heading: 'Stock Pile', body: 'Tap the face-down stock pile to flip cards to the waste. When stock is empty, tap it again to recycle the waste.' },
-    { emoji: '✨', heading: 'Auto-Move', body: 'Tap "Auto-Move to Foundation" at the bottom to automatically send any eligible cards to the foundations.' },
+    { emoji: '✨', heading: 'Auto-Move', body: 'Tap "Auto-Move to Foundation" at the bottom to automatically send any eligible cards to the foundations.\nOnce every card in the columns is face up, the button becomes ✨ Auto-complete: tap it and the game plays itself out to the finish.' },
   ],
   hearts: [
     { emoji: '♥️', heading: 'Goal', body: 'Avoid taking tricks that contain hearts (1 point each) or the Queen of Spades (13 points). When someone reaches 100, the lowest score wins!' },
