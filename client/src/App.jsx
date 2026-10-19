@@ -16,6 +16,10 @@ import TablePage from "./pages/TablePage";
 // Games
 import TriviaGame from "./games/trivia/TriviaGame";
 import SolitaireGame from "./games/solitaire/SolitaireGame";
+import SpiderGame from "./games/solitaire/SpiderGame";
+import FreeCellGame from "./games/solitaire/FreeCellGame";
+import PyramidGame from "./games/solitaire/PyramidGame";
+import TriPeaksGame from "./games/solitaire/TriPeaksGame";
 import HeartsGame from "./games/hearts/HeartsGame";
 import SpadesGame from "./games/spades/SpadesGame";
 import RookGame from "./games/rook/RookGame";
@@ -72,6 +76,10 @@ function AppRoutes() {
 
       {/* Card games */}
       <Route path="/games/solitaire" element={<ProtectedRoute><SolitaireGame /></ProtectedRoute>} />
+      <Route path="/games/spider" element={<ProtectedRoute><SpiderGame /></ProtectedRoute>} />
+      <Route path="/games/freecell" element={<ProtectedRoute><FreeCellGame /></ProtectedRoute>} />
+      <Route path="/games/pyramid" element={<ProtectedRoute><PyramidGame /></ProtectedRoute>} />
+      <Route path="/games/tripeaks" element={<ProtectedRoute><TriPeaksGame /></ProtectedRoute>} />
       <Route path="/games/hearts" element={<ProtectedRoute><HeartsGame /></ProtectedRoute>} />
       <Route path="/games/spades" element={<ProtectedRoute><SpadesGame /></ProtectedRoute>} />
       <Route path="/games/rook" element={<ProtectedRoute><RookGame /></ProtectedRoute>} />

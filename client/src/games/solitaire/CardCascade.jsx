@@ -3,11 +3,13 @@
  * Kings first, and bounce across the screen, each leaving a trail of itself behind
  * (the canvas is never cleared). Tap anywhere to skip it.
  *
- * `foundations` holds each suit's pile; `onLaunch(suit)` is called as each card leaves
- * (so the pile can show the card under it), and `onDone()` when the last one is gone.
+ * `piles` are the piles the cards leave from — [{ key, cards }], each pile bottom card first,
+ * drawn on the page in an element marked data-cascade={key}. The top cards go first, taking
+ * turns round the piles. `onLaunch(key)` is called as each card leaves (so the pile can show
+ * the card under it), and `onDone()` when the last one is gone.
  */
 import { useEffect, useRef } from 'react';
-import { SUITS, SUIT_SYMBOLS } from '../../utils/cardEngine';
+import { SUIT_SYMBOLS } from '../../utils/cardEngine';
 
 const GRAVITY = 0.5;          // px per frame²
 const LAUNCH_EVERY = 14;      // frames between cards leaving the foundations
@@ -33,7 +35,7 @@ function drawCard(ctx, card, x, y, w, h) {
   ctx.fillText(SUIT_SYMBOLS[card.suit], x + w / 2, y + h * 0.58);
 }
 
-export function CardCascade({ foundations, onLaunch, onDone }) {
+export function CardCascade({ piles, onLaunch, onDone }) {
   const canvas = useRef(null);
   const callbacks = useRef({ onLaunch, onDone });
   callbacks.current = { onLaunch, onDone };
@@ -47,19 +49,19 @@ export function CardCascade({ foundations, onLaunch, onDone }) {
     el.height = height * dpr;
     ctx.scale(dpr, dpr);
 
-    // The order they leave in: every King (one from each foundation), then every Queen, …
+    // The order they leave in: the top card of each pile in turn (every King, then every Queen, …)
     const queue = [];
-    const piles = Object.fromEntries(SUITS.map(s => [s, [...foundations[s]]]));
-    for (let left = 13; left > 0; left--) {
-      for (const suit of SUITS) {
-        const card = piles[suit][left - 1];
-        if (card) queue.push(card);
+    const tallest = Math.max(0, ...piles.map(p => p.cards.length));
+    for (let depth = 1; depth <= tallest; depth++) {
+      for (const { key, cards } of piles) {
+        const card = cards[cards.length - depth];
+        if (card) queue.push({ key, card });
       }
     }
-    // Where each foundation is on screen (the cards start from there)
-    const spot = Object.fromEntries(SUITS.map(suit => {
-      const box = document.querySelector(`[data-foundation="${suit}"]`)?.getBoundingClientRect();
-      return [suit, box ?? { left: width - 60, top: 20, width: 40, height: 64 }];
+    // Where each pile is on screen (the cards start from there)
+    const spot = Object.fromEntries(piles.map(({ key }) => {
+      const box = document.querySelector(`[data-cascade="${key}"]`)?.getBoundingClientRect();
+      return [key, box ?? { left: width - 60, top: 20, width: 40, height: 64 }];
     }));
 
     const flying = [];
@@ -72,8 +74,8 @@ export function CardCascade({ foundations, onLaunch, onDone }) {
     };
     const tick = () => {
       if (frame % LAUNCH_EVERY === 0 && queue.length) {
-        const card = queue.shift();
-        const box = spot[card.suit];
+        const { key, card } = queue.shift();
+        const box = spot[key];
         const speed = 2.5 + Math.random() * 4.5;
         flying.push({
           card, x: box.left, y: box.top, w: box.width, h: box.height,
@@ -81,7 +83,7 @@ export function CardCascade({ foundations, onLaunch, onDone }) {
           vy: -Math.random() * 8,
           bounce: 0.65 + Math.random() * 0.2,
         });
-        callbacks.current.onLaunch(card.suit);
+        callbacks.current.onLaunch(key);
       }
       for (const c of flying) {
         c.vy += GRAVITY;
@@ -104,7 +106,7 @@ export function CardCascade({ foundations, onLaunch, onDone }) {
     raf = requestAnimationFrame(tick);
     el.addEventListener('pointerdown', finish);
     return () => { cancelAnimationFrame(raf); el.removeEventListener('pointerdown', finish); };
-    // (it runs once, from the foundations as they were when the game was won)
+    // (it runs once, from the piles as they were when the game was won)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
