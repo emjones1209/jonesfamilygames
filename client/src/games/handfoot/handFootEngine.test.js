@@ -194,6 +194,42 @@ describe('Jones family rules', () => {
     expect(() => act(s, { type: 'askOut', seat: 0 })).toThrow(/can't ask to go out until/);
   });
 
+  it('you may ask when your last cards would make the books you still need and go out', () => {
+    // 2 pure books and 2 impure ones; the 9s are an impure meld of 5, and your foot is two 9s:
+    // melding both finishes the last book and leaves you out
+    const nines = { rank: '9', cards: [...Array.from({ length: 4 }, (_, i) => card('9', 'clubs', 20 + i)), card('2', 'clubs', 20)] };
+    let s = readyToGoOut([card('9', 'hearts', 1), card('9', 'spades', 1)]);
+    s.melds[0] = [...s.melds[0].slice(0, 4), nines];
+    expect(canGoOut(s, 0)).toBe(false);
+    expect(() => act(s, { type: 'meld', seat: 0, ids: ['9-hearts-1', '9-spades-1'] })).toThrow();   // (not without asking)
+    s = act(act(s, { type: 'askOut', seat: 0 }), { type: 'answerOut', seat: 2, yes: true });
+    const out = act(s, { type: 'meld', seat: 0, ids: ['9-hearts-1', '9-spades-1'] });
+    expect(out.result.outBy).toBe(0);
+
+    // The same with one 9 and a card to discard: meld the 9 (that's the book), then discard to go out
+    s = readyToGoOut([card('9', 'hearts', 1), card('7')]);
+    s.melds[0] = [...s.melds[0].slice(0, 4), { ...nines, cards: [...nines.cards, card('9', 'diamonds', 20)] }];
+    s = act(act(s, { type: 'askOut', seat: 0 }), { type: 'answerOut', seat: 2, yes: true });
+    s = act(s, { type: 'meld', seat: 0, ids: ['9-hearts-1'] });
+    expect(act(s, { type: 'discard', seat: 0, id: '7-hearts-1' }).result.outBy).toBe(0);
+
+    // …but not when those cards can't finish the books
+    s = readyToGoOut([card('9', 'hearts', 1), card('7')]);
+    s.melds[0] = [...s.melds[0].slice(0, 4), nines];                // (9s at 6: still one short)
+    expect(() => act(s, { type: 'askOut', seat: 0 })).toThrow(/can't ask to go out until/);
+  });
+
+  it('a computer player asks in that case too, instead of getting stuck', () => {
+    const nines = { rank: '9', cards: [...Array.from({ length: 4 }, (_, i) => card('9', 'clubs', 20 + i)), card('2', 'clubs', 20)] };
+    let s = readyToGoOut([card('9', 'hearts', 1), card('9', 'spades', 1)]);
+    s.melds[0] = [...s.melds[0].slice(0, 4), nines];
+    expect(robotAction(s, 0, 'hard')).toMatchObject({ type: 'askOut', seat: 0 });
+    // …and once its partner says yes, it goes out (melding both 9s together)
+    s = act(act(s, { type: 'askOut', seat: 0 }), { type: 'answerOut', seat: 2, yes: true });
+    for (let i = 0; i < 5 && s.phase === 'play'; i++) s = act(s, robotAction(s, 0, 'hard'));
+    expect(s.result.outBy).toBe(0);
+  });
+
   it('three players (each for themselves) go out without asking', () => {
     const s = readyToGoOut([card('7')], 3);
     expect(() => act(s, { type: 'askOut', seat: 0 })).toThrow(/Only partners/);

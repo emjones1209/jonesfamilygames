@@ -14,7 +14,7 @@ import { Wide, Narrow } from '../../components/Wide';
 import { TurnUpright } from '../../components/TurnUpright';
 import { ResultPanel } from '../cards/GameSetup';
 import {
-  act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, valueOf, bookCount, booksToGo, canGoOut,
+  act as rulesAct, sortHand, topOfPile, teamOf, minimumFor, meldedValue, valueOf, bookCount, booksToGo, canGoOut, couldGoOutNow,
   isWild, isBlackThree, isRedThree, isBook, isClean, ROUNDS, BOOK, CLEAN_BOOK, DIRTY_BOOK, RED_THREE, MIN_PILE, RANK_ORDER, TAKE,
 } from './handFootRules';
 
@@ -196,6 +196,7 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
   const allDown = view.initialDone.every(Boolean);
   const ourBooks = bookCount(view, 0);
   const canOut = canGoOut(view, 0);
+  const mayAsk = yourTurn && partners && view.inFoot[0] && !view.outAsk && couldGoOutNow(view);
   const toGo = booksToGo(view, 0);
   const booksLeft = [toGo.clean && `${toGo.clean} pure`, toGo.dirty && `${toGo.dirty} impure`].filter(Boolean).join(' + ');
   const redThrees = hand.filter(isRedThree).length;
@@ -341,8 +342,8 @@ export function HandFootTable({ view, names, onAction, onExit, error, subtitle, 
           (with partners) so the buttons under it never move */}
       {partners && !answering && (
         <div className="min-h-[36px] flex items-center justify-center">
-          {yourTurn && view.inFoot[0] && canOut && !view.outAsk ? (
-            // (only once your side has all the books it needs to go out)
+          {mayAsk ? (
+            // (only when you could go out this turn: your side has its books, or your cards can make them)
             <button onClick={() => act({ type: 'askOut' })}
               className="text-sm font-semibold text-white bg-game-accent rounded-full px-4 min-h-[36px]">🙋 Ask to go out</button>
           ) : view.turn === 0 && view.outAsk && playing && (

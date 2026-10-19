@@ -114,6 +114,65 @@ function whyNotOut(s, team) {
   }
   return null;
 }
+/**
+ * Moves that take the player whose turn it is out this turn, if there are any (and their
+ * partner says yes): the cards in their foot make the books the side still needs, if it
+ * does, and leave them out — say, melding their last 2 cards finishes the last book. Found
+ * by trying every way of playing the cards they hold, so only for a small hand (going out
+ * takes one anyway). Null if there's no way.
+ */
+const MAX_TRIED = 8;
+export function goingOutMoves(s) {
+  const seat = s.turn, team = teamOf(s, seat);
+  if (s.phase !== 'play' || !s.inFoot[seat] || s.hands[seat].length > MAX_TRIED) return null;
+  const tried = new Set();
+  const attempt = (t, action) => { try { return act(t, action); } catch { return null; } };
+  const search = t => {
+    if (t.phase !== 'play') return t.outBy === seat ? [] : null;
+    const hand = t.hands[seat];
+    const key = hand.map(c => c.id).sort().join() + '|' + t.melds[team].map(m => `${m.rank}${m.cards.length}${m.cards.filter(isWild).length}`).sort().join();
+    if (tried.has(key)) return null;
+    tried.add(key);
+    const tryMove = action => {
+      const next = attempt(t, action);
+      const rest = next && search(next);
+      return rest ? [action, ...rest] : null;
+    };
+    if (hand.length === 1) {
+      const out = tryMove({ type: 'discard', id: hand[0].id });
+      if (out) return out;
+    }
+    // Melds: some of the cards of a rank, with up to 3 wild cards (which wild card doesn't matter)…
+    const wilds = hand.filter(isWild);
+    for (const rank of new Set(hand.filter(isNatural).map(c => c.rank))) {
+      const own = hand.filter(c => c.rank === rank);
+      for (let k = 1; k <= own.length; k++) {
+        for (let w = 0; w <= Math.min(wilds.length, MAX_WILD); w++) {
+          const out = tryMove({ type: 'meld', ids: [...own.slice(0, k), ...wilds.slice(0, w)].map(c => c.id) });
+          if (out) return out;
+        }
+      }
+    }
+    // …and wild cards on their own, on one of the side's melds
+    for (let i = 0; i < t.melds[team].length; i++) {
+      for (let w = 1; w <= Math.min(wilds.length, MAX_WILD); w++) {
+        const out = tryMove({ type: 'meld', ids: wilds.slice(0, w).map(c => c.id), target: i });
+        if (out) return out;
+      }
+    }
+    return null;
+  };
+  return search({ ...s, outAsk: 'yes' });
+}
+
+/**
+ * Could the player whose turn it is go out this turn, if their partner said yes? Either the
+ * side already has its books, or their cards can make them and leave them out. Partners may
+ * ask to go out only then (Jones family rules).
+ */
+export const couldGoOutNow = s =>
+  s.phase === 'play' && s.inFoot[s.turn] && (canGoOut(s, teamOf(s, s.turn)) || !!goingOutMoves(s));
+
 /** Books still needed before the side can go out: { clean, dirty }. */
 export function booksToGo(s, team) {
   const b = bookCount(s, team);
@@ -236,7 +295,7 @@ export function act(s, action) {
       if (s.players !== 4) throw new Error('Only partners need to ask to go out.');
       if (!s.inFoot[seat]) throw new Error('You can only go out from your foot.');
       if (s.outAsk) throw new Error('You\'ve already asked this turn.');
-      if (!canGoOut(s, team)) throw new Error(`You can't ask to go out until ${yours(s)} ${BOOKS_NEEDED}.`);
+      if (!couldGoOutNow(s)) throw new Error(`You can't ask to go out until ${yours(s)} ${BOOKS_NEEDED} (or you could make them and go out this turn).`);
       return { ...s, outAsk: 'asking' };
     }
 
