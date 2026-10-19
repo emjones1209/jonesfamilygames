@@ -380,7 +380,7 @@ export default function SolitaireGame() {
           return (
             <DroppableFoundation key={suit} suit={suit}
               canDrop={canDropOnFoundation} onDrop={handleFoundationDrop}>
-              <div onClick={() => handleFoundationClick(suit)} data-foundation={suit} className="cursor-pointer">
+              <div onClick={() => handleFoundationClick(suit)} data-cascade={suit} className="cursor-pointer">
                 {top
                   ? <PlayingCard card={top} size={size} lift={false} />
                   : <EmptyCardSlot size={size} label={symbols[suit]} />}
@@ -448,7 +448,7 @@ export default function SolitaireGame() {
       </div>
 
       {cascading && (
-        <CardCascade foundations={game.foundations}
+        <CardCascade piles={SUITS.map(suit => ({ key: suit, cards: game.foundations[suit] }))}
           onLaunch={suit => setSpilled(sp => ({ ...sp, [suit]: (sp[suit] ?? 0) + 1 }))}
           onDone={() => setCascading(false)} />
       )}
