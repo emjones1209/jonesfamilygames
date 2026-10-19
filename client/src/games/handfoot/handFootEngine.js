@@ -18,7 +18,7 @@
  * A computer player plans its whole turn at once but plays it a step at a
  * time: the rest of the plan waits in `robotPlan`, which nobody is ever sent.
  */
-import { dealRound, act as rulesAct, scoreHand, teamOf, canGoOut, nextSeat, partnerOf, topOfPile, isNatural, ROUNDS, TAKE } from './handFootRules.js';
+import { dealRound, act as rulesAct, scoreHand, teamOf, couldGoOutNow, nextSeat, partnerOf, topOfPile, isNatural, ROUNDS, TAKE } from './handFootRules.js';
 import { chooseDraw, choosePlay, chooseAnswer } from './handFootAI.js';
 
 const MOVES = ['draw', 'takePile', 'meld', 'undo', 'discard', 'askOut'];
@@ -124,11 +124,12 @@ function goingOutPlan(s, seat, level) {
 export function robotAction(s, seat, level) {
   if (s.outAsk === 'asking') return { type: 'answerOut', seat, yes: chooseAnswer(s, seat, level) };
   if (s.phase === 'draw') return { ...chooseDraw(s, level), seat };
-  // Partners ask before going out (Jones family rules)
-  // — which they may do only once the side has all its books, so books this turn finishes get made first
+  // Partners ask before going out (Jones family rules) — which they may do once they could go
+  // out this turn. (When the rules can't tell that, with a big hand, books this turn finishes
+  // get made first, and they ask after)
   if (s.players === 4 && !s.outAsk && s.inFoot[seat]) {
     const outPlan = goingOutPlan(s, seat, level);
-    if (outPlan && canGoOut(s, teamOf(s, seat))) return { type: 'askOut', seat };
+    if (outPlan && couldGoOutNow(s)) return { type: 'askOut', seat };
     if (outPlan && works(s, outPlan[0])) return { ...outPlan[0], seat, plan: [] };
   }
   let steps = s.robotPlan?.seat === seat ? s.robotPlan.steps : null;

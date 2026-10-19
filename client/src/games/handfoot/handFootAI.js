@@ -12,7 +12,7 @@
  * beats medium by 1,100 to 1,800.)
  */
 import {
-  act, topOfPile, openMeld, teamOf, isClean, minimumFor, booksToGo, canGoOut, meldedValue,
+  act, topOfPile, openMeld, teamOf, isClean, goingOutMoves, minimumFor, booksToGo, canGoOut, meldedValue,
   isWild, isNatural, isBlackThree, isRedThree, isBook, valueOf, cardValue, BOOK, MAX_WILD, GOING_OUT,
 } from './handFootRules.js';
 
@@ -90,6 +90,14 @@ export function choosePlay(s, level) {
     actions.push(action); cur = next;
     return true;
   };
+
+  // 0. Going out, when we may (playing alone, or our partner said yes) and the rules can see a
+  //    way to: e.g. melding our last 2 cards together, which makes the last book we need
+  //    (one at a time, the first would be refused)
+  if (s.players !== 4 || s.outAsk === 'yes') {
+    const out = goingOutMoves(s);
+    if (out) return out;
+  }
 
   // 1. First meld: sets of 3+, then pairs with a wild card, until the minimum is met
   //    (counting a meld already made by taking the pile)
