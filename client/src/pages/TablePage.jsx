@@ -47,7 +47,10 @@ import { TurnAlert, TurnSoundToggle } from '../components/TurnAlert';
 import { NotifyToggle } from '../components/NotifyToggle';
 import { stillNotifying } from '../utils/push';
 
-const REACTIONS = ['👍', '😂', '😮', '😬', '🥺', '🤦', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
+const REACTIONS = [
+  '👍', '😂', '🙃', '🤦', '😮', '😬', '🥺', '😭', '🤔', '😱', '🙈', '😎', '🎉', '🥳', '👏', '🔥',
+  'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄',
+];
 const PARTNERS = 'Seats 1 & 3 are partners, and so are seats 2 & 4.';
 // Each game's screen, how to turn its view round, what the lobby says about seats,
 // whether opposite seats are partners, the setting the host picks (if any), and — for moves that name a seat's
@@ -129,6 +132,7 @@ export default function TablePage() {
   const [shared, setShared] = useState('');             // what happened to the last invite ('copied', 'failed')
   const errorTimer = useRef(null);
   const [waiting, setWaiting] = useState([]);           // seats of missing players you chose to keep waiting for
+  const [toldLeft, setToldLeft] = useState([]);         // seats of players who left that you've been told about
 
   useEffect(() => {
     const socket = getSocket();
@@ -144,6 +148,7 @@ export default function TablePage() {
       if (t.code !== code) return;
       setTable(t);
       setWaiting(w => w.filter(i => t.seats[i]?.gone));          // (back again: ask afresh next time)
+      setToldLeft(w => w.filter(i => t.seats[i]?.left));          // (back again: tell you if they leave again)
     };
     const onReaction = r => {
       const id = Math.random();
@@ -370,8 +375,20 @@ export default function TablePage() {
   // else has chosen — this goes away; "keep waiting" lasts until they next go missing.)
   const gone = table.seats.map((seat, i) => i).filter(i => i !== you && table.seats[i]?.gone);
   const lost = gone.filter(i => !waiting.includes(i));
-  const standIn = lost.length > 0 && (
+  // Someone tapped Leave (at the end of a game, say): a robot plays for them from now on,
+  // so tell everyone still here plainly rather than just putting a 🤖 by their name
+  const left = table.seats.map((seat, i) => i).filter(i => i !== you && table.seats[i]?.left && !toldLeft.includes(i));
+  const standIn = (lost.length > 0 || left.length > 0) && (
     <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm card-panel border-2 border-amber-400 p-3 flex flex-col gap-2 shadow-xl">
+      {left.map(i => (
+        <div key={`left${i}`} className="flex flex-col gap-2">
+          <p className="text-white text-sm text-center">👋 <b>{table.seats[i].name}</b> has left the table. A robot 🤖 is playing in their seat now.</p>
+          <div className="flex gap-2">
+            <Button variant="ghost" className="flex-1" onClick={leave}>Leave too</Button>
+            <Button variant="gold" className="flex-1" onClick={() => setToldLeft(w => [...w, i])}>Keep playing</Button>
+          </div>
+        </div>
+      ))}
       {lost.map(i => (
         <div key={i} className="flex flex-col gap-2">
           <p className="text-white text-sm text-center">📵 <b>{table.seats[i].name}</b> has lost their connection.</p>

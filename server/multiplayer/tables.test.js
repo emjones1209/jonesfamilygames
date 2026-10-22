@@ -279,6 +279,15 @@ test('the host picks Spades partners and a shorter game', async () => {
   host.socket.emit('mp:swap', { from: 0, to: 1 });                     // too late once the game's on: ignored
   await new Promise(r => setTimeout(r, 30));
   assert.equal(host.table.seats[0].name, 'Emily');
+
+  // Sam taps Leave: a robot plays for them, and the others are told they've left (not just disconnected)
+  friend.socket.emit('mp:leave');
+  await until(() => host.table.seats[2].left === true);
+  assert.equal(host.table.seats[2].away, true);
+  assert.equal(host.table.seats[2].gone, false);
+  // …and if they come back, they have their seat again
+  await friend.emit('mp:join', { code });
+  await until(() => host.table.seats[2].left === false && host.table.seats[2].away === false);
   host.socket.emit('mp:leave');
   friend.socket.emit('mp:leave');
 });
@@ -342,9 +351,12 @@ for (const [game, robots] of tablesToPlay) {
         : game === 'canasta' || game === 'handfoot'
           ? (v.phase === 'draw' ? { type: 'draw' } : { type: 'discard', id: v.hands[t.you][0].id })
         : engine.robotAction(v, t.you, 'medium');
-      // Hearts: the others' passes arrive before ours is counted, so only pass once a hand
-      // (In Euchre, "pass" is a bid, and you may pass in both rounds)
-      if (game === 'hearts' && action.type === 'pass') { if (passedHand === v.handNo) return; passedHand = v.handNo; }
+      // Hearts, Cribbage: the others' passes (or crib cards) arrive before ours is counted, so only
+      // pass or throw to the crib once a hand (In Euchre, "pass" is a bid, and you may pass in both rounds)
+      if ((game === 'hearts' && action.type === 'pass') || (game === 'cribbage' && action.type === 'discard')) {
+        if (passedHand === v.handNo) return;
+        passedHand = v.handNo;
+      }
       me.socket.emit('mp:action', { action });
     }, 1));
     me.socket.emit('mp:start');

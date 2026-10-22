@@ -117,7 +117,10 @@ const waitingOn = (engine, s) => (engine.waitingOn ? engine.waitingOn(s) : [engi
 const { COMPUTER_NAMES } = require('../../client/src/games/players.js');
 const robotName = table => COMPUTER_NAMES.find(n => !table.seats.some(s => s?.type === 'robot' && s.name === n)) ?? 'Robot';
 
-const REACTIONS = ['👍', '😂', '😮', '😬', '🥺', '🤦', '🎉', '👏', 'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄'];
+const REACTIONS = [
+  '👍', '😂', '🙃', '🤦', '😮', '😬', '🥺', '😭', '🤔', '😱', '🙈', '😎', '🎉', '🥳', '👏', '🔥',
+  'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄',
+];
 const LEVELS = ['easy', 'medium', 'hard'];
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';        // no I, L or O (easily confused)
 
@@ -183,6 +186,7 @@ function createTables(io, {
           connected: seat.type === 'robot' || seat.connected,
           away: !!seat.away,
           gone: !!seat.gone && !seat.away,     // disconnected a while: the others may have a robot play for them
+          left: !!seat.left,                   // chose to leave mid-game: a robot plays for them (and the others are told)
           watching: seat.type === 'human' && table.watchers.has(seat.userId),
         }),
         view: table.state && you >= 0 ? engine.viewFor(table.state, you) : null,
@@ -262,7 +266,7 @@ function createTables(io, {
         // Welcome back: take your seat again from the robot stand-in
         const s = table.seats[seat];
         clearTimeout(s.awayTimer);
-        Object.assign(s, { connected: true, away: false, gone: false, name: user.displayName });
+        Object.assign(s, { connected: true, away: false, gone: false, left: false, name: user.displayName });
       } else if (inLobby(table)) {
         const empty = table.seats.findIndex(s => s === null);
         if (empty >= 0) table.seats[empty] = { type: 'human', userId: user.id, name: user.displayName, connected: true };
@@ -429,7 +433,7 @@ function createTables(io, {
       }
       if (seat >= 0) {
         if (inLobby(table)) table.seats[seat] = null;
-        else Object.assign(table.seats[seat], { connected: false, away: true });   // a robot plays for you
+        else Object.assign(table.seats[seat], { connected: false, away: true, left: true });   // a robot plays for you
       }
       table.watchers.delete(user.id);
       if (inLobby(table) && !table.seats.some(s => s?.type === 'human')) { tables.delete(table.code); return; }
