@@ -12,7 +12,8 @@ export const REACTION_MS = 3500;     // how long a reaction stays on screen
 // device's emoji font, which turns blocky when blown up this large
 const EMOJI_FILES = {
   '👍': '1f44d', '😂': '1f602', '😮': '1f62e', '😬': '1f62c', '🥺': '1f97a', '🤦': '1f926',
-  '🎉': '1f389', '👏': '1f44f', '😄': '1f604', '✨': '2728',
+  '🎉': '1f389', '👏': '1f44f', '😄': '1f604', '✨': '2728', '🙃': '1f643', '😭': '1f62d', '😎': '1f60e',
+  '🤔': '1f914', '😱': '1f631', '🔥': '1f525', '🙈': '1f648', '🥳': '1f973',
 };
 
 /** An emoji as a sharp picture (falling back to the font for any we haven't a picture of). */
@@ -108,16 +109,16 @@ export function ReactionPicker({ choices, open, onToggle, onPick, extra }) {
     <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">
       <AnimatePresence>
         {open && (
-          <motion.div className="card-panel p-3 grid grid-cols-3 gap-2 w-72 md:w-80 origin-bottom-right"
+          <motion.div className="card-panel p-3 grid grid-cols-4 gap-2 w-80 max-w-[calc(100vw-2rem)] origin-bottom-right"
             initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.3, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 22 }}>
             {choices.map((r, i) => (
               <motion.button key={r} onClick={() => onPick(r)}
                 initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: i * 0.03, type: 'spring', stiffness: 500, damping: 18 }}
                 whileTap={{ scale: 1.3 }}
-                className={`rounded-2xl bg-white/10 hover:bg-white/20 text-white min-h-[64px] leading-tight
-                  ${isWords(r) ? 'text-base font-bold' : 'text-4xl'}`}>
-                {isWords(r) ? <WithEmoji text={r} /> : <Emoji char={r} className="block w-10 h-10 md:w-11 md:h-11 mx-auto" />}
+                className={`rounded-2xl bg-white/10 hover:bg-white/20 text-white leading-tight
+                  ${isWords(r) ? 'col-span-2 min-h-[52px] text-base font-bold' : 'min-h-[60px] text-4xl'}`}>
+                {isWords(r) ? <WithEmoji text={r} /> : <Emoji char={r} className="block w-10 h-10 mx-auto" />}
               </motion.button>
             ))}
             {extra}
