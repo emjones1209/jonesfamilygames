@@ -279,6 +279,15 @@ test('the host picks Spades partners and a shorter game', async () => {
   host.socket.emit('mp:swap', { from: 0, to: 1 });                     // too late once the game's on: ignored
   await new Promise(r => setTimeout(r, 30));
   assert.equal(host.table.seats[0].name, 'Emily');
+
+  // Sam taps Leave: a robot plays for them, and the others are told they've left (not just disconnected)
+  friend.socket.emit('mp:leave');
+  await until(() => host.table.seats[2].left === true);
+  assert.equal(host.table.seats[2].away, true);
+  assert.equal(host.table.seats[2].gone, false);
+  // …and if they come back, they have their seat again
+  await friend.emit('mp:join', { code });
+  await until(() => host.table.seats[2].left === false && host.table.seats[2].away === false);
   host.socket.emit('mp:leave');
   friend.socket.emit('mp:leave');
 });
