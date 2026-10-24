@@ -35,6 +35,7 @@ import PinochleGame from "./games/pinochle/PinochleGame";
 import CheckersGame from "./games/checkers/CheckersGame";
 import ChessGame from "./games/chess/ChessGame";
 import ChessLessons from "./games/chess/ChessLessons";
+import MtgGame from "./games/mtg/MtgGame";
 import Golf6Game from "./games/golf6/Golf6Game";
 import JigsawGame from "./games/jigsaw/JigsawGame";
 import Match3Game from "./games/match3/Match3Game";
@@ -95,6 +96,7 @@ function AppRoutes() {
       <Route path="/games/checkers" element={<ProtectedRoute><CheckersGame /></ProtectedRoute>} />
       <Route path="/games/chess" element={<ProtectedRoute><ChessGame /></ProtectedRoute>} />
       <Route path="/games/chess/learn" element={<ProtectedRoute><ChessLessons /></ProtectedRoute>} />
+      <Route path="/games/mtg" element={<ProtectedRoute><MtgGame /></ProtectedRoute>} />
       <Route path="/games/golf6" element={<ProtectedRoute><Golf6Game /></ProtectedRoute>} />
 
       {/* Puzzles */}

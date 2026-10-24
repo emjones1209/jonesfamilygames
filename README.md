@@ -22,11 +22,11 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - ⛳ 6-Card Golf
 - ⚫ Checkers
 - ♟️ Chess (with lessons and a coach for beginners)
+- 🧙 Magic: The Gathering (ten preconstructed decks, five of one color and five of two, against the computer)
 - 🧩 Jigsaw Puzzle (use your own photos!)
 - 🌸 Garden Match (Candy Crush-style)
 - 💣 Minesweeper
 - 🔢 2048
-- 🔍 Word Search (a new theme every day)
 - 🔍 Word Search (a new theme every day)
 
 ## Features

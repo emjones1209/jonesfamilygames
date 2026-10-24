@@ -36,8 +36,9 @@ const SCORES = {
   dice: { score: (s, seat) => (s.cards?.[seat] ? diceTotal(s.cards[seat]) : undefined), min: 25 },
   checkers: {},
   chess: {},
+  mtg: { score: (s, seat) => s.seats?.[seat]?.life, min: 4 },
 };
-const TWO_PLAYER = new Set(['gin', 'cribbage', 'checkers', 'chess']);
+const TWO_PLAYER = new Set(['gin', 'cribbage', 'checkers', 'chess', 'mtg']);
 const seatCount = (game, s) => s.players ?? (TWO_PLAYER.has(game) ? 2 : 4);
 
 /**
