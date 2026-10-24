@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tableNames } from '../players';
+import { useRobots, useRobotChatter } from '../useRobots';
+import { ReactionBursts } from '../../components/Reactions';
 import { Button } from '../../components/Button';
 import { TUTORIALS } from '../../components/tutorials';
 import { GameSetup } from '../cards/GameSetup';
@@ -8,14 +9,15 @@ import { newGame, act, waitingOn, robotAction } from './heartsEngine';
 import { HeartsTable } from './HeartsTable';
 import api from '../../utils/api';
 
-const NAMES = tableNames(4);
 const ROBOT_MS = 700, COLLECT_MS = 1300;
 
 export default function HeartsGame() {
   const navigate = useNavigate();
+  const robots = useRobots(4);
   const [difficulty, setDifficulty] = useState(null);
   const [game, setGame] = useState(null);
   const [error, setError] = useState('');
+  const reactions = useRobotChatter('hearts', game, robots.cast);
   const posted = useRef(false);
 
   const startGame = diff => {
@@ -35,7 +37,7 @@ export default function HeartsGame() {
     if (!game) return;
     const seat = waitingOn(game).find(x => x !== 0);
     if (seat != null) {
-      const timer = setTimeout(() => apply(robotAction(game, seat, difficulty)), ROBOT_MS);
+      const timer = setTimeout(() => apply(robotAction(game, seat, difficulty, robots.styleOf(seat))), ROBOT_MS);
       return () => clearTimeout(timer);
     }
     if (game.phase === 'playing' && game.table.status === 'collecting') {
@@ -52,16 +54,18 @@ export default function HeartsGame() {
   if (!game) {
     return (
       <GameSetup emoji="♥️" title="Hearts" subtitle="Avoid taking hearts and the Queen of Spades!"
+        note={`You vs ${robots.who(1)}, ${robots.who(2)} and ${robots.who(3)}`}
         bgClass="from-game-bg to-red-900" tutorial={TUTORIALS.hearts} onStart={startGame} />
     );
   }
 
   return (
-    <HeartsTable view={game} names={NAMES} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
+    <HeartsTable view={game} names={robots.names}
+      overlay={<ReactionBursts reactions={reactions} you={0} players={4} nameOf={seat => robots.names[seat]} />} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
       gameOverActions={
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={() => navigate('/')}>Home</Button>
-          <Button variant="primary" className="flex-1" onClick={() => startGame(difficulty)}>Play Again</Button>
+          <Button variant="primary" className="flex-1" onClick={() => { robots.recast(); startGame(difficulty); }}>Play Again</Button>
         </div>
       } />
   );

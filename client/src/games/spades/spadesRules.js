@@ -93,14 +93,16 @@ export function estimateTricks(hand) {
   return tricks;
 }
 
-export function chooseBid(hand, difficulty, partnerBid = null) {
-  const est = estimateTricks(hand);
+export function chooseBid(hand, difficulty, partnerBid = null, bold = 0) {
+  const est = estimateTricks(hand) + bold * 0.8;          // a bold player counts on a trick more, a careful one less
   if (difficulty === 'easy') return Math.max(1, Math.round(est + (Math.random() * 2 - 1)));
   const highCards = hand.filter(c => standardRank(c) >= 12).length;
   const spades = hand.filter(c => c.suit === TRUMP);
-  // Nil only with a very weak hand and no high spades (and not both partners)
-  if (difficulty === 'hard' && partnerBid !== NIL && est < 1 && highCards <= 1
-      && !spades.some(c => standardRank(c) >= 11)) {
+  // Nil only with a very weak hand and no high spades (and not both partners); a daredevil
+  // tries it with a little more in hand, and even at Medium
+  const daring = Math.max(0, bold);
+  if ((difficulty === 'hard' || daring >= 0.8) && partnerBid !== NIL && est - bold * 0.8 < 1 + daring * 0.6
+      && highCards <= (daring >= 0.8 ? 2 : 1) && !spades.some(c => standardRank(c) >= (daring >= 0.8 ? 12 : 11))) {
     return NIL;
   }
   const bid = Math.max(1, difficulty === 'hard' ? Math.floor(est) : Math.round(est));

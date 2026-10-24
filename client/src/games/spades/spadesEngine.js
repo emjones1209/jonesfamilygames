@@ -11,8 +11,8 @@
  *   { type: 'nextHand' }              deal the next hand after the scores are shown
  *   { type: 'newGame' }               start again after a game is won
  *
- * `waitingFor(state)` says whose move it is; `robotAction(state, seat, level)`
- * picks a computer player's move; `viewFor(state, seat)` hides the other hands.
+ * `waitingFor(state)` says whose move it is; `robotAction(state, seat, level, style)`
+ * picks a computer player's move (style: their personality, see players.js); `viewFor(state, seat)` hides the other hands.
  */
 import { buildDeck, shuffle } from '../../utils/cardEngine.js';
 import { trickWinner, nextSeat, teamOf } from '../cards/tricks.js';
@@ -104,8 +104,8 @@ export function act(s, a) {
 }
 
 // ── Computer players ─────────────────────────────────────────────────────────
-export function robotAction(s, seat, level) {
-  if (s.phase === 'bidding') return { type: 'bid', seat, bid: chooseBid(s.hands[seat], level, s.bids[(seat + 2) % 4]) };
+export function robotAction(s, seat, level, style) {
+  if (s.phase === 'bidding') return { type: 'bid', seat, bid: chooseBid(s.hands[seat], level, s.bids[(seat + 2) % 4], style?.bold) };
   const t = s.table;
   const card = chooseCard({
     legal: legalFor(s, seat), trick: t.trick, seat, difficulty: level, bids: s.bids, tricksWon: t.tricksWon,

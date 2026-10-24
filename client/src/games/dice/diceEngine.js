@@ -66,7 +66,7 @@ export function act(s, a) {
 }
 
 /** A computer player's next step: a roll (holding what it wants to keep) or a score. */
-export const robotAction = (s, seat, level) => ({ ...robotStep(s.cards[seat], s.dice, level), seat });
+export const robotAction = (s, seat, level, style) => ({ ...robotStep(s.cards[seat], s.dice, level, style?.bold), seat });
 
 /** Dice have no secrets: everyone sees everything. */
 export const viewFor = s => s;

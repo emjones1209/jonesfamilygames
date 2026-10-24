@@ -123,13 +123,13 @@ export function act(s, a) {
 }
 
 // ── Computer players ─────────────────────────────────────────────────────────
-export function robotAction(s, seat, level) {
+export function robotAction(s, seat, level, style) {
   if (s.phase === 'passing') return { type: 'pass', seat, ids: choosePass(s.hands[seat], level).map(c => c.id) };
   const t = s.table;
   const card = chooseCard({
     legal: legalFor(s, seat), trick: t.trick, seat, difficulty: level,
     queenPlayed: playedCards(t).some(isQueenOfSpades), pointsTaken: pointsTaken(s),
-    memory: tableMemory({ history: t.history, trick: t.trick, hand: t.hands[seat], deck: DECK }),
+    memory: tableMemory({ history: t.history, trick: t.trick, hand: t.hands[seat], deck: DECK }), bold: style?.bold,
   });
   return { type: 'play', seat, cardId: card.id };
 }

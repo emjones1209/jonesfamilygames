@@ -111,7 +111,7 @@ export const leaders = totals => {
  * @param pointsTaken  points each seat has taken so far this hand (hard)
  * @param memory       tableMemory() for this seat (hard)
  */
-export function chooseCard({ legal, trick, seat, difficulty, queenPlayed = false, pointsTaken = null, memory = null }) {
+export function chooseCard({ legal, trick, seat, difficulty, queenPlayed = false, pointsTaken = null, memory = null, bold = 0 }) {
   if (legal.length === 1) return legal[0];
   if (difficulty === 'easy') return legal[Math.floor(Math.random() * legal.length)];
   const hard = difficulty === 'hard' && memory != null && pointsTaken != null;
@@ -122,9 +122,11 @@ export function chooseCard({ legal, trick, seat, difficulty, queenPlayed = false
 
   if (hard) {
     const totalSoFar = pointsTaken.reduce((a, b) => a + b, 0);
-    // Shooting the moon: every point so far is ours, and we hold the winning cards
+    // Shooting the moon: every point so far is ours, and we hold the winning cards (a daredevil
+    // goes for it sooner and with less in hand; a careful player waits until it's nearly certain)
     const masters = legal.filter(memory.isMaster);
-    if (pointsTaken[seat] === totalSoFar && totalSoFar >= 14 && masters.length >= legal.length - 1) {
+    const moonAt = 14 - Math.round(bold * 6), spare = bold >= 0.8 ? 2 : bold <= -0.5 ? 0 : 1;
+    if (pointsTaken[seat] === totalSoFar && totalSoFar >= moonAt && masters.length >= legal.length - spare) {
       if (trick.length === 0) return highest(masters);
       const winners = legal.filter(c => wouldWin(trick, c, seat));
       if (winners.length) return highest(winners);

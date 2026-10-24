@@ -113,10 +113,12 @@ const ALONE_AT = { medium: 10, hard: 9.5 };   // Easy never goes alone
  * 2: name another suit or pass — except the dealer, who must name one.
  * @returns { call: false } or { call: true, suit, alone }
  */
-export function chooseCall({ hand, seat, dealer, upcard, round, turnedDown, level }) {
+export function chooseCall({ hand, seat, dealer, upcard, round, turnedDown, level, bold = 0 }) {
   const partnerDeals = (seat + 2) % 4 === dealer;
   const iDeal = seat === dealer;
   const noise = level === 'easy' ? Math.random() * 2 - 1 : 0;
+  // A daredevil calls trump (and goes alone) on a thinner hand; a careful player wants more
+  const alone = value => level !== 'easy' && value + bold * 0.8 >= ALONE_AT[level];
 
   let suit, value;
   if (round === 1) {
@@ -133,10 +135,10 @@ export function chooseCall({ hand, seat, dealer, upcard, round, turnedDown, leve
   } else {
     const options = SUITS.filter(s => s !== turnedDown).map(s => [s, handValue(hand, s)]);
     [suit, value] = options.reduce((a, b) => (b[1] > a[1] ? b : a));
-    if (iDeal) return { call: true, suit, alone: level !== 'easy' && value >= ALONE_AT[level] };
+    if (iDeal) return { call: true, suit, alone: alone(value) };
   }
-  if (value + noise < CALL_AT[level]) return { call: false };
-  return { call: true, suit, alone: level !== 'easy' && value >= ALONE_AT[level] };
+  if (value + noise + bold * 0.5 < CALL_AT[level]) return { call: false };
+  return { call: true, suit, alone: alone(value) };
 }
 
 // ── AI: playing ──────────────────────────────────────────────────────────────

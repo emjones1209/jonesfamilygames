@@ -185,9 +185,9 @@ export function act(state, a) {
 }
 
 // ── Computer players ─────────────────────────────────────────────────────────
-export function robotAction(s, seat, level) {
+export function robotAction(s, seat, level, style) {
   if (s.phase === 'discard') return { type: 'discard', seat, cardIds: chooseDiscard(s.hands[seat], { dealer: s.dealer === seat, level }) };
-  const card = choosePegCard(s.hands[seat], s.peg.seq, { level });
+  const card = choosePegCard(s.hands[seat], s.peg.seq, { level, bold: style?.bold });
   return { type: 'play', seat, cardId: card.id };
 }
 

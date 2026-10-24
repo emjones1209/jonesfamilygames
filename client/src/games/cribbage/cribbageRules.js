@@ -157,7 +157,7 @@ const FULL_DECK = buildDeck();
  * (Simulated games: Medium beats Easy 85% of the time, Hard beats Easy 88% and Medium 55–60% —
  * Cribbage has a lot of luck in it. Hard's careful pegging is worth about 10 percentage points of that.)
  */
-export function choosePegCard(hand, seq, { level, rng = Math.random }) {
+export function choosePegCard(hand, seq, { level, bold = 0, rng = Math.random }) {
   const count = sumValue(seq);
   const legal = playable(hand, count);
   if (!legal.length) return null;
@@ -174,7 +174,7 @@ export function choosePegCard(hand, seq, { level, rng = Math.random }) {
       // Keep low cards for later "go"s: a slight preference to play high early
       risk -= value(card) * 0.02;
     }
-    return { card, worth: points - risk };
+    return { card, worth: points - risk * (1 - bold * 0.6) };       // a daredevil takes more chances
   });
   return scored.reduce((a, b) => (b.worth > a.worth ? b : a)).card;
 }

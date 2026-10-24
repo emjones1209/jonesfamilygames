@@ -171,8 +171,8 @@ function finishHand(s) {
 
 // ── Computer players ─────────────────────────────────────────────────────────
 /** The move a computer player at `seat` makes now (it must be their turn). */
-export function robotAction(s, seat, level) {
-  if (s.phase === 'bidding') return { type: 'bid', seat, bid: chooseBid(s.hands[seat], s.high.bid, level) };
+export function robotAction(s, seat, level, style) {
+  if (s.phase === 'bidding') return { type: 'bid', seat, bid: chooseBid(s.hands[seat], s.high.bid, level, style?.bold) };
   if (s.phase === 'nest') {
     const { trump, discard } = chooseNestDiscard(s.hands[seat], level);
     return { type: 'nest', seat, trump, discard: discard.map(c => c.id) };

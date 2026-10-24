@@ -8,6 +8,10 @@
  * hard   – races through its hand to reach its foot sooner, pairing cards
  *          with wild cards and spending wild cards on any meld
  *
+ * Personality (bold, see players.js): a daredevil races for its foot even at
+ * Medium, a careful one doesn't race at all; and as a partner, a daredevil says
+ * "yes, go out" more readily, a careful one less.
+ *
  * (Simulated games: medium beats easy by about 5,800 points a game, and hard
  * beats medium by 1,100 to 1,800.)
  */
@@ -42,7 +46,7 @@ function spoils(s, team, rank) {
  * and a wild card; the rules only allow it once the pile has 5 cards) or draw
  * two from the stock.
  */
-export function chooseDraw(s, level) {
+export function chooseDraw(s, level, bold = 0) {
   const seat = s.turn, top = topOfPile(s);
   const { byRank, wilds } = groupHand(s.hands[seat]);
   let pair = top ? (byRank[top.rank] ?? []).slice(0, 2) : [];
@@ -52,7 +56,7 @@ export function chooseDraw(s, level) {
   const taken = pair.length === 2 && attempt(s, { type: 'takePile', ids });
   if (!taken || (level === 'easy' && Math.random() >= 0.4)) return { type: 'draw' };
   // Before our side's first meld, only if the rest of the turn can reach the minimum
-  if (!s.initialDone[teamOf(s, seat)] && !turnWorks(taken, choosePlay(taken, level))) return { type: 'draw' };
+  if (!s.initialDone[teamOf(s, seat)] && !turnWorks(taken, choosePlay(taken, level, bold))) return { type: 'draw' };
   return { type: 'takePile', ids };
 }
 
@@ -71,15 +75,15 @@ function turnWorks(s, plan) {
  * stock is nearly gone anyway), and only if what we're holding costs less than
  * going out earns. Easy always says yes.
  */
-export function chooseAnswer(s, seat, level) {
+export function chooseAnswer(s, seat, level, bold = 0) {
   if (level === 'easy' || s.stock.length < 12) return true;
-  if (!s.inFoot[seat]) return false;
-  return valueOf(s.hands[seat]) <= GOING_OUT;          // (a red 3 alone counts 300)
+  if (!s.inFoot[seat]) return bold >= 0.8 && valueOf(s.hands[seat]) <= GOING_OUT / 2;   // a daredevil takes the chance
+  return valueOf(s.hands[seat]) <= GOING_OUT * (1 + bold * 0.5);          // (a red 3 alone counts 300)
 }
 
 // ── Melding and discarding ───────────────────────────────────────────────────
 /** The rest of the turn after drawing: melds, then a discard (unless it goes out). */
-export function choosePlay(s, level) {
+export function choosePlay(s, level, bold = 0) {
   const seat = s.turn, team = teamOf(s, seat);
   let cur = s;
   const actions = [];
@@ -166,8 +170,8 @@ export function choosePlay(s, level) {
   for (const c of hand()) if (run({ type: 'discard', id: c.id })) break;
   return actions;
 
-  // Hard races through its hand to reach its foot
-  function racing() { return level === 'hard' && !cur.inFoot[seat]; }
+  // Hard races through its hand to reach its foot (a daredevil even at Medium; a careful player never)
+  function racing() { return level !== 'easy' && (level === 'hard' ? bold > -0.5 : bold >= 0.8) && !cur.inFoot[seat]; }
 
   // In our foot with the books we need: empty the hand and go out
   function goingOut() { return cur.inFoot[seat] && canGoOut(cur, team); }

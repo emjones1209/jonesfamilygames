@@ -180,7 +180,7 @@ function finishHole(s) {
 
 // ── Computer players ─────────────────────────────────────────────────────────
 /** The move a computer player at `seat` makes now (it must be one of `waitingOn`). */
-export function robotAction(s, seat, level) {
+export function robotAction(s, seat, level, style) {
   const grid = s.grids[seat];
   if (s.phase === 'peek') {
     const [row, col] = shuffle(POSITIONS.filter(([r, c]) => !grid[r][c].faceUp))[0];
@@ -192,7 +192,7 @@ export function robotAction(s, seat, level) {
     return { type: 'draw', seat, from: fromDiscard ? 'discard' : 'stock' };
   }
   const opponentGrids = s.grids.filter((_, i) => i !== seat);
-  const pos = choosePlacement({ grid, opponentGrids, card: s.drawn.card, fromDiscard: s.drawn.fromDiscard, difficulty: level });
+  const pos = choosePlacement({ grid, opponentGrids, card: s.drawn.card, fromDiscard: s.drawn.fromDiscard, difficulty: level, bold: style?.bold });
   return pos ? { type: 'place', seat, row: pos[0], col: pos[1] } : { type: 'discard', seat };
 }
 

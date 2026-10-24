@@ -30,7 +30,7 @@ function groupHand(hand) {
 
 // ── Drawing ──────────────────────────────────────────────────────────────────
 /** The computer's first move of a turn: take the pile or draw from the stock. */
-export function chooseDraw(s, level) {
+export function chooseDraw(s, level, bold = 0) {
   const seat = s.turn, team = teamOf(seat), top = topOfPile(s);
   if (!top) return { type: 'draw' };
   const { byRank, wilds } = groupHand(s.hands[seat]);
@@ -57,7 +57,7 @@ export function chooseDraw(s, level) {
       options.push(ids);
     }
     // A single natural card plus a wild card (worth it for a big pile)
-    const minPile = level === 'hard' ? 3 : 4;
+    const minPile = (level === 'hard' ? 3 : 4) - Math.round(bold * 1.5);   // a daredevil grabs it smaller, a careful player waits
     if (pair.length === 1 && wilds.length && s.discard.length >= minPile) options.push([pair[0].id, wilds[0].id]);
   }
   const ids = options.find(o => canTake(s, seat, o));
@@ -66,7 +66,7 @@ export function chooseDraw(s, level) {
 
 // ── Melding and discarding ───────────────────────────────────────────────────
 /** After drawing: the melds to make and the discard, as a list of actions. */
-export function choosePlay(s, level) {
+export function choosePlay(s, level, bold = 0) {
   const seat = s.turn, team = teamOf(seat);
   let cur = s;
   const actions = [];
@@ -122,7 +122,7 @@ export function choosePlay(s, level) {
   if (cur.phase === 'over') return actions;
 
   // 3. Discard
-  const card = chooseDiscard(cur, level);
+  const card = chooseDiscard(cur, level, bold);
   if (!run({ type: 'discard', id: card.id })) {
     // Shouldn't happen, but never get stuck: skip the melds and discard anything allowed
     actions.length = 0; cur = s;
@@ -165,7 +165,7 @@ function atLeast(k, good, total, n) {
 }
 
 /** The card to throw away. */
-export function chooseDiscard(s, level) {
+export function chooseDiscard(s, level, bold = 0) {
   const seat = s.turn, team = teamOf(seat), hand = s.hands[seat];
   const plain = hand.filter(c => !isWild(c));
   const pool = plain.length ? plain : hand;
@@ -191,7 +191,7 @@ export function chooseDiscard(s, level) {
     if (teamMeld(s, 1 - team, c.rank) && !frozen) score += hard && bigPile ? 200 : 80;  // hands them the pile
     if (hard) {
       if (nextDiscarded.has(c.rank)) score -= 30;               // the next player doesn't want it
-      score += pairChance(c.rank) * pileWorth;                  // could they take the pile with it?
+      score += pairChance(c.rank) * pileWorth * (1 - bold * 0.4); // could they take the pile with it? (a daredevil chances it)
     }
     if (isWild(c)) score += 500;
     return score;

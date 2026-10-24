@@ -1,22 +1,24 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tableNames } from '../players';
+import { useRobots, useRobotChatter } from '../useRobots';
+import { ReactionBursts } from '../../components/Reactions';
 import { TUTORIALS } from '../../components/tutorials';
 import { GameSetup } from '../cards/GameSetup';
 import { newGame, act, waitingFor, robotAction } from './bridgeEngine';
 import { BridgeTable } from './BridgeTable';
 import api from '../../utils/api';
 
-const NAMES = tableNames(4);            // You are South; Phoebe West, Xavier North, Heraldo East
 // Your partner always plays its best (Hard), so the difficulty only changes the opponents
 const levelFor = (seat, difficulty) => (seat === 2 ? 'hard' : difficulty);
 const BID_MS = 700, ROBOT_MS = 700, COLLECT_MS = 1300;
 
 export default function BridgeGame() {
   const navigate = useNavigate();
+  const robots = useRobots(4);
   const [difficulty, setDifficulty] = useState(null);
   const [game, setGame] = useState(null);
   const [error, setError] = useState('');
+  const reactions = useRobotChatter('bridge', game, robots.cast);
   const posted = useRef(-1);             // the hand whose score was last posted
 
   const startGame = diff => {
@@ -34,7 +36,7 @@ export default function BridgeGame() {
     if (!game) return;
     const seat = waitingFor(game);
     if (seat != null && seat !== 0) {
-      const timer = setTimeout(() => apply(robotAction(game, seat, levelFor(seat, difficulty))), game.phase === 'bidding' ? BID_MS : ROBOT_MS);
+      const timer = setTimeout(() => apply(robotAction(game, seat, levelFor(seat, difficulty), robots.styleOf(seat))), game.phase === 'bidding' ? BID_MS : ROBOT_MS);
       return () => clearTimeout(timer);
     }
     if (game.phase === 'playing' && game.table.status === 'collecting') {
@@ -51,10 +53,11 @@ export default function BridgeGame() {
   if (!game) {
     return (
       <GameSetup emoji="🌉" title="Bridge" subtitle="Contract bridge with bidding."
-        note="You play South with North (Xavier) as your partner. The deal rotates each hand."
+        note={`You play South with North (${robots.who(2)}) as your partner, against ${robots.who(1)} and ${robots.who(3)}. The deal rotates each hand.`}
         bgClass="from-game-bg to-teal-900" tutorial={TUTORIALS.bridge} onStart={startGame} />
     );
   }
 
-  return <BridgeTable view={game} names={NAMES} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty} />;
+  return <BridgeTable view={game} names={robots.names}
+      overlay={<ReactionBursts reactions={reactions} you={0} players={4} nameOf={seat => robots.names[seat]} />} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty} />;
 }

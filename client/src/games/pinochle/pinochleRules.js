@@ -165,12 +165,13 @@ export function bestTrump(hand) {
  *   medium – bids up to what the hand looks worth, less a margin
  *   hard   – bids up to what the hand looks worth
  */
-export function chooseBid(hand, { high, forced, level, rng = Math.random }) {
+export function chooseBid(hand, { high, forced, level, bold = 0, rng = Math.random }) {
   const next = high == null ? MIN_BID : high + BID_STEP;
   if (forced) return MIN_BID;
   let worth = bestTrump(hand).worth;
   if (level === 'easy') worth += Math.round((rng() - 0.4) * 80);
   if (level === 'medium') worth -= 20;
+  worth += Math.round(bold * 20);           // a daredevil bids on hope, a careful player only on what's there
   const limit = Math.floor(worth / BID_STEP) * BID_STEP;
   return next <= limit ? next : PASS;
 }

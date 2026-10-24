@@ -201,7 +201,8 @@ function unseenBy(s, seat) {
   return DECK.filter(c => !seen.has(c.id));
 }
 
-export function robotAction(s, seat, level) {
+export function robotAction(s, seat, level, style) {
+  const bold = style?.bold ?? 0;
   const hand = s.hands[seat];
   const unseen = level === 'hard' ? unseenBy(s, seat) : null;
   if (s.phase === 'firstTake') return wantsDiscard(hand, top(s), level, unseen) ? { type: 'draw', seat, from: 'discard' } : { type: 'pass', seat };
@@ -212,7 +213,9 @@ export function robotAction(s, seat, level) {
   if (bestMelds(hand).points === 0) return { type: 'knock', seat, cardId: null };
   const card = chooseDiscard(hand, { level, keep: s.takenFromPile?.id, theirPickups: s.pickups[other(seat)], unseen });
   // Knock as soon as possible (in 1,600 test games, waiting for a lower count or gin did no better)
-  if (knockCheck(s, seat, card.id)) return { type: 'knock', seat, cardId: card.id };
+  // — though a careful player waits for a low count, so as not to be undercut, while the stock lasts
+  const knock = knockCheck(s, seat, card.id);
+  if (knock && (bold > -0.5 || knock.points <= 4 || s.stock.length < 12)) return { type: 'knock', seat, cardId: card.id };
   return { type: 'discard', seat, cardId: card.id };
 }
 

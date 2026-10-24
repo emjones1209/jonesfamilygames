@@ -111,8 +111,8 @@ function finishHand(s) {
 const works = (s, step) => { try { rulesAct(s, step); return true; } catch { return false; } };
 
 /** This turn's plan if the partner said yes — when it goes out (otherwise null). */
-function goingOutPlan(s, seat, level) {
-  const steps = choosePlay({ ...s, outAsk: 'yes' }, level);
+function goingOutPlan(s, seat, level, bold) {
+  const steps = choosePlay({ ...s, outAsk: 'yes' }, level, bold);
   let cur = { ...s, outAsk: 'yes' };
   for (const step of steps) {
     try { cur = rulesAct(cur, step); } catch { return null; }
@@ -121,19 +121,20 @@ function goingOutPlan(s, seat, level) {
 }
 
 /** The next step of a computer player's turn (or its answer, when its partner asks to go out). */
-export function robotAction(s, seat, level) {
-  if (s.outAsk === 'asking') return { type: 'answerOut', seat, yes: chooseAnswer(s, seat, level) };
-  if (s.phase === 'draw') return { ...chooseDraw(s, level), seat };
+export function robotAction(s, seat, level, style) {
+  const bold = style?.bold ?? 0;
+  if (s.outAsk === 'asking') return { type: 'answerOut', seat, yes: chooseAnswer(s, seat, level, bold) };
+  if (s.phase === 'draw') return { ...chooseDraw(s, level, bold), seat };
   // Partners ask before going out (Jones family rules) — which they may do once they could go
   // out this turn. (When the rules can't tell that, with a big hand, books this turn finishes
   // get made first, and they ask after)
   if (s.players === 4 && !s.outAsk && s.inFoot[seat]) {
-    const outPlan = goingOutPlan(s, seat, level);
+    const outPlan = goingOutPlan(s, seat, level, bold);
     if (outPlan && couldGoOutNow(s)) return { type: 'askOut', seat };
     if (outPlan && works(s, outPlan[0])) return { ...outPlan[0], seat, plan: [] };
   }
   let steps = s.robotPlan?.seat === seat ? s.robotPlan.steps : null;
-  if (!steps?.length || !works(s, steps[0])) steps = choosePlay(s, level);     // plan (or re-plan) the turn
+  if (!steps?.length || !works(s, steps[0])) steps = choosePlay(s, level, bold);     // plan (or re-plan) the turn
   if (!steps.length) return { type: 'undo', seat };        // no way to finish (after taking the pile): put it back and draw
   const [step, ...rest] = steps;
   return { ...step, seat, plan: rest };

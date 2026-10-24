@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, HelpCircle } from 'lucide-react';
-import { tableNames } from '../players';
+import { useRobots, useRobotChatter } from '../useRobots';
+import { ReactionBursts } from '../../components/Reactions';
 import { Button } from '../../components/Button';
 import { TutorialModal } from '../../components/TutorialModal';
 import { TUTORIALS } from '../../components/tutorials';
@@ -11,7 +12,6 @@ import { ChessTable } from './ChessTable';
 import { LESSONS, loadDone } from './chessLessonData';
 import api from '../../utils/api';
 
-const NAMES = tableNames(2);
 const ROBOT_MS = 500;
 const LEVELS = [
   ['easy', '😊 Easy', 'Looks one move ahead — best for learning'],
@@ -21,11 +21,13 @@ const LEVELS = [
 
 export default function ChessGame() {
   const navigate = useNavigate();
+  const robots = useRobots(2);
   const { user } = useAuth();
   const [difficulty, setDifficulty] = useState(null);
   const [game, setGame] = useState(null);
   const [history, setHistory] = useState([]);      // the game before each of your moves, for Undo
   const [error, setError] = useState('');
+  const reactions = useRobotChatter('chess', game, robots.cast);
   const [tutorial, setTutorial] = useState(false);
   const posted = useRef(false);
   const lessonsDone = loadDone(user).length;
@@ -50,7 +52,7 @@ export default function ChessGame() {
   useEffect(() => {
     if (!game) return;
     if (waitingFor(game) === 1) {
-      const timer = setTimeout(() => apply(robotAction(game, 1, difficulty)), ROBOT_MS);
+      const timer = setTimeout(() => apply(robotAction(game, 1, difficulty, robots.styleOf(1))), ROBOT_MS);
       return () => clearTimeout(timer);
     }
     if (game.phase === 'gameOver' && !posted.current) {
@@ -79,7 +81,7 @@ export default function ChessGame() {
               {lessonsDone ? `${lessonsDone} of ${LESSONS.length} lessons done — carry on` : `New to chess? Start here: ${LESSONS.length} short lessons`}
             </div>
           </button>
-          <p className="text-white/40 text-xs mt-3">Play the computer (you&apos;re White first, then colours swap):</p>
+          <p className="text-white/40 text-xs mt-3">Play {robots.who(1)} (you&apos;re White first, then colours swap):</p>
           {LEVELS.map(([d, label, note]) => (
             <Button key={d} variant="primary" className="w-full text-lg" onClick={() => startGame(d)}>
               {label}<span className="block text-xs font-normal opacity-70">{note}</span>
@@ -100,7 +102,8 @@ export default function ChessGame() {
   };
 
   return (
-    <ChessTable view={game} names={NAMES} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
+    <ChessTable view={game} names={robots.names}
+      overlay={<ReactionBursts reactions={reactions} you={0} players={2} nameOf={seat => robots.names[seat]} />} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
       onUndo={undo} onLearn={() => navigate('/games/chess/learn')}
       gameOverActions={
         <div className="flex gap-3">

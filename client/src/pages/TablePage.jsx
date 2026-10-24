@@ -272,6 +272,7 @@ export default function TablePage() {
                 <span className="text-white/40 text-sm w-6">{i + 1}</span>
                 <span className="flex-1 min-w-0 text-white">
                   {seatName(seat)}{i === you ? ' (you)' : ''}
+                  {seat?.tagline && <span className="block text-xs text-white/50">{seat.tagline}</span>}
                   {game.teams && <span className="block text-xs text-white/40">{teamOf(i)}</span>}
                 </span>
                 {moving != null ? (
