@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tableNames } from '../players';
+import { useRobots, useRobotChatter } from '../useRobots';
+import { ReactionBursts } from '../../components/Reactions';
 import { Button } from '../../components/Button';
 import { TUTORIALS } from '../../components/tutorials';
 import { GameSetup } from '../cards/GameSetup';
@@ -9,16 +10,17 @@ import { newGame, act, waitingFor, robotAction } from './rookEngine';
 import { RookTable } from './RookTable';
 import api from '../../utils/api';
 
-const NAMES = tableNames(4);
 // Your partner always plays its best (Hard), so the difficulty only changes the opponents
 const levelFor = (seat, difficulty) => (seat === 2 ? 'hard' : difficulty);
 const ROBOT_MS = 700, COLLECT_MS = 1300;
 
 export default function RookGame() {
   const navigate = useNavigate();
+  const robots = useRobots(4);
   const [difficulty, setDifficulty] = useState(null);
   const [game, setGame] = useState(null);
   const [error, setError] = useState('');
+  const reactions = useRobotChatter('rook', game, robots.cast);
   const posted = useRef(false);
 
   const startGame = diff => {
@@ -38,7 +40,7 @@ export default function RookGame() {
     if (!game) return;
     const seat = waitingFor(game);
     if (seat != null && seat !== 0) {
-      const timer = setTimeout(() => apply(robotAction(game, seat, levelFor(seat, difficulty))), ROBOT_MS);
+      const timer = setTimeout(() => apply(robotAction(game, seat, levelFor(seat, difficulty), robots.styleOf(seat))), ROBOT_MS);
       return () => clearTimeout(timer);
     }
     if (game.phase === 'playing' && game.table.status === 'collecting') {
@@ -55,17 +57,18 @@ export default function RookGame() {
   if (!game) {
     return (
       <GameSetup emoji="🐦" title="Rook" subtitle="Bid, name trump, and capture the counters!"
-        note={`You and Xavier (your partner) vs Phoebe and Heraldo · first team to ${WINNING_SCORE}`}
+        note={`You and ${robots.who(2)}, your partner, vs ${robots.who(1)} and ${robots.who(3)} · first team to ${WINNING_SCORE}`}
         bgClass="from-game-bg to-orange-900" tutorial={TUTORIALS.rook} onStart={startGame} />
     );
   }
 
   return (
-    <RookTable view={game} names={NAMES} onAction={apply} onExit={() => navigate('/')} error={error}
+    <RookTable view={game} names={robots.names}
+      overlay={<ReactionBursts reactions={reactions} you={0} players={4} nameOf={seat => robots.names[seat]} />} onAction={apply} onExit={() => navigate('/')} error={error}
       gameOverActions={
         <div className="flex gap-3">
           <Button variant="ghost" className="flex-1" onClick={() => navigate('/')}>Home</Button>
-          <Button variant="gold" className="flex-1" onClick={() => startGame(difficulty)}>Play Again</Button>
+          <Button variant="gold" className="flex-1" onClick={() => { robots.recast(); startGame(difficulty); }}>Play Again</Button>
         </div>
       } />
   );

@@ -203,10 +203,10 @@ function finishHand(s) {
 }
 
 // ── Computer players ─────────────────────────────────────────────────────────
-export function robotAction(s, seat, level) {
+export function robotAction(s, seat, level, style) {
   switch (s.phase) {
     case 'bidding':
-      return { type: 'bid', seat, bid: chooseBid(s.hands[seat], { high: s.high?.amount ?? null, forced: dealerStuck(s, seat), level }) };
+      return { type: 'bid', seat, bid: chooseBid(s.hands[seat], { high: s.high?.amount ?? null, forced: dealerStuck(s, seat), level, bold: style?.bold }) };
     case 'trump':
       return { type: 'trump', seat, suit: bestTrump(s.hands[seat]).suit };
     case 'passing':

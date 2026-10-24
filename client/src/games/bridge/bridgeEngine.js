@@ -120,8 +120,8 @@ export function act(s, a) {
 
 // ── Computer players ─────────────────────────────────────────────────────────
 /** The move for `seat` (which must be `waitingFor`); a computer declarer plays dummy's cards as well. */
-export function robotAction(s, seat, level) {
-  if (s.phase === 'bidding') return { type: 'bid', seat, bid: chooseBid({ hand: s.hands[seat], auction: s.auction, seat, difficulty: level }) };
+export function robotAction(s, seat, level, style) {
+  if (s.phase === 'bidding') return { type: 'bid', seat, bid: chooseBid({ hand: s.hands[seat], auction: s.auction, seat, difficulty: level, bold: style?.bold }) };
   const t = s.table, turn = t.turn;
   const card = choosePartnershipCard({
     legal: legalCards(s), trick: t.trick, seat: turn, difficulty: level, trump: s.contract.trump,

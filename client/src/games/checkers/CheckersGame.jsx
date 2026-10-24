@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tableNames } from '../players';
+import { useRobots, useRobotChatter } from '../useRobots';
+import { ReactionBursts } from '../../components/Reactions';
 import { Button } from '../../components/Button';
 import { TUTORIALS } from '../../components/tutorials';
 import { GameSetup } from '../cards/GameSetup';
@@ -8,15 +9,16 @@ import { newGame, act, waitingFor, robotAction, pieces } from './checkersEngine'
 import { CheckersTable } from './CheckersTable';
 import api from '../../utils/api';
 
-const NAMES = tableNames(2);
 const ROBOT_MS = 600;
 
 export default function CheckersGame() {
   const navigate = useNavigate();
+  const robots = useRobots(2);
   const [difficulty, setDifficulty] = useState(null);
   const [game, setGame] = useState(null);
   const [history, setHistory] = useState([]);      // the game before each of your moves, for Undo
   const [error, setError] = useState('');
+  const reactions = useRobotChatter('checkers', game, robots.cast);
   const posted = useRef(false);
 
   const startGame = (diff, from = null) => {
@@ -39,7 +41,7 @@ export default function CheckersGame() {
   useEffect(() => {
     if (!game) return;
     if (waitingFor(game) === 1) {
-      const timer = setTimeout(() => apply(robotAction(game, 1, difficulty)), ROBOT_MS);
+      const timer = setTimeout(() => apply(robotAction(game, 1, difficulty, robots.styleOf(1))), ROBOT_MS);
       return () => clearTimeout(timer);
     }
     if (game.phase === 'gameOver' && !posted.current) {
@@ -54,7 +56,7 @@ export default function CheckersGame() {
   if (!game) {
     return (
       <GameSetup emoji="⚫" title="Checkers" subtitle="Jump your way to a king!"
-        note="You vs Phoebe · you play Black and move first"
+        note={`You vs ${robots.who(1)} · you play Black and move first`}
         bgClass="from-game-bg to-amber-950" tutorial={TUTORIALS.checkers} onStart={startGame} />
     );
   }
@@ -65,7 +67,8 @@ export default function CheckersGame() {
   };
 
   return (
-    <CheckersTable view={game} names={NAMES} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
+    <CheckersTable view={game} names={robots.names}
+      overlay={<ReactionBursts reactions={reactions} you={0} players={2} nameOf={seat => robots.names[seat]} />} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
       onUndo={undo}
       gameOverActions={
         <div className="flex gap-3">

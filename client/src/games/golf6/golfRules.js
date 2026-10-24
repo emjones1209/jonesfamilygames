@@ -148,7 +148,7 @@ export function chooseSource({ grid, topDiscard, difficulty, rng = Math.random }
  * Where to put `card` ([row, col]), or null to discard it. A card taken from
  * the discard pile is always kept.
  */
-export function choosePlacement({ grid, opponentGrids = [], card, fromDiscard, difficulty, rng = Math.random }) {
+export function choosePlacement({ grid, opponentGrids = [], card, fromDiscard, difficulty, bold = 0, rng = Math.random }) {
   const dv = cardValue(card);
   const hidden = POSITIONS.filter(([r, c]) => !grid[r][c].faceUp);
   const worseFaceUp = POSITIONS.filter(([r, c]) => grid[r][c].faceUp && cardValue(grid[r][c]) > dv);
@@ -167,8 +167,9 @@ export function choosePlacement({ grid, opponentGrids = [], card, fromDiscard, d
       if (!cell.faceUp) { if (dv <= -2 && bestGain > 0) { bestGain = 0; best = [r, c]; } }
       else { const gain = cardValue(cell) - dv; if (gain > bestGain) { bestGain = gain; best = [r, c]; } }
     }
-    // No good swap: put a low card over a face-down one to make progress
-    if (!best && dv <= 4 && hidden.length) best = pick(hidden, rng);
+    // No good swap: put a low card over a face-down one to make progress (a daredevil gambles
+    // on a higher one, a careful player only a really low one)
+    if (!best && dv <= 4 + Math.round(bold * 2) && hidden.length) best = pick(hidden, rng);
     if (!best && fromDiscard) {
       best = worseFaceUp.length
         ? worseFaceUp.reduce((a, b) => (cardValue(grid[b[0]][b[1]]) > cardValue(grid[a[0]][a[1]]) ? b : a))
@@ -180,11 +181,12 @@ export function choosePlacement({ grid, opponentGrids = [], card, fromDiscard, d
   // ── hard ──
   const finishing = bestPlacement(grid, card);
   let choice = finishing;
-  // Only finish the round (turn over the last card) when clearly ahead
+  // Only finish the round (turn over the last card) when clearly ahead — a daredevil goes out
+  // as soon as it isn't behind, a careful player wants a bigger lead
   if (finishing && allFaceUp(finishing.next)) {
     const myFinal = gridScore(finishing.next);
     const theirs = Math.min(...opponentGrids.map(estimateGrid));
-    if (opponentGrids.length && myFinal > theirs - 3) choice = bestPlacement(grid, card, { allowFinish: false });
+    if (opponentGrids.length && myFinal > theirs - 3 + Math.round(bold * 3)) choice = bestPlacement(grid, card, { allowFinish: false });
   }
   // Never break up a pair for a small gain
   if (choice && inPair(grid, ...choice.pos) && choice.gain < 4) choice = null;

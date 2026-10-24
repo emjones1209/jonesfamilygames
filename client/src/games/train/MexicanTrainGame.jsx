@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tableNames } from '../players';
+import { useRobots, useRobotChatter } from '../useRobots';
+import { ReactionBursts } from '../../components/Reactions';
 import { ArrowLeft, HelpCircle } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { TutorialModal } from '../../components/TutorialModal';
@@ -19,8 +20,8 @@ export default function MexicanTrainGame() {
   const [game, setGame] = useState(null);
   const [error, setError] = useState('');
   const [showTutorial, setShowTutorial] = useState(false);
-
-  const names = tableNames(settings.players);
+  const robots = useRobots(settings.players);
+  const reactions = useRobotChatter('train', game, robots.cast);
 
   const startGame = diff => {
     setDifficulty(diff);
@@ -38,7 +39,7 @@ export default function MexicanTrainGame() {
     if (!game) return;
     const seat = waitingFor(game);
     if (seat != null && seat !== 0) {
-      const timer = setTimeout(() => apply(robotAction(game, seat, difficulty)), AI_MS);
+      const timer = setTimeout(() => apply(robotAction(game, seat, difficulty, robots.styleOf(seat))), AI_MS);
       return () => clearTimeout(timer);
     }
     if (game.phase === 'gameOver') api.post('/scores', { game: 'train', score: -game.totals[0], difficulty }).catch(() => {});   // negated: low scores rank high
@@ -57,7 +58,7 @@ export default function MexicanTrainGame() {
           <h1 className="game-title text-3xl mb-2">Mexican Train</h1>
           <p className="text-white/50 mb-5 text-center">Dominoes — play out your tiles, lowest score wins!</p>
           <p className="text-white/60 text-sm mb-2">Players (including you)</p>
-          <div className="flex gap-3 mb-4">
+          <div className="flex gap-3 mb-2">
             {[2, 3, 4].map(n => (
               <button key={n} onClick={() => setSettings(s => ({ ...s, players: n }))}
                 className={`w-14 h-14 rounded-2xl font-bold text-xl border-2 ${settings.players === n ? 'border-game-gold bg-white/20 text-white' : 'border-white/20 bg-white/5 text-white/60'}`}>
@@ -65,6 +66,9 @@ export default function MexicanTrainGame() {
               </button>
             ))}
           </div>
+          <p className="text-white/40 text-xs mb-4 text-center">
+            You vs {robots.cast.map((_, i) => robots.who(i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')}
+          </p>
           <div className="w-full space-y-2 mb-5">
             {LENGTHS.map(([n, text]) => (
               <button key={n} onClick={() => setSettings(s => ({ ...s, rounds: n }))}
@@ -89,11 +93,12 @@ export default function MexicanTrainGame() {
   if (!game) return null;
 
   return (
-    <TrainTable view={game} names={names} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
+    <TrainTable view={game} names={robots.names} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
+      overlay={<ReactionBursts reactions={reactions} you={0} players={settings.players} nameOf={seat => robots.names[seat]} />}
       gameOverActions={
         <div className="flex gap-3">
           <Button variant="ghost" className="flex-1" onClick={() => navigate('/')}>Home</Button>
-          <Button variant="gold" className="flex-1" onClick={() => startGame(difficulty)}>Play Again</Button>
+          <Button variant="gold" className="flex-1" onClick={() => { robots.recast(); startGame(difficulty); }}>Play Again</Button>
         </div>
       } />
   );

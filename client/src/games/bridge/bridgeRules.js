@@ -96,7 +96,7 @@ const targetLevel = (points, denom) => {
  * balanced 15-17, support partner's suit with 3+ cards, stop at the level the
  * combined points justify.
  */
-export function chooseBid({ hand, auction, seat, difficulty }) {
+export function chooseBid({ hand, auction, seat, difficulty, bold = 0 }) {
   const current = currentBid(auction);
   const legalBids = [1, 2, 3, 4, 5, 6, 7].flatMap(l => DENOMINATIONS.map(d => `${l}${d}`))
     .filter(b => bidHigher(b, current));
@@ -106,7 +106,7 @@ export function chooseBid({ hand, auction, seat, difficulty }) {
     return legalBids[Math.floor(Math.random() * Math.min(3, legalBids.length))];
   }
 
-  const hcp = highCardPoints(hand);
+  const hcp = highCardPoints(hand) + Math.round(bold * 2);   // a daredevil values a hand higher, a careful player lower
   const lengths = suitLengths(hand);
   const partnerBids = auction.filter(b => b.seat === partnerOf(seat) && b.bid !== PASS);
   const partnerSuit = partnerBids.length ? bidDenom(partnerBids[partnerBids.length - 1].bid) : null;

@@ -106,8 +106,8 @@ export function act(s, a) {
 }
 
 // ── Computer players ─────────────────────────────────────────────────────────
-export function robotAction(s, seat, level) {
-  const m = chooseMove(s.pos, level);
+export function robotAction(s, seat, level, style) {
+  const m = chooseMove(s.pos, level, Math.random, style?.bold ?? 0);
   return { type: 'move', seat, from: m.from, to: m.to, promo: m.promo || undefined };
 }
 

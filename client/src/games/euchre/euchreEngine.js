@@ -186,10 +186,10 @@ export function act(s, a) {
 }
 
 // ── Computer players ─────────────────────────────────────────────────────────
-export function robotAction(s, seat, level) {
+export function robotAction(s, seat, level, style) {
   if (s.phase === 'bidding') {
     const choice = chooseCall({
-      hand: s.hands[seat], seat, dealer: s.dealer, upcard: s.upcard, round: s.round, turnedDown: s.turnedDown, level,
+      hand: s.hands[seat], seat, dealer: s.dealer, upcard: s.upcard, round: s.round, turnedDown: s.turnedDown, level, bold: style?.bold,
     });
     return choice.call ? { type: 'call', seat, suit: choice.suit, alone: choice.alone } : { type: 'pass', seat };
   }

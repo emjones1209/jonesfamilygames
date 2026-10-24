@@ -12,8 +12,8 @@
  *   { type: 'nextRound' }                   deal the next round after the scores are shown
  *   { type: 'newGame' }                     start again after the last round
  *
- * `waitingFor(state)` says whose move it is; `robotAction(state, seat, level)`
- * picks a computer player's move; `viewFor(state, seat)` hides the other hands
+ * `waitingFor(state)` says whose move it is; `robotAction(state, seat, level, style)`
+ * picks a computer player's move (style: their personality, see players.js); `viewFor(state, seat)` hides the other hands
  * and the boneyard.
  */
 import { dealRound, act as rulesAct, roundScores, isDouble, MEXICAN } from './trainRules.js';
@@ -80,7 +80,7 @@ function finishRound(s) {
 
 // ── Computer players ─────────────────────────────────────────────────────────
 /** The move a computer player at `seat` makes now (it must be their turn). */
-export const robotAction = (s, seat, level) => ({ ...chooseAction(s, level), seat });
+export const robotAction = (s, seat, level, style) => ({ ...chooseAction(s, level, style?.bold), seat });
 
 // ── What each player may see ─────────────────────────────────────────────────
 const hide = tiles => tiles.map(() => null);   // keeps the count, drops the tiles

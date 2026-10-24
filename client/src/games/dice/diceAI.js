@@ -1,5 +1,5 @@
 /**
- * Five Dice computer players. `robotStep(card, turn, level)` returns the next
+ * Five Dice computer players. `robotStep(card, turn, level, bold)` returns the next
  * move: { type: 'roll', held } (which dice to keep) or { type: 'score', box }.
  *
  * easy   – keeps its most common number and scores wherever it gets the most points
@@ -11,10 +11,10 @@
  */
 import { options, counts, UPPER, upperTotal, UPPER_BONUS_AT, UPPER_BONUS, ROLLS_PER_TURN } from './diceRules.js';
 
-export function robotStep(card, turn, level) {
+export function robotStep(card, turn, level, bold = 0) {
   if (turn.rollsLeft === ROLLS_PER_TURN) return { type: 'roll', held: [false, false, false, false, false] };
   const choose = level === 'hard' ? hardPlan : level === 'medium' ? mediumPlan : easyPlan;
-  return choose(card, turn);
+  return choose(card, turn, bold);
 }
 
 // ── Easy ─────────────────────────────────────────────────────────────────────
@@ -28,7 +28,7 @@ function easyPlan(card, { dice, rollsLeft }) {
 }
 
 // ── Medium ───────────────────────────────────────────────────────────────────
-function mediumPlan(card, { dice, rollsLeft }) {
+function mediumPlan(card, { dice, rollsLeft }, bold) {
   const opts = options(card, dice);
   const value = (box, pts) => {
     const i = UPPER.indexOf(box);
@@ -38,7 +38,8 @@ function mediumPlan(card, { dice, rollsLeft }) {
   };
   const best = Object.entries(opts).reduce((a, b) => (value(...b) > value(...a) ? b : a));
   const sorted = [...new Set(dice)].sort((a, b) => a - b);
-  if (rollsLeft === 0 || opts.fiveKind === 50 || opts.largeStraight === 40 || (opts.fullHouse === 25 && card.fullHouse == null)) {
+  // (A daredevil turns down a full house to roll on for something bigger)
+  if (rollsLeft === 0 || opts.fiveKind === 50 || opts.largeStraight === 40 || (opts.fullHouse === 25 && card.fullHouse == null && bold < 0.8)) {
     return { type: 'score', box: best[0] };
   }
   // Chase a straight when four in a row are showing and a straight box is open
@@ -113,7 +114,7 @@ function boxValue(card, box, pts) {
   return v;
 }
 
-function hardPlan(card, { dice, rollsLeft }) {
+function hardPlan(card, { dice, rollsLeft }, bold) {
   // Best box value for every possible set of five dice (with no rolls left)
   const final = new Float64Array(6 ** 6);
   for (const hand of HANDS) {
@@ -149,7 +150,9 @@ function hardPlan(card, { dice, rollsLeft }) {
       const e = expect(keep, worth);
       if (e > bestE) { bestE = e; bestKeep = keep; }
     }
-    if (bestE > bestNow + 1e-9) {
+    // Roll again if it's expected to do better — a daredevil pushes their luck a little past
+    // that, a careful player stops a little sooner
+    if (bestE > bestNow - bold * 3 + 1e-9) {
       // Hold the dice that make up the chosen set
       const need = counts(diceOf(bestKeep.code));
       return { type: 'roll', held: dice.map(d => (need[d] > 0 ? (need[d]--, true) : false)) };

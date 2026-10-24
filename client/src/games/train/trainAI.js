@@ -13,7 +13,7 @@
  */
 import { legalMoves, openEnd, isDouble, pips, matches, MEXICAN } from './trainRules.js';
 
-export function chooseAction(s, level) {
+export function chooseAction(s, level, bold = 0) {
   const seat = s.turn;
   const moves = legalMoves(s, seat);
   if (!moves.length) return s.drew || !s.boneyard.length ? { type: 'pass' } : { type: 'draw' };
@@ -25,7 +25,8 @@ export function chooseAction(s, level) {
 
   const own = m => s.trains[m.train].owner === seat;
   if (level === 'medium') {
-    const score = m => pips(tile(m.tileId)) + (own(m) ? 5 : 0) + (isDouble(tile(m.tileId)) ? 3 : 0);
+    // (A daredevil plays doubles and wanders off its own train more; a careful player stays home)
+    const score = m => pips(tile(m.tileId)) + (own(m) ? 5 - bold * 4 : 0) + (isDouble(tile(m.tileId)) ? 3 + bold * 4 : 0);
     return play(moves.reduce((a, b) => (score(b) > score(a) ? b : a)));
   }
 
@@ -43,7 +44,7 @@ export function chooseAction(s, level) {
     const t = tile(m.tileId);
     let v = pips(t);
     if (someoneNearlyOut) return v * 10 + (coverable(m) ? 1 : 0);     // just shed points
-    if (!coverable(m)) v -= 100;
+    if (!coverable(m)) v -= bold >= 0.8 ? 30 : 100;                     // a daredevil risks a double it can't cover
     if (own(m)) {
       // On our own train, follow the planned run (and take our marker off)
       if (chain.length && chain[0].id === t.id) v += 40 + (s.trains[seat].open ? 30 : 0);
@@ -53,7 +54,7 @@ export function chooseAction(s, level) {
       v += inChain.has(t.id) ? -40 : 20;
       if (s.trains[m.train].owner === MEXICAN) v += 2;
     }
-    if (isDouble(t) && coverable(m)) v += 15;                           // doubles are hard to place later
+    if (isDouble(t) && coverable(m)) v += 15 + bold * 10;               // doubles are hard to place later
     return v;
   };
   return play(moves.reduce((a, b) => (score(b) > score(a) ? b : a)));

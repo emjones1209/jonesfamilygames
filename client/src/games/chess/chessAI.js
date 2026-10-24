@@ -149,15 +149,22 @@ export function rankMoves(position, level = 'medium', spread = (LEVELS[level] ??
   return ranked;
 }
 
-/** The computer's move. Picks among moves within a few points of the best, so games vary. */
-export function chooseMove(pos, level = 'medium', random = Math.random) {
+/**
+ * The computer's move. Picks among moves within a few points of the best, so games vary —
+ * and by personality (bold): a daredevil prefers captures and promotions among moves nearly
+ * as good as the best, a careful player prefers quiet moves.
+ */
+export function chooseMove(pos, level = 'medium', random = Math.random, bold = 0) {
   const cfg = LEVELS[level] ?? LEVELS.medium;
   const moves = legalMoves(pos);
   if (!moves.length) return null;
   if (random() < cfg.random) return moves[Math.floor(random() * moves.length)];
   const ranked = rankMoves(pos, level);
-  const good = ranked.filter(r => r.exact && r.score >= ranked[0].score - cfg.spread);
-  return good[Math.floor(random() * good.length)].move;
+  const good = ranked.filter(r => r.exact && r.score >= ranked[0].score - cfg.spread - Math.abs(bold) * 15);
+  const sharp = r => !!(r.move.captured || r.move.promo);
+  const liked = Math.abs(bold) >= 0.3 && !isMateScore(ranked[0].score) ? good.filter(r => sharp(r) === bold > 0) : [];
+  const pool = liked.length ? liked : good.filter(r => r.score >= ranked[0].score - cfg.spread);
+  return pool[Math.floor(random() * pool.length)].move;
 }
 
 export const isMateScore = score => Math.abs(score) > MATE / 2;

@@ -178,7 +178,7 @@ const LEVELS = {
  * plays at random; Medium 4; Hard searches as deep as its budget allows
  * (usually 7–10 moves) with a better sense of position.
  */
-export function chooseMove(board, seat, level = 'medium', random = Math.random) {
+export function chooseMove(board, seat, level = 'medium', random = Math.random, bold = 0) {
   const moves = legalMoves(board, seat);
   if (!moves.length) return null;
   if (moves.length === 1) return moves[0];
@@ -187,6 +187,7 @@ export function chooseMove(board, seat, level = 'medium', random = Math.random) 
   const evalLevel = level === 'hard' ? 'hard' : 'simple';
   const budget = { nodes };                                             // shared by every depth
   let best = moves;                                                     // best moves from the last finished depth
+  let lastScored = null;
   let ranked = order(moves);                                            // each depth tries the last one's best first
   for (let depth = 1; depth <= maxDepth; depth++) {
     const scored = [];
@@ -200,8 +201,20 @@ export function chooseMove(board, seat, level = 'medium', random = Math.random) 
     if (scored.length < moves.length) break;                          // ran out part-way: keep the last full answer
     const top = Math.max(...scored.map(s => s.v));
     best = scored.filter(s => s.v === top).map(s => s.m);
+    lastScored = scored;
     ranked = [...scored].sort((a, b) => b.v - a.v).map(s => s.m);
     if (Math.abs(top) > WIN / 2) break;                                // found a forced win (or loss)
+  }
+  // Personality: among moves nearly as good as the best, a daredevil pushes forward
+  // and a careful player keeps its pieces out of reach
+  if (bold && lastScored && Math.abs(Math.max(...lastScored.map(s => s.v))) < WIN / 2) {
+    const top = Math.max(...lastScored.map(s => s.v));
+    const close = lastScored.filter(s => s.v >= top - 12).map(s => s.m);
+    const advance = m => (seat === 0 ? -1 : 1) * (m.path[m.path.length - 1][0] - m.path[0][0]) + (crowns(board, m) ? 3 : 0);
+    const exposed = m => threatened(applyMove(board, m), seat).length;
+    const styleOf = m => (bold > 0 ? advance(m) : -exposed(m));
+    const most = Math.max(...close.map(styleOf));
+    best = close.filter(m => styleOf(m) === most);
   }
   return best[Math.floor(random() * best.length)];
 }

@@ -10,8 +10,18 @@ const { io: connect } = require('socket.io-client');
 
 process.env.JWT_SECRET = 'test-secret';
 const { socketAuth } = require('../middleware/auth');
-const { createTables } = require('./tables');
+const { createTables, REACTIONS } = require('./tables');
 const engine = require('../../client/src/games/rook/rookEngine.js');
+const { COMPUTER_NAMES } = require('../../client/src/games/players.js');
+
+/** The robots' names at a table: each a different one of the computer players (picked at random). */
+function robotNames(seats) {
+  const names = seats.filter(s => s?.type === 'robot').map(s => s.name);
+  assert.ok(names.every(n => COMPUTER_NAMES.includes(n)), `unexpected robot names ${names}`);
+  assert.equal(new Set(names).size, names.length, 'two robots with the same name');
+  assert.ok(seats.filter(s => s?.type === 'robot').every(s => s.tagline), 'a robot without a tagline');
+  return names;
+}
 
 let server, io, tables, url;
 const clients = [];
@@ -21,7 +31,7 @@ before(async () => {
   server = http.createServer();
   io = new Server(server);
   io.use(socketAuth);
-  tables = createTables(io, { robotMs: 2, collectMs: 2, awayMs: 60, notify: (userIds, message) => notices.push({ userIds, message }) });
+  tables = createTables(io, { robotMs: 2, collectMs: 2, awayMs: 60, sayAfterMs: 1, chatterRng: () => 0, notify: (userIds, message) => notices.push({ userIds, message }) });
   await new Promise(resolve => server.listen(0, resolve));
   url = `http://localhost:${server.address().port}`;
 });
@@ -200,7 +210,8 @@ test('two people and a robot play 6-Card Golf (empty seats are left out)', async
   }
   gran.socket.emit('mp:start');
   await until(() => gran.table.status === 'playing');
-  assert.deepEqual(gran.table.seats.map(s => s.name), ['Gran', 'Kid', 'Phoebe']);
+  assert.deepEqual(gran.table.seats.map(s => s.name).slice(0, 2), ['Gran', 'Kid']);
+  assert.equal(robotNames(gran.table.seats).length, 1);
   assert.equal(gran.table.view.players, 3);
   await until(() => peeked != null);
 
@@ -242,7 +253,8 @@ test('a person and two robots play Mexican Train', async () => {
   }, 1));
   grandpa.socket.emit('mp:start');
   await until(() => grandpa.table.status === 'playing');
-  assert.deepEqual(grandpa.table.seats.map(s => s.name), ['Grandpa', 'Phoebe', 'Xavier']);
+  assert.equal(grandpa.table.seats[0].name, 'Grandpa');
+  assert.equal(robotNames(grandpa.table.seats).length, 2);
   assert.equal(grandpa.table.view.players, 3);
 
   await until(() => grandpa.table.view.phase === 'gameOver', 30000);
@@ -258,14 +270,15 @@ test('the host picks Spades partners and a shorter game', async () => {
   await friend.emit('mp:join', { code });
   for (const seat of [2, 3]) host.socket.emit('mp:robot', { seat, on: true });
   await until(() => host.table?.seats.filter(Boolean).length === 4);
-  assert.deepEqual(host.table.seats.map(s => s.name), ['Emily', 'Sam', 'Phoebe', 'Xavier']);
+  const [r2, r3] = robotNames(host.table.seats);
+  assert.deepEqual(host.table.seats.map(s => s.name), ['Emily', 'Sam', r2, r3]);
 
   // Sam sits opposite Emily (her partner): only the host can move people
   friend.socket.emit('mp:swap', { from: 1, to: 2 });
   host.socket.emit('mp:swap', { from: 1, to: 9 });                     // no such seat: ignored
   host.socket.emit('mp:swap', { from: 1, to: 2 });
   await until(() => host.table.seats[2].name === 'Sam');
-  assert.deepEqual(host.table.seats.map(s => s.name), ['Emily', 'Phoebe', 'Sam', 'Xavier']);
+  assert.deepEqual(host.table.seats.map(s => s.name), ['Emily', r2, 'Sam', r3]);
   assert.equal(friend.table.you, 2);
 
   assert.equal(host.table.options.target, 500);
@@ -334,7 +347,7 @@ for (const [game, robots] of tablesToPlay) {
     await until(() => me.table);
     for (const seat of robots) me.socket.emit('mp:robot', { seat, on: true });
     await until(() => me.table.seats.filter(Boolean).length === robots.length + 1);
-    assert.deepEqual(me.table.seats.filter(Boolean).slice(1).map(s => s.name), ['Phoebe', 'Xavier', 'Heraldo'].slice(0, robots.length));
+    assert.equal(robotNames(me.table.seats).length, robots.length);
 
     const engine = engines[game];
     const done = v => (game === 'dice' ? v.phase === 'gameOver' : ['handOver', 'gameOver', 'show'].includes(v.phase));
@@ -364,6 +377,11 @@ for (const [game, robots] of tablesToPlay) {
     await until(() => done(me.table.view), 60000);
     assert.equal(sawSomething, false, `saw cards that should be hidden in ${game}`);
     assert.deepEqual(me.errors, []);
+    // The robots react to how it went (in these tests they always do; really, now and then)
+    if (game !== 'checkers' && game !== 'chess') {
+      await until(() => me.reactions.some(r => r.seat !== 0));
+      assert.ok(me.reactions.every(r => REACTIONS.includes(r.emoji)));
+    }
   });
 }
 

@@ -1,6 +1,7 @@
-﻿import React, { useState, useCallback, useEffect, useRef } from "react";
+﻿import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { tableNames } from "../players";
+import { useRobots, useRobotChatter } from "../useRobots";
+import { ReactionBursts } from "../../components/Reactions";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, HelpCircle } from "lucide-react";
 import { shuffle } from "../../utils/cardEngine";
@@ -16,7 +17,6 @@ import { RulesButton } from '../../components/RulesButton';
 
 // Two players: you and the computer
 const NUM_PLAYERS = 2;
-const PLAYER_NAMES = tableNames(NUM_PLAYERS);
 // Pacing of a computer turn (ms): pause before drawing, time showing the drawn
 // card, and time showing where it went before the next player's turn
 const AI_THINK_MS = 700, AI_SHOW_MS = 1300, AI_AFTER_MS = 1000;
@@ -25,6 +25,8 @@ const cardLabel = c => (c.suit==="joker" ? "Joker" : `${c.rank}${SUIT_SYMBOL[c.s
 
 export default function Golf6Game() {
   const navigate=useNavigate();
+  const robots=useRobots(NUM_PLAYERS);
+  const PLAYER_NAMES=robots.names;
   const [difficulty,setDifficulty]=useState(null);
   const [grids,setGrids]=useState([]);
   const [stock,setStock]=useState([]);
@@ -45,6 +47,9 @@ export default function Golf6Game() {
   const [showTutorial,setShowTutorial]=useState(false);
   // Turning a card over without drawing ends your turn, so it takes two taps: one to choose, one to confirm
   const [armed,setArmed]=useState(null);   // { row, col }
+  // The robot reacts when the game ends (Golf here is a single hand)
+  const scoreboard=useMemo(()=>({ phase: phase==="gameOver"?"gameOver":"playing", totals: totalScores, players: NUM_PLAYERS }),[phase,totalScores]);
+  const reactions=useRobotChatter("golf",scoreboard,robots.cast);
 
   const startGame=diff=>{
     setDifficulty(diff);
@@ -83,7 +88,7 @@ export default function Golf6Game() {
     setPhase("gameOver");
     setMsg(`Final hands: You ${rs[0]} · ${PLAYER_NAMES[1]} ${rs[1]}`);
     api.post("/scores",{game:"golf6",score:-nt[0],difficulty}).catch(()=>{});   // negated: low golf scores rank high
-  },[difficulty]);
+  },[difficulty,PLAYER_NAMES]);
 
   const checkAndAdvance=useCallback((ng,pi)=>{
     const np = NUM_PLAYERS;
@@ -103,7 +108,7 @@ export default function Golf6Game() {
       setFinalTurnsLeft(left);
     }
     setCurrentPlayer(next);
-  },[finalRound,finalTurnsLeft,totalScores,endGame]);
+  },[finalRound,finalTurnsLeft,totalScores,endGame,PLAYER_NAMES]);
 
   const drawFromStock=()=>{
     if (phase!=="playing"||currentPlayer!==0||drawn) return;
@@ -166,7 +171,7 @@ export default function Golf6Game() {
       const fromDiscard=!ns.length||chooseSource({ grid:ng[pi], topDiscard:nd[0], difficulty });
       const drawnCard=fromDiscard?nd.shift():{...ns.shift(),faceUp:true};
       const opponentGrids=ng.filter((_,i)=>i!==pi);
-      const [bestRow,bestCol]=choosePlacement({ grid:ng[pi], opponentGrids, card:drawnCard, fromDiscard, difficulty })||[-1,-1];
+      const [bestRow,bestCol]=choosePlacement({ grid:ng[pi], opponentGrids, card:drawnCard, fromDiscard, difficulty, bold:robots.styleOf(pi)?.bold })||[-1,-1];
       let finalDiscard, placedMsg;
       if (bestRow>=0) {
         const old=ng[pi][bestRow][bestCol];
@@ -196,7 +201,7 @@ export default function Golf6Game() {
     }, AI_THINK_MS);
 
     return ()=>timers.forEach(clearTimeout);
-  },[currentPlayer,phase]);
+  },[currentPlayer,phase,robots,PLAYER_NAMES]);
 
   if (phase==="setup") return (
     <div className="min-h-screen bg-gradient-to-br from-game-bg to-lime-900 p-5 flex flex-col">
@@ -207,7 +212,7 @@ export default function Golf6Game() {
         <div className="text-6xl mb-3">&#9971;</div>
         <h1 className="game-title text-3xl mb-2">6-Card Golf</h1>
         <p className="text-white/50 mb-1 text-center">Lowest score wins! Same-column pairs cancel to 0 (pairs of 2s and Jokers keep their minus points).</p>
-        <p className="text-white/40 text-sm mb-1 text-center">You against {PLAYER_NAMES[1]}</p>
+        <p className="text-white/40 text-sm mb-1 text-center">You against {robots.who(1)}</p>
         <p className="text-white/30 text-xs mb-5 text-center">Joker=-4, 2=-2, K=0, A=1, J=11, Q=12</p>
         <div className="w-full space-y-3">
           {[["easy","😊 Easy"],["medium","🤔 Medium"],["hard","🔥 Hard"]].map(([d,l])=>(
@@ -244,7 +249,7 @@ export default function Golf6Game() {
         {phase==="gameOver"&&!showResults
           ? <div className="flex gap-2">
               <button onClick={()=>setShowResults(true)} className="bg-game-gold text-game-bg font-bold text-sm rounded-xl px-3 min-h-[40px]">See results</button>
-              <button onClick={()=>startGame(difficulty)} className="bg-primary-600 text-white font-semibold text-sm rounded-xl px-3 min-h-[40px]">Play again</button>
+              <button onClick={()=>{ robots.recast(); startGame(difficulty); }} className="bg-primary-600 text-white font-semibold text-sm rounded-xl px-3 min-h-[40px]">Play again</button>
             </div>
           : <div className="text-white/60 text-xs">{difficulty} {finalRound?"- Final Round!":""}</div>}
         <div className="text-game-gold font-bold text-sm">You: {myScore}</div>
@@ -337,7 +342,7 @@ export default function Golf6Game() {
             </div>
             <div className="flex gap-3 mb-3">
               <Button variant="secondary" className="flex-1" onClick={()=>navigate("/")}>Home</Button>
-              <Button variant="primary" className="flex-1" onClick={()=>startGame(difficulty)}>Again</Button>
+              <Button variant="primary" className="flex-1" onClick={()=>{ robots.recast(); startGame(difficulty); }}>Again</Button>
             </div>
             <Button variant="ghost" className="w-full" onClick={()=>setShowResults(false)}>
               Look at the final cards
@@ -345,6 +350,7 @@ export default function Golf6Game() {
           </motion.div>
         </div>
       )}
+      <ReactionBursts reactions={reactions} you={0} players={NUM_PLAYERS} nameOf={seat=>PLAYER_NAMES[seat]} />
     </div>
   );
 }

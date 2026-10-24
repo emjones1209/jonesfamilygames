@@ -91,12 +91,13 @@ export function handStrength(hand) {
 }
 
 /** Next bid, or 'pass'. `high` is the current high bid (0 if none yet). */
-export function chooseBid(hand, high, difficulty) {
+export function chooseBid(hand, high, difficulty, bold = 0) {
   const next = high ? high + BID_STEP : MIN_BID;
   if (next > MAX_BID) return 'pass';
   if (difficulty === 'easy') return next <= 90 && Math.random() < 0.5 ? next : 'pass';
   let limit = Math.floor(handStrength(hand) / BID_STEP) * BID_STEP;
   if (difficulty === 'hard') limit += BID_STEP;       // bid a little more boldly
+  limit += Math.round(bold * 2) * BID_STEP;           // and a daredevil more boldly still (a careful player less)
   return next <= Math.min(limit, MAX_BID) ? next : 'pass';
 }
 

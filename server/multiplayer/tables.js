@@ -30,7 +30,7 @@
  *   mp:mine                    → ack { tables }   the open tables I have a seat at, latest first (for "Rejoin your table")
  * To each player:
  *   mp:table  { code, game, status, hostId, level, options, you, seats, view }
- *   mp:reaction { seat, emoji }
+ *   mp:reaction { seat, emoji }                   (robots send them too, now and then: see chatter.js)
  *
  * Notifications: someone who sends an invitation and puts their iPad down can
  * ask to be told when a guest turns up. `notify(userIds, message)` (see
@@ -113,9 +113,12 @@ const defaultOptions = game => Object.fromEntries(
 /** Seats that must move now: several at once in some games (everyone turning over cards in Golf). */
 const waitingOn = (engine, s) => (engine.waitingOn ? engine.waitingOn(s) : [engine.waitingFor(s)].filter(x => x != null));
 
-// Robots take the computer players' names from the single-player games (Phoebe, Xavier, Heraldo)
-const { COMPUTER_NAMES } = require('../../client/src/games/players.js');
-const robotName = table => COMPUTER_NAMES.find(n => !table.seats.some(s => s?.type === 'robot' && s.name === n)) ?? 'Robot';
+// Robots are the single-player games' computer players (Phoebe, Xavier, Heraldo, Ajax, Beatrice),
+// picked at random, each with their own personality: how boldly they play and what they say
+const { pickRobots, robotNamed } = require('../../client/src/games/players.js');
+const { moments, reactionsFor } = require('../../client/src/games/chatter.js');
+const robotName = table => pickRobots(1, { taken: table.seats.filter(s => s?.type === 'robot').map(s => s.name) })[0]?.name ?? 'Robot';
+const personalityAt = (table, seat) => (table.seats[seat]?.type === 'robot' ? robotNamed(table.seats[seat].name) : null);
 
 const REACTIONS = [
   '👍', '😂', '🙃', '🤦', '😮', '😬', '🥺', '😭', '🤔', '😱', '🙈', '😎', '🎉', '🥳', '👏', '🔥',
@@ -127,6 +130,8 @@ const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';        // no I, L or O (easily con
 function createTables(io, {
   robotMs = 900,          // pause before a robot moves
   collectMs = 1400,       // how long a finished trick stays on the table
+  sayAfterMs = 700,       // a moment to take in what happened before a robot reacts to it
+  chatterRng = Math.random,   // (tests make the robots always speak up)
   awayMs = 60000,         // after this, the others may have a robot play for a disconnected player
   idleMs = 3 * 60 * 60 * 1000,
   notify = () => {},
@@ -188,6 +193,7 @@ function createTables(io, {
           gone: !!seat.gone && !seat.away,     // disconnected a while: the others may have a robot play for them
           left: !!seat.left,                   // chose to leave mid-game: a robot plays for them (and the others are told)
           watching: seat.type === 'human' && table.watchers.has(seat.userId),
+          tagline: seat.type === 'robot' ? robotNamed(seat.name)?.tagline ?? null : null,
         }),
         view: table.state && you >= 0 ? engine.viewFor(table.state, you) : null,
       });
@@ -205,7 +211,7 @@ function createTables(io, {
       table.timer = setTimeout(() => {
         if (!waitingOn(engine, table.state).includes(seat)) return;
         try {
-          apply(table, engine.robotAction(table.state, seat, table.level));
+          apply(table, engine.robotAction(table.state, seat, table.level, personalityAt(table, seat) ?? undefined));
         } catch (e) {
           console.error(`Robot move refused at table ${table.code} (${table.game}):`, e.message);   // never take the server down
         }
@@ -216,9 +222,27 @@ function createTables(io, {
   }
 
   function apply(table, action) {
+    const before = table.state;
     table.state = GAMES[table.game].engine.act(table.state, action);
     broadcast(table);
     schedule(table);
+    chatter(table, before);
+  }
+
+  /** Now and then, a robot reacts to what just happened (see chatter.js), as a person would. */
+  function chatter(table, before) {
+    const said = reactionsFor(moments(table.game, before, table.state), {
+      robots: seat => personalityAt(table, seat),
+      isPerson: seat => table.seats[seat]?.type === 'human',
+      lastSaid: table.lastSaid,
+      rng: chatterRng,
+    });
+    said.forEach(({ seat, emoji }, i) => {
+      const timer = setTimeout(() => {
+        if (tables.get(table.code) === table) io.to(table.code).emit('mp:reaction', { seat, emoji });
+      }, sayAfterMs + i * 900);
+      timer.unref?.();
+    });
   }
 
   const inLobby = table => table.status === 'lobby';
@@ -243,7 +267,7 @@ function createTables(io, {
       const code = newCode();
       const table = {
         code, game, hostId: user.id, status: 'lobby', level: 'hard', options: defaultOptions(game), state: null, timer: null,
-        seats: Array(GAMES[game].seats).fill(null), lastActive: Date.now(), lastReaction: new Map(),
+        seats: Array(GAMES[game].seats).fill(null), lastActive: Date.now(), lastReaction: new Map(), lastSaid: new Map(),
         watchers: new Set(), notified: new Map(),
       };
       table.seats[0] = { type: 'human', userId: user.id, name: user.displayName, connected: true };

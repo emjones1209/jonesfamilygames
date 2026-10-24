@@ -88,10 +88,11 @@ function finishHand(s) {
 const works = (s, step) => { try { rulesAct(s, step); return true; } catch { return false; } };
 
 /** The next step of a computer player's turn (it must be their turn). */
-export function robotAction(s, seat, level) {
-  if (s.phase === 'draw') return { ...chooseDraw(s, level), seat };
+export function robotAction(s, seat, level, style) {
+  const bold = style?.bold ?? 0;
+  if (s.phase === 'draw') return { ...chooseDraw(s, level, bold), seat };
   let steps = s.robotPlan?.seat === seat ? s.robotPlan.steps : null;
-  if (!steps?.length || !works(s, steps[0])) steps = choosePlay(s, level);     // plan (or re-plan) the turn
+  if (!steps?.length || !works(s, steps[0])) steps = choosePlay(s, level, bold);     // plan (or re-plan) the turn
   const [step, ...rest] = steps;
   return { ...step, seat, plan: rest };
 }
