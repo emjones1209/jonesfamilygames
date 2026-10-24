@@ -119,7 +119,7 @@ const robotName = table => COMPUTER_NAMES.find(n => !table.seats.some(s => s?.ty
 
 const REACTIONS = [
   '👍', '😂', '🙃', '🤦', '😮', '😬', '🥺', '😭', '🤔', '😱', '🙈', '😎', '🎉', '🥳', '👏', '🔥',
-  'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄',
+  'Nice!', 'Oops!', 'Ouch!', 'Good one!', 'Hurry up! 😄',
 ];
 const LEVELS = ['easy', 'medium', 'hard'];
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';        // no I, L or O (easily confused)
