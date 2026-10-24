@@ -49,7 +49,7 @@ import { stillNotifying } from '../utils/push';
 
 const REACTIONS = [
   '👍', '😂', '🙃', '🤦', '😮', '😬', '🥺', '😭', '🤔', '😱', '🙈', '😎', '🎉', '🥳', '👏', '🔥',
-  'Nice!', 'Oops!', 'Good one!', 'Hurry up! 😄',
+  'Nice!', 'Oops!', 'Ouch!', 'Good one!', 'Hurry up! 😄',
 ];
 const PARTNERS = 'Seats 1 & 3 are partners, and so are seats 2 & 4.';
 // Each game's screen, how to turn its view round, what the lobby says about seats,
