@@ -177,8 +177,9 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
     const att = b ? view.battlefield.find(x => x.id === b.attacker) : blockerOf(p.id) ? view.battlefield.find(x => x.id === blockerOf(p.id).id) : null;
     if (att) return `🛡 ${att.name}`;
     if (combatIds.has(p.id) || attackers?.has(p.id)) return '⚔️ attacking';
-    const auras = view.battlefield.filter(x => x.attachedTo === p.id);
-    if (auras.length) return `✨ ${auras.map(a => a.name).join(', ')}`;
+    const attached = view.battlefield.filter(x => x.attachedTo === p.id);
+    if (attached.length) return attached.map(a => `${defOf(a).aura ? '✨' : '⚒️'} ${a.name}`).join(', ');
+    if (defOf(p).equipment) return p.attachedTo ? `⚒️ on ${view.battlefield.find(x => x.id === p.attachedTo)?.name ?? '?'}` : '⚒️ not equipped';
     return null;
   };
 
@@ -193,8 +194,10 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
       return `${names[1]} is thinking…`;
     }
     if (pending) return '';
+    if (top?.kind === 'trigger') return `${top.controller === 1 ? `${names[1]}'s` : 'Your'} ${top.sourceName} has triggered: "${top.text}" Respond with an instant, or tap OK.`;
     if (top && top.controller === 1) return `${names[1]} is ${top.card ? `casting ${top.card.name}` : `using ${top.sourceName}`}. You can respond with an instant, or tap OK.`;
     if (top) return `Your ${top.card?.name ?? top.sourceName} is waiting to resolve. Tap OK.`;
+    if (view.step === 'upkeep') return 'Upkeep: the start of the turn, before the draw. Tap OK.';
     if (view.step === 'attacks') return `${names[1]} is attacking. Cast an instant before blocking, or tap OK.`;
     if (view.step === 'blocks') return 'Blockers are set. Cast a combat trick now, or tap OK for combat damage.';
     if (view.step === 'end') return `${names[1]}'s turn is ending: last chance for instants. Tap OK when done.`;
@@ -301,7 +304,7 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
                   glow={targeting && isTarget({ type: 'stack', id: item.id }) ? 'target' : i === 0 ? 'selected' : null}
                   onClick={() => tapStack(item)} />
                 <span className="text-[10px] text-white/60 mt-0.5 max-w-[7rem] text-center leading-tight">
-                  {names[item.controller]}{item.kind === 'ability' ? '\'s ability' : ''}
+                  {names[item.controller]}{item.kind === 'ability' ? '\'s ability' : item.kind === 'trigger' ? '\'s trigger' : ''}
                   {item.targets.filter(Boolean).length ? ` → ${item.targets.filter(Boolean).map(t => targetName(view, t, names)).join(', ')}` : ''}
                 </span>
               </div>
@@ -410,11 +413,13 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
             })()}
             {detail.p && (defOf(detail.p).abilities ?? []).map((ab, i) => (
               canActivate(view, 0, detail.p, i)
-                ? <Button key={i} variant="primary" onClick={() => activate(detail.p, i)}>Use: {ab.cost && <ManaCost cost={ab.cost} />}{ab.tap ? ' tap' : ''} → {ab.label}</Button>
-                : detail.p.controller === 0 && <p key={i} className="text-white/50 text-xs text-center">Its ability ({ab.label}) can't be used right now.</p>
+                ? <Button key={i} variant="primary" onClick={() => activate(detail.p, i)}>{ab.equip ? 'Equip' : 'Use'}: {ab.cost && <ManaCost cost={ab.cost} />}{ab.tap ? ' tap' : ''}{ab.sac ? ' sacrifice' : ''}{ab.equip ? '' : ` → ${ab.label}`}</Button>
+                : detail.p.controller === 0 && <p key={i} className="text-white/50 text-xs text-center">
+                  {ab.equip ? 'Equip can only be used in your own main phase, when nothing is waiting, with mana to pay.' : `Its ability (${ab.label}) can't be used right now.`}
+                </p>
             ))}
             {detail.p && view.battlefield.filter(x => x.attachedTo === detail.p.id).map(a => (
-              <Button key={a.id} variant="ghost" onClick={() => setDetail({ card: a, p: a })}>✨ Enchanted by {a.name}</Button>
+              <Button key={a.id} variant="ghost" onClick={() => setDetail({ card: a, p: a })}>{defOf(a).aura ? `✨ Enchanted by ${a.name}` : `⚒️ Equipped with ${a.name}`}</Button>
             ))}
             {detail.p?.attachedTo && (() => {
               const host = view.battlefield.find(x => x.id === detail.p.attachedTo);

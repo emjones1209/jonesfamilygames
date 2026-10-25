@@ -23,12 +23,14 @@ const FRAMES = {
   G: ['#d3e8cf', '#4f9a5c', '#132c17'],
   gold: ['#f2e2a6', '#c79a2c', '#3a2a05'],
   land: ['#e6dccb', '#9b8a6c', '#2b2418'],
+  artifact: ['#dcdde2', '#8a8f99', '#1f2228'],
   none: ['#e3e3e3', '#999', '#222'],
 };
 
 function frameOf(def) {
   if (isLand(def)) return { land: true, colors: [def.mana], frame: FRAMES.land };
   const colors = colorsOf(def);
+  if (!colors.length && def.type.includes('Artifact')) return { colors, frame: FRAMES.artifact };
   return { colors, frame: colors.length > 1 ? FRAMES.gold : FRAMES[colors[0]] ?? FRAMES.none };
 }
 
@@ -67,11 +69,11 @@ export function RulesText({ text, size = 13 }) {
 const KW_LABEL = {
   flying: 'Flying', reach: 'Reach', firstStrike: 'First strike', doubleStrike: 'Double strike', trample: 'Trample',
   haste: 'Haste', vigilance: 'Vigilance', lifelink: 'Lifelink', deathtouch: 'Deathtouch', defender: 'Defender',
-  menace: 'Menace', shroud: 'Shroud',
+  menace: 'Menace', shroud: 'Shroud', hexproof: 'Hexproof',
 };
 const KW_ICON = {
   flying: '🪽', reach: '🕸️', firstStrike: '⚔️', doubleStrike: '⚔️⚔️', trample: '🦶', haste: '⚡', vigilance: '👁️',
-  lifelink: '❤️', deathtouch: '☠️', defender: '🧱', menace: '😠', shroud: '🛡️', unblockable: '👻', cantBlock: '🚫',
+  lifelink: '❤️', deathtouch: '☠️', defender: '🧱', menace: '😠', shroud: '🛡️', hexproof: '🧿', unblockable: '👻', cantBlock: '🚫',
 };
 
 /** A whole card, big enough to read. `p` (a permanent) and `s` (the game) show its current power/toughness. */
@@ -122,12 +124,15 @@ function artEmoji(def) {
     [/Knight/, '🛡️'], [/Soldier/, '💂'], [/Bird/, '🦅'], [/Cat/, '🦁'], [/Unicorn/, '🦄'], [/Ox/, '🐂'], [/Merfolk/, '🧜'],
     [/Wall/, '🧱'], [/Djinn/, '🧞'], [/Elemental/, '🌪️'], [/Rat/, '🐀'], [/Beast/, '🐗'], [/Wurm/, '🐛'], [/Dinosaur/, '🦖'],
     [/Spider/, '🕷️'], [/Bear/, '🐻'], [/Centaur/, '🏹'], [/Wolf/, '🐺'], [/Giant|Ogre/, '🗿'], [/Jellyfish/, '🪼'],
-    [/Shade|Illusion/, '👻'], [/Wizard|Shaman/, '🧙'], [/Kavu/, '🦎'], [/Faerie/, '🧚'],
+    [/Shade|Illusion|Specter|Spirit/, '👻'], [/Wizard|Shaman/, '🧙'], [/Kavu/, '🦎'], [/Faerie/, '🧚'],
+    [/Thopter/, '🛩️'], [/Construct|Golem/, '🤖'], [/Gnome/, '🧌'], [/Insect/, '🪲'], [/Antelope/, '🦌'], [/Snake/, '🐍'],
+    [/Cleric/, '🙏'], [/Rogue/, '🗡️'], [/Equipment/, '⚒️'],
   ];
   for (const [re, e] of table) if (re.test(sub)) return e;
   if (isLand(def)) return { W: '☀️', U: '💧', B: '💀', R: '🔥', G: '🌳' }[def.mana];
   if (def.aura) return '✨';
-  if (def.type === 'Enchantment') return '🌟';
+  if (def.type.includes('Enchantment')) return '🌟';
+  if (def.type === 'Artifact') return '💎';
   const fx = (def.effect ?? []).map(e => e.do);
   if (fx.includes('counter')) return '🚫';
   if (fx.includes('damage')) return '🔥';
@@ -173,6 +178,7 @@ export function MiniCard({ card, s = null, p = null, width = 84, glow = null, di
         <div className="flex flex-wrap gap-0.5 px-1 leading-none" style={{ fontSize: 10 * f }}>
           {kw.filter(k => KW_ICON[k]).map(k => <span key={k} title={KW_LABEL[k] ?? k}>{KW_ICON[k]}</span>)}
           {def.abilities && <span title="Has an ability you can use">✋</span>}
+          {def.triggers && <span title="Has a triggered ability: it happens by itself when something happens">🔔</span>}
           {def.mana && isCreature(def) && <Symbol sym={def.mana} size={11 * f} />}
         </div>
         {pt && (

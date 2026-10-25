@@ -34,7 +34,7 @@ const handId = (s, seat, name) => s.seats[seat].hand.find(c => c.name === name).
 
 describe('cards and decks', () => {
   it('every deck has 40 real cards from the pool, at most 4 of each spell', () => {
-    expect(DECKS).toHaveLength(10);
+    expect(DECKS).toHaveLength(13);
     for (const deck of DECKS) {
       const list = deckList(deck);
       expect(list, deck.name).toHaveLength(40);
@@ -45,9 +45,11 @@ describe('cards and decks', () => {
     }
   });
 
-  it('has five one-color decks and five two-color decks, each only using its colors', () => {
-    expect(DECKS.filter(d => d.colors.length === 1)).toHaveLength(5);
-    expect(DECKS.filter(d => d.colors.length === 2)).toHaveLength(5);
+  it('has five one-color decks, five two-color decks and three advanced ones, each only using its colors', () => {
+    const basic = DECKS.filter(d => !d.advanced);
+    expect(basic.filter(d => d.colors.length === 1)).toHaveLength(5);
+    expect(basic.filter(d => d.colors.length === 2)).toHaveLength(5);
+    expect(DECKS.filter(d => d.advanced)).toHaveLength(3);
     for (const deck of DECKS) {
       for (const name of Object.keys(deck.cards)) {
         const cost = parseCost(CARDS[name].cost);
@@ -183,6 +185,141 @@ describe('spells and the stack', () => {
     s = act(s, { type: 'choose', seat: 1, cards: [handId(s, 1, 'Mountain'), handId(s, 1, 'Hill Giant')] });
     expect(s.seats[1].hand.map(c => c.name)).toEqual(['Shock']);
     expect(waitingFor(s)).toBe(0);
+  });
+});
+
+// Let both players pass until the stack is empty (or someone has a choice to make)
+const settle = s => {
+  for (let i = 0; i < 20 && s.stack.length && !s.pending; i++) s = act(s, { type: 'pass', seat: waitingFor(s) });
+  return s;
+};
+
+describe('triggered abilities', () => {
+
+  it('Soul Warden gains life when another creature enters, and Ajani\'s Pridemate grows when you gain life', () => {
+    let s = setup({ bf: [[0, 'Soul Warden'], [0, "Ajani's Pridemate"], ...lands(0, 'Plains', 3)], hand0: ['Savannah Lions'], hand1: [] });
+    s = act(s, { type: 'cast', seat: 0, card: handId(s, 0, 'Savannah Lions'), targets: [] });
+    s = settle(s);
+    expect(s.seats[0].life).toBe(21);
+    expect(stats(s, perm(s, idOf(s, "Ajani's Pridemate"))).power).toBe(3);
+    expect(s.log.some(e => /Soul Warden's ability triggers/.test(describeLog(e, ['You', 'Phoebe'])))).toBe(true);
+  });
+
+  it('a creature that dies can leave something behind: Doomed Traveler makes a Spirit', () => {
+    let s = setup({ bf: [[1, 'Doomed Traveler'], ...lands(0, 'Mountain', 1)], hand0: ['Shock'] });
+    s.seats[0].hand[0].name = 'Shock';
+    s.battlefield.find(p => p.name === 'Mountain').owner = 0;
+    s = act(s, { type: 'cast', seat: 0, card: handId(s, 0, 'Shock'), targets: [{ type: 'perm', id: idOf(s, 'Doomed Traveler') }] });
+    s = settle(s);
+    expect(s.battlefield.some(p => p.name === 'Spirit' && p.controller === 1)).toBe(true);
+  });
+
+  it('Zulaport Cutthroat sees each of your creatures die, even all at once', () => {
+    let s = setup({ bf: [[1, 'Zulaport Cutthroat'], [1, 'Savannah Lions'], [1, 'Typhoid Rats'], ...lands(0, 'Mountain', 2)], hand0: ['Pyroclasm'] });
+    s = act(s, { type: 'cast', seat: 0, card: handId(s, 0, 'Pyroclasm'), targets: [] });
+    s = settle(s);
+    expect(s.battlefield.filter(p => p.controller === 1)).toHaveLength(0);
+    expect(s.seats[0].life).toBe(17);          // three creatures died: 3 drains
+    expect(s.seats[1].life).toBe(23);
+  });
+
+  it('upkeep triggers happen before the draw: Phyrexian Arena draws and costs 1 life', () => {
+    let s = setup({ bf: [[1, 'Phyrexian Arena']], step: 'main2' });
+    const hand = s.seats[1].hand.length;
+    s = act(s, { type: 'endTurn', seat: 0 });
+    for (let i = 0; i < 20 && s.active === 1 && s.step !== 'main1'; i++) s = act(s, { type: 'pass', seat: waitingFor(s) });
+    expect(s.step).toBe('main1');
+    expect(s.seats[1].hand.length).toBe(hand + 2);     // Arena's card and the normal draw
+    expect(s.seats[1].life).toBe(19);
+  });
+
+  it('battle cry pumps the other attackers; landfall pumps when a land enters', () => {
+    let s = setup({ bf: [[0, 'Accorder Paladin'], [0, 'Savannah Lions'], [0, 'Steppe Lynx']], hand0: ['Plains'] });
+    s = act(s, { type: 'play', seat: 0, card: handId(s, 0, 'Plains') });
+    s = settle(s);
+    expect(stats(s, perm(s, idOf(s, 'Steppe Lynx'))).power).toBe(2);
+    s = act(s, { type: 'attack', seat: 0, attackers: [idOf(s, 'Accorder Paladin'), idOf(s, 'Savannah Lions')] });
+    s = settle(s);
+    expect(stats(s, perm(s, idOf(s, 'Savannah Lions'))).power).toBe(3);
+    expect(stats(s, perm(s, idOf(s, 'Accorder Paladin'))).power).toBe(3);
+  });
+
+  it('Hypnotic Specter makes the player it damages discard at random', () => {
+    let s = setup({ bf: [[0, 'Hypnotic Specter']], hand1: ['Shock', 'Shock'] });
+    s = act(s, { type: 'attack', seat: 0, attackers: [idOf(s, 'Hypnotic Specter')] });
+    for (let i = 0; i < 20 && s.step !== 'main2'; i++) s = act(s, waitingFor(s) === 1 && s.step === 'declareBlockers' ? { type: 'block', seat: 1, blocks: [] } : { type: 'pass', seat: waitingFor(s) });
+    s = settle(s);
+    expect(s.seats[1].life).toBe(18);
+    expect(s.seats[1].hand).toHaveLength(1);
+    expect(s.seats[1].graveyard.map(c => c.name)).toContain('Shock');
+  });
+});
+
+describe('artifacts and equipment', () => {
+  it('equipment attaches for its equip cost, only at sorcery speed, and stays when the creature dies', () => {
+    let s = setup({ bf: [[0, 'Bonesplitter', { id: 'eq' }], [0, 'Savannah Lions', { id: 'lion' }], ...lands(0, 'Plains', 2)], hand1: [] });
+    s = act(s, { type: 'activate', seat: 0, perm: 'eq', ability: 0, targets: [{ type: 'perm', id: 'lion' }] });
+    s = settle(s);
+    expect(perm(s, 'eq').attachedTo).toBe('lion');
+    expect(stats(s, perm(s, 'lion')).power).toBe(4);
+    // The creature dies: the equipment stays, unattached
+    s.battlefield.find(p => p.id === 'lion').damage = 5;
+    s = act(s, { type: 'endTurn', seat: 0 });
+    expect(perm(s, 'eq')).toBeDefined();
+    expect(perm(s, 'eq').attachedTo).toBe(null);
+  });
+
+  it('equip can\'t be used at instant speed', () => {
+    const s = setup({ bf: [[1, 'Bonesplitter', { id: 'eq' }], [1, 'Savannah Lions', { id: 'lion' }], ...lands(1, 'Mountain', 2)], step: 'end' });
+    s.priority = 1;
+    expect(() => act(s, { type: 'activate', seat: 1, perm: 'eq', ability: 0, targets: [{ type: 'perm', id: 'lion' }] })).toThrow();
+  });
+
+  it('Swiftfoot Boots give haste and hexproof (the opponent can\'t target it, you can)', () => {
+    const s = setup({ bf: [[0, 'Swiftfoot Boots', { attachedTo: 'g' }], [0, 'Grizzly Bears', { id: 'g', sick: true }]] });
+    expect(legalTargets(s, 1, { kind: 'creature' }).some(r => r.id === 'g')).toBe(false);
+    expect(legalTargets(s, 0, { kind: 'creature' }).some(r => r.id === 'g')).toBe(true);
+    expect(() => act(s, { type: 'attack', seat: 0, attackers: ['g'] })).not.toThrow();
+  });
+
+  it('Mind Stone taps for colorless mana, but can\'t pay for its own draw ability', () => {
+    let s = setup({ bf: [[0, 'Mind Stone', { id: 'ms' }]] });
+    expect(payment(s, 0, '{1}')).toEqual(['ms']);
+    expect(payment(s, 0, '{W}')).toBe(null);
+    expect(() => act(s, { type: 'activate', seat: 0, perm: 'ms', ability: 0, targets: [] })).toThrow();
+    s = setup({ bf: [[0, 'Mind Stone', { id: 'ms' }], [0, 'Plains']], step: 'main2' });
+    const before = s.seats[0].hand.length;
+    s = act(s, { type: 'activate', seat: 0, perm: 'ms', ability: 0, targets: [] });
+    s = settle(s);
+    expect(perm(s, 'ms')).toBeUndefined();
+    expect(s.seats[0].hand.length).toBe(before + 1);
+  });
+
+  it('Mogg Fanatic is sacrificed as it\'s used, and still deals its damage', () => {
+    let s = setup({ bf: [[0, 'Mogg Fanatic', { id: 'mf', sick: true }], [1, 'Typhoid Rats', { id: 'rats' }]] });
+    s = act(s, { type: 'activate', seat: 0, perm: 'mf', ability: 0, targets: [{ type: 'perm', id: 'rats' }] });
+    expect(perm(s, 'mf')).toBeUndefined();
+    s = settle(s);
+    expect(perm(s, 'rats')).toBeUndefined();
+  });
+
+  it('Steel Overseer puts a counter on each artifact creature; Wurmcoil Engine leaves two Wurms when it dies', () => {
+    let s = setup({ bf: [[0, 'Steel Overseer', { id: 'so' }], [0, 'Ornithopter', { id: 'or' }], [0, 'Savannah Lions'], [0, 'Wurmcoil Engine', { id: 'wc' }], ...lands(1, 'Mountain', 3)] });
+    s = act(s, { type: 'activate', seat: 0, perm: 'so', ability: 0, targets: [] });
+    s = settle(s);
+    expect(perm(s, 'or').counters).toBe(1);
+    expect(perm(s, 'so').counters).toBe(1);
+    expect(perm(s, idOf(s, 'Savannah Lions')).counters).toBe(0);
+    s.battlefield.find(p => p.id === 'wc').damage = 9;
+    s = act(s, { type: 'endTurn', seat: 0 });
+    const wurms = s.battlefield.filter(p => p.name === 'Phyrexian Wurm');
+    expect(wurms).toHaveLength(2);
+    expect(wurms.map(w => [...stats(s, w).kw][0]).sort()).toEqual(['deathtouch', 'lifelink']);
+  });
+
+  it('the computer equips its creatures and casts its artifacts', () => {
+    const s = setup({ bf: [[1, 'Bonesplitter', { id: 'eq' }], [1, 'Hill Giant', { id: 'hg' }], ...lands(1, 'Mountain', 2)], active: 1 });
+    expect(robotAction(s, 1, 'medium')).toMatchObject({ type: 'activate', perm: 'eq', targets: [{ type: 'perm', id: 'hg' }] });
   });
 });
 
@@ -407,7 +544,7 @@ describe('whole games between computer players', () => {
         finished++;
       }
     }
-    expect(finished).toBe(100);
+    expect(finished).toBe(DECKS.length ** 2);
   }, 120000);
 
   it('hard beats easy more often than not', () => {

@@ -4,13 +4,13 @@
  * No card art: card faces are drawn by the app.
  *
  *   cost      mana cost, e.g. '{2}{W}{W}'
- *   type      'Creature' | 'Instant' | 'Sorcery' | 'Enchantment' | 'Basic Land'
- *   sub       subtypes ('Aura' for auras)
+ *   type      'Creature' | 'Instant' | 'Sorcery' | 'Enchantment' | 'Artifact' | 'Artifact Creature' | 'Basic Land'
+ *   sub       subtypes ('Aura' for auras, 'Equipment' for equipment)
  *   pt        [power, toughness]
  *   kw        keywords: flying, reach, firstStrike, doubleStrike, trample, haste,
- *             vigilance, lifelink, deathtouch, defender, menace, shroud,
+ *             vigilance, lifelink, deathtouch, defender, menace, shroud, hexproof,
  *             plus cantBlock and unblockable (written out in the text)
- *   mana      a land's or creature's "{T}: Add {G}."
+ *   mana      a land's, creature's or artifact's "{T}: Add {G}." ('C': colorless, {C})
  *   targets   what a spell (or a creature's "enters" ability) targets, chosen on casting:
  *               { kind: 'creature', controller?: 'you'|'opp', nonColor?, flying?, combat?: 'attackingOrBlocking'|'blocking' }
  *               { kind: 'player', opp? } · { kind: 'any' } (creature or player)
@@ -22,13 +22,31 @@
  *   etb       a creature's "When ~ enters" effect (its targets go in `targets`)
  *   aura      { grant: { p, t, cantAttack, cantBlock, noUntap }, tapOnEnter }
  *   anthem    { others?: true, p, t } creatures you control get +p/+t
- *   abilities activated abilities: [{ cost, tap, targets, effect, label }]
+ *   abilities activated abilities: [{ cost, tap, sac, sorcery, targets, effect, label }]
+ *             (sac: "Sacrifice ~" is part of the cost; sorcery: only when you could cast a sorcery)
+ *   equipment { p, t, kw } what the equipped creature gets; its "Equip {N}" is an ability
+ *             with `equip: true` (see `equip` below)
+ *   triggers  triggered abilities: [{ when, effect, text, yours?, others? }]. They go on the
+ *             stack when they trigger (see mtgEngine.js). when:
+ *               upkeep          at the beginning of your upkeep
+ *               attacks         whenever ~ attacks
+ *               dies            when ~ dies
+ *               creatureDies    whenever ~ or another creature (yours: you control) dies
+ *               creatureEnters  whenever another creature (yours: you control) enters;
+ *                               the effect's 'that' is the creature that entered
+ *               landfall        whenever a land you control enters
+ *               gainLife        whenever you gain life
+ *               damagesOpponent whenever ~ deals damage to an opponent
  *   onSpell   "Whenever you cast an instant or sorcery spell" effect
  *   entersTapped
  */
 
 const ANY = { kind: 'any' };
 const CREATURE = { kind: 'creature' };
+const YOURS = { kind: 'creature', controller: 'you' };
+/** "Equip {N}: Attach to target creature you control. Equip only as a sorcery." */
+const equip = cost => ({ cost, sorcery: true, equip: true, targets: [YOURS], effect: [{ do: 'attach', what: 0 }], label: 'Equip' });
+const BATTLE_CRY = 'Battle cry (Whenever this creature attacks, each other attacking creature gets +1/+0 until end of turn.)';
 
 export const CARDS = {
   // ── Basic lands ────────────────────────────────────────────────────────────
@@ -86,6 +104,26 @@ export const CARDS = {
     cost: '{3}{W}', type: 'Instant', text: 'Destroy target attacking or blocking creature.',
     targets: [{ kind: 'creature', combat: 'attackingOrBlocking' }], effect: [{ do: 'destroy', what: 0 }],
   },
+  'Soul Warden': {
+    cost: '{W}', type: 'Creature', sub: 'Human Cleric', pt: [1, 1], text: 'Whenever another creature enters, you gain 1 life.',
+    triggers: [{ when: 'creatureEnters', others: true, effect: [{ do: 'gain', n: 1 }], text: 'Whenever another creature enters, you gain 1 life.' }],
+  },
+  "Ajani's Pridemate": {
+    cost: '{1}{W}', type: 'Creature', sub: 'Cat Soldier', pt: [2, 2], text: "Whenever you gain life, put a +1/+1 counter on Ajani's Pridemate.",
+    triggers: [{ when: 'gainLife', effect: [{ do: 'counters', what: 'self', n: 1 }], text: "Whenever you gain life, put a +1/+1 counter on Ajani's Pridemate." }],
+  },
+  'Doomed Traveler': {
+    cost: '{W}', type: 'Creature', sub: 'Human Soldier', pt: [1, 1], text: 'When Doomed Traveler dies, create a 1/1 white Spirit creature token with flying.',
+    triggers: [{ when: 'dies', effect: [{ do: 'token', n: 1, token: 'Spirit' }], text: 'When Doomed Traveler dies, create a 1/1 white Spirit creature token with flying.' }],
+  },
+  'Accorder Paladin': {
+    cost: '{1}{W}', type: 'Creature', sub: 'Human Knight', pt: [3, 1], text: BATTLE_CRY,
+    triggers: [{ when: 'attacks', effect: [{ do: 'battleCry' }], text: 'Battle cry: each other attacking creature gets +1/+0 until end of turn.' }],
+  },
+  'Steppe Lynx': {
+    cost: '{W}', type: 'Creature', sub: 'Cat', pt: [0, 1], text: 'Landfall — Whenever a land you control enters, Steppe Lynx gets +2/+2 until end of turn.',
+    triggers: [{ when: 'landfall', effect: [{ do: 'pump', what: 'self', p: 2, t: 2 }], text: 'Landfall — Whenever a land you control enters, Steppe Lynx gets +2/+2 until end of turn.' }],
+  },
   Righteousness: {
     cost: '{W}', type: 'Instant', text: 'Target blocking creature gets +7/+7 until end of turn.',
     targets: [{ kind: 'creature', combat: 'blocking' }], effect: [{ do: 'pump', what: 0, p: 7, t: 7 }],
@@ -110,6 +148,11 @@ export const CARDS = {
   'Wall of Air': { cost: '{1}{U}{U}', type: 'Creature', sub: 'Wall', pt: [1, 5], kw: ['defender', 'flying'], text: 'Defender, flying' },
   'Air Elemental': { cost: '{3}{U}{U}', type: 'Creature', sub: 'Elemental', pt: [4, 4], kw: ['flying'], text: 'Flying' },
   'Mahamoti Djinn': { cost: '{4}{U}{U}', type: 'Creature', sub: 'Djinn', pt: [5, 6], kw: ['flying'], text: 'Flying' },
+  'Thieving Magpie': {
+    cost: '{2}{U}{U}', type: 'Creature', sub: 'Bird', pt: [1, 3], kw: ['flying'],
+    text: 'Flying\nWhenever Thieving Magpie deals damage to an opponent, draw a card.',
+    triggers: [{ when: 'damagesOpponent', effect: [{ do: 'draw', n: 1 }], text: 'Whenever Thieving Magpie deals damage to an opponent, draw a card.' }],
+  },
   Counterspell: {
     cost: '{U}{U}', type: 'Instant', text: 'Counter target spell.',
     targets: [{ kind: 'spell' }], effect: [{ do: 'counter', what: 0 }],
@@ -161,6 +204,35 @@ export const CARDS = {
     targets: [{ kind: 'player', opp: true }], etb: [{ do: 'lose', n: 3, who: 0 }, { do: 'gain', n: 3 }],
   },
   Bogstomper: { cost: '{4}{B}{B}', type: 'Creature', sub: 'Beast', pt: [6, 5], text: '' },
+  'Hypnotic Specter': {
+    cost: '{1}{B}{B}', type: 'Creature', sub: 'Specter', pt: [2, 2], kw: ['flying'],
+    text: 'Flying\nWhenever Hypnotic Specter deals damage to an opponent, that player discards a card at random.',
+    triggers: [{ when: 'damagesOpponent', effect: [{ do: 'discardRandom', n: 1, who: 'opp' }], text: 'Whenever Hypnotic Specter deals damage to an opponent, that player discards a card at random.' }],
+  },
+  'Zulaport Cutthroat': {
+    cost: '{1}{B}', type: 'Creature', sub: 'Human Rogue Ally', pt: [1, 1],
+    text: 'Whenever Zulaport Cutthroat or another creature you control dies, each opponent loses 1 life and you gain 1 life.',
+    triggers: [{
+      when: 'creatureDies', yours: true, effect: [{ do: 'lose', n: 1, who: 'opp' }, { do: 'gain', n: 1 }],
+      text: 'Whenever Zulaport Cutthroat or another creature you control dies, each opponent loses 1 life and you gain 1 life.',
+    }],
+  },
+  'Rotting Regisaur': {
+    cost: '{2}{B}', type: 'Creature', sub: 'Zombie Dinosaur', pt: [7, 6], text: 'At the beginning of your upkeep, discard a card.',
+    triggers: [{ when: 'upkeep', effect: [{ do: 'discard', n: 1, who: 'you' }], text: 'At the beginning of your upkeep, discard a card.' }],
+  },
+  'Phyrexian Arena': {
+    cost: '{1}{B}{B}', type: 'Enchantment', text: 'At the beginning of your upkeep, you draw a card and you lose 1 life.',
+    triggers: [{ when: 'upkeep', effect: [{ do: 'draw', n: 1 }, { do: 'lose', n: 1, who: 'you' }], text: 'At the beginning of your upkeep, you draw a card and you lose 1 life.' }],
+  },
+  Bitterblossom: {
+    cost: '{1}{B}', type: 'Kindred Enchantment', sub: 'Faerie',
+    text: 'At the beginning of your upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token with flying.',
+    triggers: [{
+      when: 'upkeep', effect: [{ do: 'lose', n: 1, who: 'you' }, { do: 'token', n: 1, token: 'Faerie' }],
+      text: 'At the beginning of your upkeep, you lose 1 life and create a 1/1 black Faerie Rogue creature token with flying.',
+    }],
+  },
   'Doom Blade': {
     cost: '{1}{B}', type: 'Instant', text: 'Destroy target nonblack creature.',
     targets: [{ kind: 'creature', nonColor: 'B' }], effect: [{ do: 'destroy', what: 0 }],
@@ -216,6 +288,27 @@ export const CARDS = {
     text: 'Flying\n{R}: Shivan Dragon gets +1/+0 until end of turn.',
     abilities: [{ cost: '{R}', effect: [{ do: 'pump', what: 'self', p: 1, t: 0 }], label: '+1/+0' }],
   },
+  'Mogg Fanatic': {
+    cost: '{R}', type: 'Creature', sub: 'Goblin', pt: [1, 1], text: 'Sacrifice Mogg Fanatic: It deals 1 damage to any target.',
+    abilities: [{ sac: true, targets: [ANY], effect: [{ do: 'damage', n: 1, to: 0 }], label: 'Sacrifice: 1 damage' }],
+  },
+  'Plated Geopede': {
+    cost: '{1}{R}', type: 'Creature', sub: 'Insect', pt: [1, 1], kw: ['firstStrike'],
+    text: 'First strike\nLandfall — Whenever a land you control enters, Plated Geopede gets +2/+2 until end of turn.',
+    triggers: [{ when: 'landfall', effect: [{ do: 'pump', what: 'self', p: 2, t: 2 }], text: 'Landfall — Whenever a land you control enters, Plated Geopede gets +2/+2 until end of turn.' }],
+  },
+  'Goblin Wardriver': {
+    cost: '{R}{R}', type: 'Creature', sub: 'Goblin Warrior', pt: [2, 2], text: BATTLE_CRY,
+    triggers: [{ when: 'attacks', effect: [{ do: 'battleCry' }], text: 'Battle cry: each other attacking creature gets +1/+0 until end of turn.' }],
+  },
+  'Ogre Battledriver': {
+    cost: '{2}{R}{R}', type: 'Creature', sub: 'Ogre Warrior', pt: [3, 3],
+    text: 'Whenever another creature you control enters, that creature gets +2/+0 and gains haste until end of turn.',
+    triggers: [{
+      when: 'creatureEnters', others: true, yours: true, effect: [{ do: 'pump', what: 'that', p: 2, t: 0, kw: ['haste'] }],
+      text: 'Whenever another creature you control enters, that creature gets +2/+0 and gains haste until end of turn.',
+    }],
+  },
   'Lightning Bolt': {
     cost: '{R}', type: 'Instant', text: 'Lightning Bolt deals 3 damage to any target.',
     targets: [ANY], effect: [{ do: 'damage', n: 3, to: 0 }],
@@ -266,6 +359,21 @@ export const CARDS = {
   'Colossal Dreadmaw': { cost: '{4}{G}{G}', type: 'Creature', sub: 'Dinosaur', pt: [6, 6], kw: ['trample'], text: 'Trample' },
   'Duskdale Wurm': { cost: '{5}{G}{G}', type: 'Creature', sub: 'Wurm', pt: [7, 7], kw: ['trample'], text: 'Trample' },
   Gigantosaurus: { cost: '{G}{G}{G}{G}{G}', type: 'Creature', sub: 'Dinosaur', pt: [10, 10], text: '' },
+  'Sakura-Tribe Elder': {
+    cost: '{1}{G}', type: 'Creature', sub: 'Snake Shaman', pt: [1, 1],
+    text: 'Sacrifice Sakura-Tribe Elder: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.',
+    abilities: [{ sac: true, effect: [{ do: 'fetchLand' }], label: 'Sacrifice: find a land' }],
+  },
+  'Grazing Gladehart': {
+    cost: '{2}{G}', type: 'Creature', sub: 'Antelope', pt: [2, 2], text: 'Landfall — Whenever a land you control enters, you may gain 2 life.',
+    triggers: [{ when: 'landfall', effect: [{ do: 'gain', n: 2 }], text: 'Landfall — Whenever a land you control enters, you may gain 2 life.' }],
+  },
+  'Pelakka Wurm': {
+    cost: '{4}{G}{G}{G}', type: 'Creature', sub: 'Wurm', pt: [7, 7], kw: ['trample'],
+    text: 'Trample\nWhen Pelakka Wurm enters, you gain 7 life.\nWhen Pelakka Wurm dies, draw a card.',
+    etb: [{ do: 'gain', n: 7 }],
+    triggers: [{ when: 'dies', effect: [{ do: 'draw', n: 1 }], text: 'When Pelakka Wurm dies, draw a card.' }],
+  },
   'Giant Growth': {
     cost: '{G}', type: 'Instant', text: 'Target creature gets +3/+3 until end of turn.',
     targets: [CREATURE], effect: [{ do: 'pump', what: 0, p: 3, t: 3 }],
@@ -330,6 +438,18 @@ export const CARDS = {
     effect: [{ do: 'counters', what: 0, n: 1 }, { do: 'bite', a: 0, b: 1 }],
   },
   Watchwolf: { cost: '{G}{W}', type: 'Creature', sub: 'Wolf', pt: [3, 3], text: '' },
+  'Cruel Celebrant': {
+    cost: '{W}{B}', type: 'Creature', sub: 'Vampire', pt: [1, 2],
+    text: 'Whenever Cruel Celebrant or another creature or planeswalker you control dies, each opponent loses 1 life and you gain 1 life.',
+    triggers: [{
+      when: 'creatureDies', yours: true, effect: [{ do: 'lose', n: 1, who: 'opp' }, { do: 'gain', n: 1 }],
+      text: 'Whenever Cruel Celebrant or another creature you control dies, each opponent loses 1 life and you gain 1 life.',
+    }],
+  },
+  'Behemoth Sledge': {
+    cost: '{1}{G}{W}', type: 'Artifact', sub: 'Equipment', text: 'Equipped creature gets +2/+2 and has lifelink and trample.\nEquip {3}',
+    equipment: { p: 2, t: 2, kw: ['lifelink', 'trample'] }, abilities: [equip('{3}')],
+  },
   'Advent of the Wurm': {
     cost: '{1}{G}{G}{W}', type: 'Instant', text: 'Create a 5/5 green Wurm creature token with trample.',
     effect: [{ do: 'token', n: 1, token: 'Wurm' }],
@@ -339,12 +459,73 @@ export const CARDS = {
     text: 'Trample\nWhen Armada Wurm enters, create a 5/5 green Wurm creature token with trample.',
     etb: [{ do: 'token', n: 1, token: 'Wurm' }],
   },
+
+  // ── Artifacts (colorless: any deck can play them) ───────────────────────────
+  'Mind Stone': {
+    cost: '{2}', type: 'Artifact', mana: 'C', text: '{T}: Add {C}.\n{1}, {T}, Sacrifice Mind Stone: Draw a card.',
+    abilities: [{ cost: '{1}', tap: true, sac: true, effect: [{ do: 'draw', n: 1 }], label: 'Sacrifice: draw a card' }],
+  },
+  Ornithopter: { cost: '{0}', type: 'Artifact Creature', sub: 'Thopter', pt: [0, 2], kw: ['flying'], text: 'Flying' },
+  'Steel Overseer': {
+    cost: '{2}', type: 'Artifact Creature', sub: 'Construct', pt: [1, 1], text: '{T}: Put a +1/+1 counter on each artifact creature you control.',
+    abilities: [{ tap: true, effect: [{ do: 'countersAll', artifact: true, n: 1 }], label: '+1/+1 counters' }],
+  },
+  'Bottle Gnomes': {
+    cost: '{3}', type: 'Artifact Creature', sub: 'Gnome', pt: [1, 3], text: 'Sacrifice Bottle Gnomes: You gain 3 life.',
+    abilities: [{ sac: true, effect: [{ do: 'gain', n: 3 }], label: 'Sacrifice: gain 3 life' }],
+  },
+  'Solemn Simulacrum': {
+    cost: '{4}', type: 'Artifact Creature', sub: 'Golem', pt: [2, 2],
+    text: 'When Solemn Simulacrum enters, you may search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.\nWhen Solemn Simulacrum dies, you may draw a card.',
+    etb: [{ do: 'fetchLand' }],
+    triggers: [{ when: 'dies', effect: [{ do: 'draw', n: 1 }], text: 'When Solemn Simulacrum dies, you may draw a card.' }],
+  },
+  'Wurmcoil Engine': {
+    cost: '{6}', type: 'Artifact Creature', sub: 'Phyrexian Wurm', pt: [6, 6], kw: ['deathtouch', 'lifelink'],
+    text: 'Deathtouch, lifelink\nWhen Wurmcoil Engine dies, create a 3/3 colorless Phyrexian Wurm artifact creature token with deathtouch and a 3/3 colorless Phyrexian Wurm artifact creature token with lifelink.',
+    triggers: [{
+      when: 'dies', effect: [{ do: 'token', n: 1, token: 'WurmDeathtouch' }, { do: 'token', n: 1, token: 'WurmLifelink' }],
+      text: 'When Wurmcoil Engine dies, create two 3/3 Phyrexian Wurm tokens: one with deathtouch, one with lifelink.',
+    }],
+  },
+  Bonesplitter: {
+    cost: '{1}', type: 'Artifact', sub: 'Equipment', text: 'Equipped creature gets +2/+0.\nEquip {1}',
+    equipment: { p: 2, t: 0 }, abilities: [equip('{1}')],
+  },
+  'Short Sword': {
+    cost: '{1}', type: 'Artifact', sub: 'Equipment', text: 'Equipped creature gets +1/+1.\nEquip {1}',
+    equipment: { p: 1, t: 1 }, abilities: [equip('{1}')],
+  },
+  'Vulshok Morningstar': {
+    cost: '{2}', type: 'Artifact', sub: 'Equipment', text: 'Equipped creature gets +2/+2.\nEquip {2}',
+    equipment: { p: 2, t: 2 }, abilities: [equip('{2}')],
+  },
+  'Loxodon Warhammer': {
+    cost: '{3}', type: 'Artifact', sub: 'Equipment', text: 'Equipped creature gets +3/+0 and has trample and lifelink.\nEquip {3}',
+    equipment: { p: 3, t: 0, kw: ['trample', 'lifelink'] }, abilities: [equip('{3}')],
+  },
+  'Swiftfoot Boots': {
+    cost: '{2}', type: 'Artifact', sub: 'Equipment', text: 'Equipped creature has hexproof and haste.\nEquip {1}',
+    equipment: { kw: ['hexproof', 'haste'] }, abilities: [equip('{1}')],
+  },
+  "Accorder's Shield": {
+    cost: '{0}', type: 'Artifact', sub: 'Equipment', text: 'Equipped creature gets +0/+3 and has vigilance.\nEquip {3}',
+    equipment: { p: 0, t: 3, kw: ['vigilance'] }, abilities: [equip('{3}')],
+  },
 };
 
 /** Creature tokens the cards make. */
 export const TOKENS = {
   Soldier: { name: 'Soldier', type: 'Token Creature', sub: 'Soldier', pt: [1, 1], colors: ['W'], text: '' },
   Wurm: { name: 'Wurm', type: 'Token Creature', sub: 'Wurm', pt: [5, 5], colors: ['G'], kw: ['trample'], text: 'Trample' },
+  Spirit: { name: 'Spirit', type: 'Token Creature', sub: 'Spirit', pt: [1, 1], colors: ['W'], kw: ['flying'], text: 'Flying' },
+  Faerie: { name: 'Faerie Rogue', type: 'Token Creature', sub: 'Faerie Rogue', pt: [1, 1], colors: ['B'], kw: ['flying'], text: 'Flying' },
+  WurmDeathtouch: {
+    name: 'Phyrexian Wurm', type: 'Token Artifact Creature', sub: 'Phyrexian Wurm', pt: [3, 3], colors: [], kw: ['deathtouch'], text: 'Deathtouch',
+  },
+  WurmLifelink: {
+    name: 'Phyrexian Wurm', type: 'Token Artifact Creature', sub: 'Phyrexian Wurm', pt: [3, 3], colors: [], kw: ['lifelink'], text: 'Lifelink',
+  },
 };
 
 for (const [name, card] of Object.entries(CARDS)) card.name = name;

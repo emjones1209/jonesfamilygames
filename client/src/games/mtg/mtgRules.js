@@ -34,6 +34,7 @@ export const manaValue = def => {
 export const colorsOf = def => def.colors ?? COLORS.filter(k => parseCost(def.cost)[k] > 0);
 export const isLand = def => def.type.includes('Land');
 export const isCreature = def => def.type.includes('Creature');
+export const isArtifact = def => def.type.includes('Artifact');
 export const isInstant = def => def.type === 'Instant';
 export const isPermanentCard = def => !['Instant', 'Sorcery'].includes(def.type);
 
@@ -44,7 +45,7 @@ export const allCreatures = s => s.battlefield.filter(p => isCreature(defOf(p)))
 
 /**
  * A permanent as it is right now: base power/toughness plus counters, auras,
- * anthems and until-end-of-turn effects.
+ * equipment, anthems and until-end-of-turn effects.
  */
 export function stats(s, p) {
   const def = defOf(p);
@@ -68,6 +69,11 @@ export function stats(s, p) {
       if (g.cantBlock) out.cantBlock = true;
       if (g.noUntap) out.noUntap = true;
     }
+    if (od.equipment && other.attachedTo === p.id) {
+      power += od.equipment.p ?? 0;
+      toughness += od.equipment.t ?? 0;
+      for (const k of od.equipment.kw ?? []) kw.add(k);
+    }
     if (od.anthem && other.controller === p.controller && isCreature(def) && !(od.anthem.others && other.id === p.id)) {
       power += od.anthem.p;
       toughness += od.anthem.t;
@@ -79,10 +85,14 @@ export function stats(s, p) {
 export const has = (s, p, keyword) => stats(s, p).kw.has(keyword);
 
 // ── Mana ─────────────────────────────────────────────────────────────────────
-/** Untapped lands and creatures that can tap for mana now: [{ id, color, creature }]. */
-export function manaSources(s, seat) {
+/**
+ * Untapped lands, creatures and artifacts that can tap for mana now: [{ id, color, creature }]
+ * (color 'C' is colorless: it only pays generic costs). `except`: a permanent that can't
+ * help pay, e.g. Mind Stone paying for its own {T} ability.
+ */
+export function manaSources(s, seat, except = null) {
   return s.battlefield
-    .filter(p => p.controller === seat && !p.tapped && defOf(p).mana)
+    .filter(p => p.controller === seat && !p.tapped && defOf(p).mana && p.id !== except)
     .filter(p => !isCreature(defOf(p)) || !p.sick || has(s, p, 'haste'))
     .map(p => ({ id: p.id, color: defOf(p).mana, creature: isCreature(defOf(p)) }));
 }
@@ -92,9 +102,9 @@ export function manaSources(s, seat) {
  * first; generic mana from whatever is left, using creatures last and the
  * colors you have most to spare first.
  */
-export function payment(s, seat, cost) {
+export function payment(s, seat, cost, except = null) {
   const need = parseCost(cost);
-  const sources = manaSources(s, seat);
+  const sources = manaSources(s, seat, except);
   const chosen = [];
   const left = [...sources].sort((a, b) => a.creature - b.creature);
   for (const c of COLORS) {
@@ -123,6 +133,7 @@ export const sameTarget = (a, b) => a && b && a.type === b.type && (a.type === '
 function creatureOk(s, seat, spec, p) {
   const def = defOf(p);
   if (!isCreature(def) || has(s, p, 'shroud')) return false;
+  if (has(s, p, 'hexproof') && p.controller !== seat) return false;     // only its controller can target it
   if (spec.controller === 'you' && p.controller !== seat) return false;
   if (spec.controller === 'opp' && p.controller === seat) return false;
   if (spec.nonColor && colorsOf(def).includes(spec.nonColor)) return false;
