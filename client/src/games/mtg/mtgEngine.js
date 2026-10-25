@@ -67,24 +67,42 @@ const newId = s => `c${s.nextId++}`;
 
 // ── Log ──────────────────────────────────────────────────────────────────────
 /**
- * Log entries: { seat, v: [verb for "you", verb for others], rest } or { text }.
- * In `rest`/`text`, @0 and @1 stand for the players (see describeLog).
+ * Log entries: { seat, v: [verb for "you", verb for others], rest } or { text }, plus
+ *   why    lines explaining what happened and the rules behind it
+ *   about  the player whose action (or spell, or attack) it was
+ *   card   { name, token } the card it's about, to show
+ *   minor  nothing much to explain (a land played, a new turn)
+ * In `rest`/`text`/`why`, @0 and @1 stand for the players (see describeLog). The
+ * wording takes seat 0 as "you".
  */
 function log(s, entry) {
   s.log.push({ n: s.logNo++, ...entry });
   if (s.log.length > LOG_LENGTH) s.log.shift();
 }
-const said = (s, seat, v, rest = '') => log(s, { seat, v, rest });
-const note = (s, text) => log(s, { text });
+const said = (s, seat, v, rest = '', extra = {}) => log(s, { seat, v, rest, about: seat, ...extra });
+const note = (s, text, extra = {}) => log(s, { text, ...extra });
+/** "@0 draw" / "@1 draws" */
+const subj = (seat, you, them) => `@${seat} ${seat === 0 ? you : them}`;
+/** Explanation lines are collected here while a spell resolves or combat damage is dealt. */
+const explain = (s, line) => { if (s.why) s.why.push(line); };
+
+const fillNames = (t, names, viewer) => t.replace(/@(\d)/g, (_, i) => (Number(i) === viewer ? 'you' : names[i]));
+const capital = t => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** A log entry as text, for `viewer` (who's "you"); names[seat] for the others. */
 export function describeLog(entry, names, viewer = 0) {
-  const who = i => (Number(i) === viewer ? 'you' : names[i]);
-  const fill = t => t.replace(/@(\d)/g, (_, i) => who(i));
-  if (entry.text) return fill(entry.text).replace(/^you/, 'You');
+  if (entry.text) return capital(fillNames(entry.text, names, viewer));
   const subject = entry.seat === viewer ? 'You' : names[entry.seat];
-  return `${subject} ${entry.v[entry.seat === viewer ? 0 : 1]}${entry.rest ? ` ${fill(entry.rest)}` : ''}`;
+  return `${subject} ${entry.v[entry.seat === viewer ? 0 : 1]}${entry.rest ? ` ${fillNames(entry.rest, names, viewer)}` : ''}`;
 }
+
+/** A log entry's explanation, as lines of text. */
+export const explainLog = (entry, names, viewer = 0) => (entry.why ?? []).map(t => capital(fillNames(t, names, viewer)));
+
+const ptText = (s, p) => { const st = stats(s, p); return `${st.power}/${st.toughness}`; };
+const article = word => (/^[AEIOU]/i.test(word) ? `an ${word}` : `a ${word}`);
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const cardRef = c => ({ name: c.name, token: c.token ?? null });
 
 function nameOf(s, ref) {
   if (!ref) return '';
@@ -265,12 +283,22 @@ function checkState(s) {
     for (const p of [...s.battlefield]) {
       if (!perm(s, p.id)) continue;
       const def = defOf(p);
-      if (def.aura && !perm(s, p.attachedTo)) { leave(s, p, 'graveyard'); again = true; continue; }
+      if (def.aura && !perm(s, p.attachedTo)) {
+        leave(s, p, 'graveyard');
+        explain(s, `${p.name} goes to the graveyard too: an aura with nothing to enchant can't stay.`);
+        again = true;
+        continue;
+      }
       if (!isCreature(def)) continue;
       const { toughness } = stats(s, p);
-      if (toughness <= 0 || p.damage >= toughness || (p.deathtouched && p.damage > 0)) {
+      const reason = toughness <= 0 ? `its toughness is down to ${toughness}, and a creature with 0 toughness or less dies`
+        : p.deathtouched && p.damage > 0 && p.damage < toughness ? 'it was dealt damage by a creature with deathtouch, and any amount of that is enough'
+          : p.damage >= toughness ? `it has ${p.damage} damage and its toughness is ${toughness} — damage equal to toughness destroys a creature` : null;
+      if (reason) {
         leave(s, p, 'graveyard');
-        note(s, `${p.name} dies.`);
+        const line = `${p.name} dies: ${reason}.${p.token ? ' (A token that leaves the battlefield simply disappears.)' : ''}`;
+        explain(s, line);
+        note(s, `${p.name} dies.`, { why: [line], minor: !!s.why, card: cardRef(p) });
         again = true;
       }
     }
@@ -327,27 +355,70 @@ function nextStep(s) {
 }
 
 function combat(s) {
+  const lifeBefore = s.seats.map(p => p.life);
+  const anyBlocks = s.combat.attackers.some(a => a.blocked);
+  s.why = [];
+  const toPlayer = [0, 0];
   if (hasFirstStrikeStep(s)) {
-    damageStep(s, true);
+    explain(s, 'First strike: creatures with first strike (or double strike) deal their combat damage first. Any creature that dies then doesn\'t get to strike back.');
+    damageStep(s, true, toPlayer);
     checkState(s);
-    if (s.phase !== 'playing') return;
-    damageStep(s, false);
-  } else damageStep(s, null);
+    if (s.phase === 'playing') {
+      explain(s, 'Then regular combat damage: everyone else (and double strikers again).');
+      damageStep(s, false, toPlayer);
+    }
+  } else damageStep(s, null, toPlayer);
   checkState(s);
+  for (const seat of [0, 1]) {
+    if (s.seats[seat].life !== lifeBefore[seat]) explain(s, `@${seat}: ${lifeBefore[seat]} → ${s.seats[seat].life} life.`);
+  }
+  if (s.phase === 'playing' && toPlayer.creatures) explain(s, 'Damage on creatures that survived wears off at the end of the turn.');
+  const hit = [0, 1].filter(seat => toPlayer[seat]);
+  const text = hit.length ? hit.map(seat => `${subj(seat, 'take', 'takes')} ${toPlayer[seat]} combat damage`).join(', ') + '.' : 'Combat damage: no damage to players.';
+  // (Worth explaining to you when the computer attacked, or blocked your attack)
+  note(s, text, { why: s.why, about: anyBlocks || s.active === 1 ? 1 : 0 });
+  s.why = null;
   if (s.phase !== 'playing') return;
   s.combat = null;
   enterStep(s, 'main2');
 }
 
-function damageStep(s, first) {
+function damageStep(s, first, toPlayer) {
   const hits = combatDamage(s, first);
   const sources = new Map(hits.map(h => [h.source, creatureSource(s, perm(s, h.source))]));
-  const toPlayer = [0, 0];
+  const name = id => perm(s, id)?.name;
+  // Explain each fight: who hit whom, and why (blocked, trample, deathtouch, lifelink)
+  for (const a of s.combat.attackers) {
+    const att = perm(s, a.id);
+    if (!att) continue;
+    const mine = hits.filter(h => h.source === a.id);
+    const back = hits.filter(h => h.to.type === 'perm' && h.to.id === a.id);
+    const desc = `${att.name} (${ptText(s, att)})`;
+    if (!a.blocked) {
+      if (mine.length) explain(s, `${desc} wasn't blocked, so it deals ${mine[0].n} damage to @${mine[0].to.seat}.`);
+      continue;
+    }
+    const blockers = a.blockers.map(id => perm(s, id)).filter(Boolean);
+    if (!blockers.length && !mine.length) {
+      if (first !== false) explain(s, `${desc} was blocked, so it deals no damage even though its blocker is gone (only trample would let it hit the player).`);
+      continue;
+    }
+    for (const h of [...mine].sort((x, y) => (x.to.type === 'player') - (y.to.type === 'player'))) {
+      if (h.to.type === 'player') explain(s, `${att.name} has trample: it only has to give its blockers enough damage to destroy them, and the other ${h.n} goes through to @${h.to.seat}.`);
+      else explain(s, `${att.name} deals ${h.n} damage to ${name(h.to.id)} (${ptText(s, perm(s, h.to.id))}).`);
+    }
+    for (const h of back) explain(s, `${name(h.source)} (${ptText(s, perm(s, h.source))}) deals ${h.n} damage back to ${att.name}.`);
+  }
+  for (const [id, src] of sources) {
+    const total = hits.filter(h => h.source === id).reduce((n, h) => n + h.n, 0);
+    if (src.lifelink && total) explain(s, `${name(id)} has lifelink: it dealt ${total} damage, so ${subj(src.controller, 'gain', 'gains')} ${total} life.`);
+    if (src.deathtouch && hits.some(h => h.source === id && h.to.type === 'perm')) explain(s, `${name(id)} has deathtouch: any damage it deals to a creature destroys it.`);
+  }
   for (const h of hits) {
     dealDamage(s, sources.get(h.source), h.to, h.n);
     if (h.to.type === 'player') toPlayer[h.to.seat] += h.n;
+    else if (perm(s, h.to.id)) toPlayer.creatures = true;    // (any creature hit: its damage wears off later)
   }
-  for (const seat of [0, 1]) if (toPlayer[seat]) note(s, `@${seat} take${seat === 0 ? '' : 's'} ${toPlayer[seat]} combat damage.`);
 }
 
 function cleanup(s) {
@@ -409,10 +480,26 @@ function block(s, blocks) {
     a.blocked = a.blockers.length > 0;
   }
   const defender = other(s.active);
+  const desc = id => { const p = perm(s, id); return `${p.name} (${ptText(s, p)})`; };
+  const why = [];
   for (const a of s.combat.attackers) {
-    if (a.blocked) said(s, defender, ['block', 'blocks'], `${perm(s, a.id).name} with ${a.blockers.map(id => perm(s, id).name).join(' and ')}.`);
+    const att = perm(s, a.id);
+    if (a.blocked) {
+      why.push(a.blockers.length > 1
+        ? `${a.blockers.map(desc).join(' and ')} gang up on ${desc(a.id)}: ${att.name} splits its damage between them, and they all hit it.`
+        : `${desc(a.blockers[0])} blocks ${desc(a.id)}: each will deal damage equal to its power to the other.`);
+    } else {
+      why.push(`${desc(a.id)} isn't blocked, so it will hit @${defender} for ${Math.max(0, stats(s, att).power)}.`);
+    }
   }
-  if (!blocks.length) said(s, defender, ['don\'t block.', 'doesn\'t block.']);
+  why.push('Before damage is dealt, both players get one last chance to cast instants (combat tricks like Giant Growth).');
+  const blocked = s.combat.attackers.filter(a => a.blocked);
+  if (blocked.length) {
+    const rest = blocked.map(a => `${perm(s, a.id).name} with ${a.blockers.map(id => perm(s, id).name).join(' and ')}`).join('; ');
+    said(s, defender, ['block', 'blocks'], `${rest}.`, { why });
+  } else {
+    said(s, defender, ['don\'t block.', 'doesn\'t block.'], '', { why });
+  }
   enterStep(s, 'blocks');
 }
 
@@ -420,13 +507,21 @@ function block(s, blocks) {
 function resolveTop(s) {
   const item = s.stack.pop();
   const seat = item.controller;
+  const fizzleWhy = 'When a spell or ability resolves, it checks its targets again. Its target is gone or no longer legal, so it does nothing at all.';
+  s.why = [];
   if (item.kind === 'ability') {
     const source = perm(s, item.source);
     const ab = defOf(source ?? { name: item.sourceName, token: item.sourceToken })?.abilities?.[item.ability];
     const ctx = context(s, item, ab.targets ?? []);
-    if (ctx.fizzled) { note(s, `${item.sourceName}'s ability has no legal target, so it does nothing.`); return; }
-    run(s, ab.effect, { ...ctx, sourceId: item.source, source: source ? creatureSource(s, source) : { controller: seat } });
-    checkState(s);
+    const card = { name: item.sourceName, token: item.sourceToken };
+    if (ctx.fizzled) {
+      note(s, `${item.sourceName}'s ability has no legal target, so it does nothing.`, { why: [fizzleWhy], about: seat, card });
+    } else {
+      run(s, ab.effect, { ...ctx, name: item.sourceName, sourceId: item.source, source: source ? creatureSource(s, source) : { controller: seat } });
+      checkState(s);
+      note(s, `${item.sourceName}'s ability resolves.`, { why: s.why, about: seat, card });
+    }
+    s.why = null;
     return;
   }
 
@@ -434,21 +529,39 @@ function resolveTop(s) {
   const ctx = context(s, item, targetSpecs(def));
   if (!isCreature(def) && ctx.fizzled) {
     s.seats[card.owner].graveyard.push(card);
-    note(s, `${card.name} has no legal target, so it does nothing.`);
+    note(s, `${card.name} has no legal target, so it does nothing.`, { why: [fizzleWhy, 'It still goes to the graveyard, and the mana spent on it is gone.'], about: seat, card: cardRef(card) });
+    s.why = null;
     return;
   }
   if (isPermanentCard(def)) {
     const p = enter(s, card, seat, { tapped: !!def.entersTapped });
+    if (isCreature(def)) {
+      explain(s, `${card.name} (${ptText(s, p)}) enters the battlefield under ${seat === 0 ? 'your' : `@${seat}'s`} control.`);
+      if (def.entersTapped) explain(s, 'It enters tapped (sideways).');
+      if (has(s, p, 'haste')) explain(s, 'It has haste, so it can attack right away.');
+      else explain(s, `It can't attack (or use {T} abilities) until its controller's next turn — creatures need a turn to settle in.${stats(s, p).cantBlock ? '' : ' It can block straight away, though.'}`);
+    }
     if (def.aura) {
       p.attachedTo = item.targets[0].id;
-      if (def.aura.tapOnEnter) perm(s, p.attachedTo).tapped = true;
+      const host = perm(s, p.attachedTo);
+      explain(s, `${card.name} is attached to ${host.name}: "${def.text.split('\n').slice(1).join(' ')}"`);
+      if (def.aura.tapOnEnter) host.tapped = true;
+      explain(s, `It stays as long as ${host.name} is on the battlefield.`);
+    } else if (!isCreature(def)) {
+      explain(s, `${card.name} stays on the battlefield: "${def.text}"`);
     }
-    if (def.etb) run(s, def.etb, { ...ctx, sourceId: p.id, source: creatureSource(s, p) });
+    if (def.etb) {
+      explain(s, 'Its "enters" ability happens now:');
+      run(s, def.etb, { ...ctx, name: card.name, sourceId: p.id, source: creatureSource(s, p) });
+    }
   } else {
-    run(s, def.effect, { ...ctx, sourceId: null, source: { controller: seat } });
+    run(s, def.effect, { ...ctx, name: card.name, sourceId: null, source: { controller: seat } });
     s.seats[card.owner].graveyard.push(card);
+    explain(s, `${card.name} then goes to its owner's graveyard (instants and sorceries are used up once they resolve).`);
   }
   checkState(s);
+  note(s, `${card.name} resolves.`, { why: s.why, about: seat, card: cardRef(card) });
+  s.why = null;
 }
 
 /** Which of an item's targets are still legal; it fizzles if it had targets and none are. */
@@ -464,37 +577,108 @@ function run(s, effects, ctx) {
   const permRef = what => (what === 'self' ? perm(s, ctx.sourceId) : target(what)?.type === 'perm' ? perm(s, target(what).id) : null);
   const playerOf = who => (who === 'you' ? seat : who === 'opp' ? other(seat) : target(who)?.seat ?? null);
 
+  const name = ctx.name ?? 'It';
+  const life = (who, f) => {
+    const before = s.seats[who].life;
+    f();
+    explain(s, `@${who}: ${before} → ${s.seats[who].life} life.`);
+  };
+  const hurt = (t, n, source = ctx.source, from = name) => {
+    if (t.type === 'player') {
+      life(t.seat, () => dealDamage(s, source, t, n));
+      return;
+    }
+    const p = perm(s, t.id);
+    if (!p) return;
+    explain(s, `${from} deals ${n} damage to ${p.name} (${ptText(s, p)}${p.damage ? `, already has ${p.damage} damage` : ''}).`);
+    dealDamage(s, source, t, n);
+    if (p.damage < stats(s, p).toughness && !(p.deathtouched && p.damage)) explain(s, `That isn't enough to destroy ${p.name}: it survives (the damage wears off at the end of the turn).`);
+  };
+
   for (const e of effects ?? []) {
     if (s.phase !== 'playing') return;
     switch (e.do) {
       case 'damage': {
-        if (e.to === 'eachCreature') { for (const p of allCreatures(s)) dealDamage(s, ctx.source, { type: 'perm', id: p.id }, e.n); break; }
+        if (e.to === 'eachCreature') {
+          explain(s, `${name} deals ${e.n} damage to every creature on the battlefield — both players' creatures.`);
+          for (const p of allCreatures(s)) dealDamage(s, ctx.source, { type: 'perm', id: p.id }, e.n);
+          break;
+        }
         const t = target(e.to);
-        if (t) dealDamage(s, ctx.source, t, e.n);
+        if (t?.type === 'player') explain(s, `${name} deals ${e.n} damage to @${t.seat}.`);
+        if (t) hurt(t, e.n);
         break;
       }
-      case 'destroy': { const p = permRef(e.what); if (p) leave(s, p, 'graveyard'); break; }
+      case 'destroy': {
+        const p = permRef(e.what);
+        if (!p) break;
+        leave(s, p, 'graveyard');
+        explain(s, `${p.name} is destroyed and goes to its owner's graveyard${p.token ? ' (a token just disappears)' : ''}.`);
+        break;
+      }
       case 'exile': {
         const p = permRef(e.what);
         if (!p) break;
         const power = Math.max(0, stats(s, p).power);
         leave(s, p, 'exile');
-        if (e.lifeForPower && power) s.seats[p.controller].life += power;
+        explain(s, `${p.name} is exiled: removed from the game entirely (it doesn't even go to the graveyard).`);
+        if (e.lifeForPower && power) {
+          explain(s, `Its controller gains life equal to its power (${power}).`);
+          life(p.controller, () => { s.seats[p.controller].life += power; });
+        }
         break;
       }
-      case 'bounce': { const p = permRef(e.what); if (p) leave(s, p, 'hand'); break; }
-      case 'pump': { const p = permRef(e.what); if (p) p.boosts.push({ p: e.p, t: e.t, kw: e.kw }); break; }
-      case 'pumpAll': for (const p of creaturesOf(s, seat)) p.boosts.push({ p: e.p, t: e.t, kw: e.kw }); break;
-      case 'counters': { const p = permRef(e.what); if (p) p.counters += e.n; break; }
-      case 'draw': draw(s, seat, e.n); break;
-      case 'gain': s.seats[seat].life += e.n; break;
-      case 'lose': { const who = playerOf(e.who); if (who != null) s.seats[who].life -= e.n; break; }
+      case 'bounce': {
+        const p = permRef(e.what);
+        if (!p) break;
+        leave(s, p, 'hand');
+        explain(s, p.token
+          ? `${p.name} is a token, so instead of going back to a hand it simply disappears.`
+          : `${p.name} returns to its owner's hand. Any damage, counters and auras on it are gone — it can be cast again, but costs mana again (and arrives fresh, unable to attack that turn).`);
+        break;
+      }
+      case 'pump': {
+        const p = permRef(e.what);
+        if (!p) break;
+        p.boosts.push({ p: e.p, t: e.t, kw: e.kw });
+        const sign = n => (n >= 0 ? `+${n}` : `${n}`);
+        explain(s, `${p.name} gets ${sign(e.p)}/${sign(e.t)} until end of turn: it's now ${ptText(s, p)}.`);
+        break;
+      }
+      case 'pumpAll': {
+        const mine = creaturesOf(s, seat);
+        for (const p of mine) p.boosts.push({ p: e.p, t: e.t, kw: e.kw });
+        explain(s, `Every creature ${subj(seat, 'control', 'controls')} (${mine.length}) gets +${e.p}/+${e.t}${e.kw ? ` and ${e.kw.join(', ')}` : ''} until end of turn.`);
+        break;
+      }
+      case 'counters': {
+        const p = permRef(e.what);
+        if (!p) break;
+        p.counters += e.n;
+        explain(s, `${p.name} gets a +1/+1 counter (that one lasts): it's now ${ptText(s, p)}.`);
+        break;
+      }
+      case 'draw':
+        draw(s, seat, e.n);
+        explain(s, `${subj(seat, 'draw', 'draws')} ${plural(e.n, 'card')}.`);
+        break;
+      case 'gain': life(seat, () => { s.seats[seat].life += e.n; }); break;
+      case 'lose': {
+        const who = playerOf(e.who);
+        if (who != null) life(who, () => { s.seats[who].life -= e.n; });
+        break;
+      }
       case 'discard': {
         const who = playerOf(e.who);
         if (who == null) break;
         const hand = s.seats[who].hand;
-        if (hand.length <= e.n) discard(s, who, hand.map(c => c.id));
-        else s.pending = { type: 'discard', seat: who, count: e.n, reason: 'spell' };
+        if (hand.length <= e.n) {
+          explain(s, `${subj(who, 'have', 'has')} only ${plural(hand.length, 'card')} in hand, so ${who === 0 ? 'you discard' : 'they discard'} them all.`);
+          discard(s, who, hand.map(c => c.id));
+        } else {
+          explain(s, `${subj(who, 'choose', 'chooses')} ${plural(e.n, 'card')} to discard (the player discarding gets to choose).`);
+          s.pending = { type: 'discard', seat: who, count: e.n, reason: 'spell' };
+        }
         break;
       }
       case 'counter': {
@@ -503,23 +687,40 @@ function run(s, effects, ctx) {
         if (at < 0) break;
         const [countered] = s.stack.splice(at, 1);
         s.seats[countered.card.owner].graveyard.push(countered.card);
-        note(s, `${countered.card.name} is countered.`);
+        explain(s, `${countered.card.name} is countered: it's taken off the stack and put into the graveyard without doing anything. The mana spent on it is lost.`);
+        note(s, `${countered.card.name} is countered.`, { minor: true, card: cardRef(countered.card) });
         break;
       }
-      case 'token': for (let i = 0; i < e.n; i++) makeToken(s, seat, e.token); break;
-      case 'fetchLand': fetchLand(s, seat); break;
+      case 'token': {
+        for (let i = 0; i < e.n; i++) makeToken(s, seat, e.token);
+        const tk = TOKENS[e.token];
+        explain(s, `${subj(seat, 'create', 'creates')} ${e.n === 1 ? 'a' : e.n} ${tk.pt.join('/')} ${tk.name} token${e.n === 1 ? '' : 's'}${tk.kw ? ` with ${tk.kw.join(', ')}` : ''}. Tokens are creatures like any other, but vanish if they ever leave the battlefield.`);
+        break;
+      }
+      case 'fetchLand': {
+        const got = fetchLand(s, seat);
+        explain(s, got
+          ? `${subj(seat, 'search', 'searches')} the library for a basic land, ${got}, and put${seat === 0 ? '' : 's'} it onto the battlefield tapped (extra mana from next turn), then shuffle${seat === 0 ? '' : 's'}.`
+          : 'There were no basic lands left to find.');
+        break;
+      }
       case 'returnToHand': {
         const t = target(e.what);
         const gy = s.seats[seat].graveyard, at = t ? gy.findIndex(c => c.id === t.id) : -1;
-        if (at >= 0) s.seats[seat].hand.push(gy.splice(at, 1)[0]);
+        if (at < 0) break;
+        const [c] = gy.splice(at, 1);
+        s.seats[seat].hand.push(c);
+        explain(s, `${c.name} comes back from the graveyard to ${seat === 0 ? 'your' : `@${seat}'s`} hand, ready to be cast again.`);
         break;
       }
       case 'fight': case 'bite': {
         const a = permRef(e.a), b = permRef(e.b);
-        if (!a || !b) break;
-        const pa = stats(s, a).power, pb = stats(s, b).power;
-        dealDamage(s, creatureSource(s, a), { type: 'perm', id: b.id }, pa);
-        if (e.do === 'fight') dealDamage(s, creatureSource(s, b), { type: 'perm', id: a.id }, pb);
+        if (!a || !b) { explain(s, 'One of the two creatures is gone, so no damage is dealt.'); break; }
+        const pa = Math.max(0, stats(s, a).power), pb = Math.max(0, stats(s, b).power);
+        if (e.do === 'fight') explain(s, `${a.name} (${ptText(s, a)}) and ${b.name} (${ptText(s, b)}) fight: each deals damage equal to its power to the other.`);
+        const sa = creatureSource(s, a), sb = creatureSource(s, b);
+        hurt({ type: 'perm', id: b.id }, pa, sa, a.name);
+        if (e.do === 'fight') hurt({ type: 'perm', id: a.id }, pb, sb, b.name);
         break;
       }
       default: throw new Error(`Unknown effect ${e.do}`);
@@ -531,15 +732,17 @@ function run(s, effects, ctx) {
 function fetchLand(s, seat) {
   const p = s.seats[seat];
   const lands = p.library.filter(c => defOf(c).type === 'Basic Land');
+  let best = null;
   if (lands.length) {
     const have = c => s.battlefield.filter(x => x.controller === seat && defOf(x).mana === c).length;
     const want = c => p.hand.reduce((n, card) => n + parseCost(defOf(card).cost)[c], 0);
     const score = card => { const c = defOf(card).mana; return want(c) * 2 - have(c); };
-    const best = lands.reduce((a, b) => (score(b) > score(a) ? b : a));
+    best = lands.reduce((a, b) => (score(b) > score(a) ? b : a));
     p.library = p.library.filter(c => c.id !== best.id);
     enter(s, best, seat, { tapped: true });
   }
   shuffle(s, p.library);
+  return best?.name ?? null;
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -566,6 +769,45 @@ const describeTargets = (s, targets) => {
   return named.length ? ` targeting ${named.join(' and ')}` : '';
 };
 
+/** Why a spell can be cast now, what it costs and what it will do. */
+function castWhy(s, seat, card, targets) {
+  const def = defOf(card);
+  const extra = [def.sub, def.pt?.join('/')].filter(Boolean).join(', ');
+  const mv = manaValueOf(def);
+  const why = [`${card.name} is ${article(def.type.toLowerCase())}${extra ? ` (${extra})` : ''}. It costs ${def.cost}, so ${subj(seat, 'tap', 'taps')} ${mv === 1 ? 'a land' : `${mv} lands`} (or other mana sources) to pay for it.`];
+  if (def.text) why.push(`What it does: "${def.text.replace(/\n/g, ' ')}"`);
+  const named = targets.filter(Boolean).map(t => nameOf(s, t));
+  if (named.length) why.push(`It targets ${named.join(' and ')}. A target is chosen when the spell is cast.`);
+  why.push(isInstant(def)
+    ? 'It\'s an instant, so it can be cast at almost any time — even during the other player\'s turn, or in response to another spell.'
+    : `${def.type === 'Sorcery' ? 'Sorceries' : isCreature(def) ? 'Creatures' : 'Enchantments'} can only be cast in their caster's own main phase, when nothing else is waiting.`);
+  why.push(`It goes on "the stack" first: before it happens, ${seat === 0 ? '@1 gets' : 'you get'} a chance to respond with an instant.`);
+  return why;
+}
+const manaValueOf = def => { const c = parseCost(def.cost); return c.generic + COLORS.reduce((n, k) => n + c[k], 0); };
+
+/** What an attack means, and what the attackers' keywords do. */
+function attackWhy(s, ids) {
+  const defender = other(s.active);
+  const ps = ids.map(id => perm(s, id));
+  const total = ps.reduce((n, p) => n + Math.max(0, stats(s, p).power), 0);
+  const why = [`Attacking creatures tap (turn sideways) — unless they have vigilance. Together they have ${total} power.`];
+  const kwLine = {
+    flying: n => `${n} has flying: only creatures with flying or reach can block it.`,
+    unblockable: n => `${n} can't be blocked at all.`,
+    trample: n => `${n} has trample: damage beyond what its blockers need goes through to the player.`,
+    firstStrike: n => `${n} has first strike: in a fight it deals its damage first.`,
+    doubleStrike: n => `${n} has double strike: it deals damage twice, first and then again.`,
+    deathtouch: n => `${n} has deathtouch: any damage it deals destroys a creature, so blocking it is costly.`,
+    lifelink: n => `${n} has lifelink: damage it deals gains its controller that much life.`,
+    vigilance: n => `${n} has vigilance, so it didn't tap — it can still block next turn.`,
+    menace: n => `${n} has menace: it can only be blocked by two or more creatures.`,
+  };
+  for (const p of ps) for (const k of stats(s, p).kw) if (kwLine[k]) why.push(kwLine[k](p.name));
+  why.push(`Next ${subj(defender, 'choose', 'chooses')} blockers: each untapped creature can block one attacker (several can block the same one). Unblocked attackers deal their damage to the player.`);
+  return why;
+}
+
 export function act(state, a) {
   if (a.type === 'resign') {
     if (state.phase === 'gameOver') throw new Error('The game is over.');
@@ -588,10 +830,13 @@ export function act(state, a) {
         shuffle(s, me.library);
         draw(s, a.seat, OPENING_HAND);
         me.mulligans += 1;
-        said(s, a.seat, ['take a mulligan.', 'takes a mulligan.']);
+        said(s, a.seat, ['take a mulligan.', 'takes a mulligan.'], '', {
+          minor: true,
+          why: ['A mulligan: the hand is shuffled back and a new 7 drawn. For each mulligan, one card goes to the bottom of the library after keeping.'],
+        });
         return s;
       }
-      said(s, a.seat, ['keep', 'keeps'], `${me.hand.length - me.mulligans} cards.`);
+      said(s, a.seat, ['keep', 'keeps'], `${me.hand.length - me.mulligans} cards.`, { minor: true });
       if (me.mulligans) s.pending = { type: 'bottom', seat: a.seat, count: me.mulligans };
       else afterMulligan(s, a.seat);
       break;
@@ -611,7 +856,12 @@ export function act(state, a) {
       } else {
         const names = ids.map(id => me.hand.find(c => c.id === id).name);
         discard(s, a.seat, ids);
-        said(s, a.seat, ['discard', 'discards'], `${names.join(' and ')}.`);
+        said(s, a.seat, ['discard', 'discards'], `${names.join(' and ')}.`, {
+          minor: p.reason !== 'handSize',
+          why: [p.reason === 'handSize'
+            ? 'At the end of a player\'s turn, they can only keep 7 cards in hand: any extra are discarded (to the graveyard).'
+            : 'A spell made them discard; the player discarding chooses which cards go.'],
+        });
         if (p.reason === 'handSize') endTurn(s);
       }
       break;
@@ -626,7 +876,10 @@ export function act(state, a) {
       me.hand = me.hand.filter(c => c.id !== card.id);
       enter(s, card, a.seat);
       me.landsPlayed += 1;
-      said(s, a.seat, ['play', 'plays'], `${card.name}.`);
+      said(s, a.seat, ['play', 'plays'], `${card.name}.`, {
+        minor: true, card: cardRef(card),
+        why: [`Each player can play one land a turn, in their own main phase. ${card.name} taps for {${defOf(card).mana}}: one more mana to spend each turn.`],
+      });
       break;
     }
 
@@ -648,10 +901,15 @@ export function act(state, a) {
       me.hand = me.hand.filter(c => c.id !== card.id);
       const item = { id: newId(s), kind: 'spell', card, controller: a.seat, targets };
       s.stack.push(item);
-      said(s, a.seat, ['cast', 'casts'], `${card.name}${describeTargets(s, targets)}.`);
+      const why = castWhy(s, a.seat, card, targets);
       if (!isPermanentCard(def)) {
-        for (const p of s.battlefield) if (p.controller === a.seat && defOf(p).onSpell) run(s, defOf(p).onSpell, { controller: a.seat, targets: [], sourceId: p.id });
+        for (const p of s.battlefield) {
+          if (p.controller !== a.seat || !defOf(p).onSpell) continue;
+          run(s, defOf(p).onSpell, { controller: a.seat, targets: [], sourceId: p.id });
+          why.push(`${p.name} reacts to the spell being cast: "${defOf(p).text.split('\n').pop()}" It's now ${ptText(s, p)}.`);
+        }
       }
+      said(s, a.seat, ['cast', 'casts'], `${card.name}${describeTargets(s, targets)}.`, { why, card: cardRef(card) });
       s.passes = 1;
       s.priority = other(a.seat);
       break;
@@ -665,7 +923,14 @@ export function act(state, a) {
       if (ab.cost) tapFor(s, a.seat, ab.cost);
       if (ab.tap) p.tapped = true;
       s.stack.push({ id: newId(s), kind: 'ability', source: p.id, sourceName: p.name, sourceToken: p.token, ability: a.ability, controller: a.seat, targets });
-      said(s, a.seat, ['activate', 'activates'], `${p.name}${describeTargets(s, targets)}.`);
+      said(s, a.seat, ['activate', 'activates'], `${p.name}${describeTargets(s, targets)}.`, {
+        card: cardRef(p),
+        why: [
+          `${p.name} has an ability: "${defOf(p).text.split('\n').find(l => l.includes(':') && (ab.tap ? l.includes('{T}') : true)) ?? defOf(p).text}"`,
+          ab.tap ? `The {T} means it taps to use it — so it can only do this once a turn, and not on the turn it arrived.` : `It costs ${ab.cost}, and can be used again as long as there's mana to pay.`,
+          'Abilities use the stack just like spells, so the other player can respond before it happens.',
+        ],
+      });
       s.passes = 1;
       s.priority = other(a.seat);
       break;
@@ -684,7 +949,7 @@ export function act(state, a) {
       if (!ids.length) { enterStep(s, 'main2'); break; }
       for (const id of ids) { const p = perm(s, id); if (!has(s, p, 'vigilance')) p.tapped = true; }
       s.combat = { attackers: ids.map(id => ({ id, blockers: [], blocked: false })) };
-      said(s, a.seat, ['attack', 'attacks'], `with ${ids.map(id => perm(s, id).name).join(', ')}.`);
+      said(s, a.seat, ['attack', 'attacks'], `with ${ids.map(id => perm(s, id).name).join(', ')}.`, { why: attackWhy(s, ids) });
       enterStep(s, 'attacks');
       break;
     }

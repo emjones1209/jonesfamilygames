@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { CARDS } from './cardPool';
 import { DECKS, deckList } from './decks';
 import { parseCost, payment, stats, combatDamage, legalTargets, perm, manaValue } from './mtgRules';
-import { newGame, act, waitingFor, canCast, viewFor, describeLog } from './mtgEngine';
+import { newGame, act, waitingFor, canCast, viewFor, describeLog, explainLog } from './mtgEngine';
 import { robotAction, duel } from './mtgAI';
 
 // A game in progress from a description: battlefield [[seat, name, { tapped, sick }]], hands, whose turn
@@ -325,6 +325,35 @@ describe('what you can see', () => {
     expect(describeLog({ seat: 0, v: ['cast', 'casts'], rest: 'Shock targeting @1.' }, ['You', 'Ajax'])).toBe('You cast Shock targeting Ajax.');
     expect(describeLog({ seat: 1, v: ['cast', 'casts'], rest: 'Shock targeting @0.' }, ['You', 'Ajax'])).toBe('Ajax casts Shock targeting you.');
     expect(describeLog({ text: '@0 take 3 combat damage.' }, ['You', 'Ajax'])).toBe('You take 3 combat damage.');
+  });
+});
+
+describe('explanations', () => {
+  const names = ['You', 'Ajax'];
+  const lines = (s, re) => s.log.filter(e => re.test(describeLog(e, names))).flatMap(e => explainLog(e, names));
+
+  it('explains a spell when it\'s cast and when it resolves', () => {
+    let s = setup({ bf: [[1, 'Mountain'], [0, 'Grizzly Bears']], hand1: ['Lightning Bolt'], active: 1 });
+    s = act(s, { type: 'cast', seat: 1, card: s.seats[1].hand[0].id, targets: [{ type: 'perm', id: idOf(s, 'Grizzly Bears') }] });
+    const cast = s.log.find(e => /casts Lightning Bolt/.test(describeLog(e, names)));
+    expect(cast.about).toBe(1);
+    expect(explainLog(cast, names).join(' ')).toMatch(/instant.*any time/);
+    const resolved = lines(s, /Lightning Bolt resolves/).join(' ');
+    expect(resolved).toMatch(/deals 3 damage to Grizzly Bears \(2\/2\)/);
+    expect(resolved).toMatch(/Grizzly Bears dies: it has 3 damage and its toughness is 2/);
+  });
+
+  it('explains combat: blocks, trample, lifelink and life totals', () => {
+    let s = setup({ bf: [[1, 'Colossal Dreadmaw'], [1, 'Vampire Nighthawk'], [0, 'Grizzly Bears']], active: 1 });
+    s = act(s, { type: 'attack', seat: 1, attackers: [idOf(s, 'Colossal Dreadmaw'), idOf(s, 'Vampire Nighthawk')] });
+    expect(lines(s, /Ajax attacks/).join(' ')).toMatch(/Vampire Nighthawk has flying/);
+    s = act(s, { type: 'block', seat: 0, blocks: [{ blocker: idOf(s, 'Grizzly Bears'), attacker: idOf(s, 'Colossal Dreadmaw') }] });
+    const combat = s.log.find(e => /combat damage/.test(describeLog(e, names)));
+    expect(combat.about).toBe(1);
+    const text = explainLog(combat, names).join(' ');
+    expect(text).toMatch(/trample.*the other 4 goes through to you/);
+    expect(text).toMatch(/lifelink.*Ajax gains 2 life/);
+    expect(text).toMatch(/You: 20 → 14 life/);
   });
 });
 

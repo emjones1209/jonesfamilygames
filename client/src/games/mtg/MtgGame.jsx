@@ -13,8 +13,9 @@ import { Symbol } from './CardFace';
 import { MtgTable } from './MtgTable';
 import api from '../../utils/api';
 
-const ROBOT_MS = 900;
+const ROBOT_MS = 1600;         // time between the computer's moves
 const DECK_KEY = 'mtg:deck';
+const EXPLAIN_KEY = 'mtg:explain';
 const LEVELS = [['easy', '😊 Easy'], ['medium', '🤔 Medium'], ['hard', '🔥 Hard']];
 
 const remembered = () => { try { return localStorage.getItem(DECK_KEY); } catch { return null; } };
@@ -33,6 +34,21 @@ export default function MtgGame() {
   const [error, setError] = useState('');
   const reactions = useRobotChatter('mtg', game, robots.cast);
   const posted = useRef(false);
+  // Explanations of the computer's moves: it waits while you read them
+  const [explainOn, setExplainOn] = useState(() => { try { return localStorage.getItem(EXPLAIN_KEY) !== 'off'; } catch { return true; } });
+  const [seen, setSeen] = useState(0);              // log entries up to here have been read
+  const lastLog = g => g?.log[g.log.length - 1]?.n ?? 0;
+  const unseen = useMemo(
+    () => (game && explainOn && game.phase !== 'gameOver' ? game.log.filter(e => e.n > seen && e.about === 1 && e.why?.length) : []),
+    [game, explainOn, seen],
+  );
+  const reading = unseen.some(e => !e.minor);
+  const toggleExplain = () => {
+    const on = !explainOn;
+    setExplainOn(on);
+    setSeen(lastLog(game));
+    try { localStorage.setItem(EXPLAIN_KEY, on ? 'on' : 'off'); } catch { /* private mode */ }
+  };
 
   const startGame = (diff, previous = null) => {
     setDifficulty(diff);
@@ -41,6 +57,7 @@ export default function MtgGame() {
     // In a rematch, whoever lost goes first
     const first = previous && previous.winner != null ? 1 - previous.winner : null;
     setGame(newGame({ decks: [myDeck, theirs], first, wins: previous?.wins }));
+    setSeen(0);
     setError('');
     posted.current = false;
   };
@@ -48,13 +65,14 @@ export default function MtgGame() {
   const apply = action => {
     try {
       setGame(act(game, action));
+      setSeen(lastLog(game));                        // you've seen what happened before you acted
       setError('');
     } catch (e) { setError(e.message); }
   };
 
   useEffect(() => {
     if (!game) return;
-    if (waitingFor(game) === 1) {
+    if (waitingFor(game) === 1 && !reading) {
       const timer = setTimeout(() => {
         try {
           setGame(act(game, robotAction(game, 1, difficulty, robots.styleOf(1))));
@@ -75,7 +93,7 @@ export default function MtgGame() {
       }).catch(() => {});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, difficulty]);
+  }, [game, difficulty, reading]);
 
   const view = useMemo(() => game && viewFor(game, 0), [game]);
 
@@ -87,7 +105,8 @@ export default function MtgGame() {
   }
 
   return (
-    <MtgTable view={view} names={robots.names} onAction={apply} onExit={() => navigate('/')} error={error} subtitle={difficulty}
+    <MtgTable view={view} names={robots.names} onAction={apply}
+      explain={{ on: explainOn, toggle: toggleExplain, unseen, done: () => setSeen(lastLog(game)) }} onExit={() => navigate('/')} error={error} subtitle={difficulty}
       overlay={<ReactionBursts reactions={reactions} you={0} players={2} nameOf={seat => robots.names[seat]} />}
       gameOverActions={
         <div className="flex flex-col gap-2">

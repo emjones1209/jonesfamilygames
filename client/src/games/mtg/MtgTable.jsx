@@ -13,11 +13,11 @@ import { Button } from '../../components/Button';
 import { RulesButton } from '../../components/RulesButton';
 import { ResultPanel } from '../cards/GameSetup';
 import { useMediaQuery } from '../../utils/useMediaQuery';
-import { CardFace, MiniCard, LandTile, ManaCost } from './CardFace';
+import { CardFace, MiniCard, LandTile, ManaCost, RulesText } from './CardFace';
 import {
   defOf, isLand, isCreature, legalTargets, targetSpecs, targetsAvailable, canBlock, sameTarget, manaAvailable, payment,
 } from './mtgRules';
-import { waitingFor, canCast, canPlayLand, canActivate, instantOptions, attackersFor, describeLog, isMain } from './mtgEngine';
+import { waitingFor, canCast, canPlayLand, canActivate, instantOptions, attackersFor, describeLog, explainLog, isMain } from './mtgEngine';
 import { deckById } from './decks';
 
 const BG = 'from-[#1b1424] to-[#0d1a14]';
@@ -67,7 +67,7 @@ function whyNot(view, card) {
  * @param view   the game as you see it (viewFor(game, 0))
  * @param names  [you, opponent]
  */
-export function MtgTable({ view, names, onAction, onExit, error, subtitle, reactions = {}, overlay, gameOverActions }) {
+export function MtgTable({ view, names, onAction, onExit, error, subtitle, reactions = {}, overlay, gameOverActions, explain = null }) {
   const big = useMediaQuery('(min-width: 768px)');
   const huge = useMediaQuery('(min-width: 1100px) and (min-height: 800px)');
   const W = huge ? 88 : big ? 76 : 56;                  // battlefield card width
@@ -80,6 +80,7 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
   const [blocker, setBlocker] = useState(null);         // a blocker picked, waiting for its attacker
   const [picked, setPicked] = useState([]);             // cards chosen to discard / put on the bottom
   const [showLog, setShowLog] = useState(false);
+  const [opened, setOpened] = useState(null);           // the log entry whose explanation is open
   const [showGy, setShowGy] = useState(null);           // seat whose graveyard you're looking at
   const [confirmResign, setConfirmResign] = useState(false);
 
@@ -271,6 +272,12 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 text-xs font-semibold min-h-[36px]">
             <ScrollText size={14} /> <span className="hidden md:inline">Log</span>
           </button>
+          {explain && (
+            <button onClick={explain.toggle} aria-label="Explain the opponent's moves"
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold min-h-[36px] ${explain.on ? 'bg-game-gold/80 text-game-bg' : 'bg-white/10 text-white/60'}`}>
+              💬 <span className="hidden md:inline">Explain {explain.on ? 'on' : 'off'}</span>
+            </button>
+          )}
         </div>
         <div className="text-white/80 text-sm font-semibold">Magic{subtitle ? ` · ${subtitle}` : ''} · Turn {view.turnNo}</div>
         <div className="text-white/70 text-xs text-right font-semibold">{names[0]} {view.wins[0]} · {names[1]} {view.wins[1]}</div>
@@ -304,7 +311,12 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
         <p className={`font-semibold text-center text-sm md:text-base ${error ? 'text-red-300' : targeting ? 'text-yellow-300' : 'text-white/90'}`}>{error || status}</p>
         {advice.map(t => <p key={t} className="text-xs text-green-300/90 text-center">💡 {t}</p>)}
         <div className="text-xs text-white/50 text-center leading-snug">
-          {logLines.map(e => <div key={e.n}>{describeLog(e, names)}</div>)}
+          {logLines.map(e => (
+            <button type="button" key={e.n} className="block mx-auto hover:text-white/80" disabled={!e.why?.length}
+              onClick={() => { setOpened(e.n); setShowLog(true); }}>
+              {describeLog(e, names)}{e.why?.length ? ' ❔' : ''}
+            </button>
+          ))}
         </div>
         <div className="flex gap-2 flex-wrap justify-center mt-1">
           {targeting && (
@@ -356,6 +368,32 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
         </button>
       )}
       {overlay}
+
+      {/* What the computer just did, and how it worked: it waits until you've read it */}
+      {explain?.unseen.some(e => !e.minor) && !over && (
+        <div className="fixed z-40 inset-x-2 bottom-2 max-h-[55vh] md:inset-x-auto md:right-3 md:top-16 md:bottom-auto md:w-[26rem] md:max-h-[80vh]
+          flex flex-col rounded-3xl bg-game-card/95 border border-game-gold/40 shadow-2xl backdrop-blur">
+          <div className="px-4 pt-3 pb-2 border-b border-white/10 flex items-center justify-between gap-2">
+            <h2 className="text-game-gold font-bold">What {names[1]} did</h2>
+            <span className="text-white/40 text-xs">{names[1]} waits while you read</span>
+          </div>
+          <div className="overflow-y-auto px-4 py-2 space-y-3">
+            {explain.unseen.map(e => (
+              <div key={e.n} className="flex gap-2">
+                {e.card && <div className="shrink-0"><MiniCard card={e.card} width={48} onClick={() => setDetail({ card: e.card })} /></div>}
+                <div className="min-w-0">
+                  <p className="font-semibold text-white text-sm">{describeLog(e, names)}</p>
+                  {!e.minor && <Explanation entry={e} names={names} />}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="px-4 py-2 border-t border-white/10 flex items-center gap-3">
+            <Button variant="gold" className="flex-1" onClick={explain.done}>Got it</Button>
+            <button className="text-white/40 text-xs underline" onClick={explain.toggle}>Stop explaining</button>
+          </div>
+        </div>
+      )}
 
       {/* Reading a card */}
       {detail && (
@@ -411,7 +449,17 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
         <Modal onClose={() => setShowLog(false)}>
           <h3 className="text-game-gold font-bold">What's happened</h3>
           <div className="max-h-[60vh] overflow-y-auto text-sm text-white/80 w-full max-w-md space-y-1">
-            {[...view.log].reverse().map(e => <div key={e.n}>{describeLog(e, names)}</div>)}
+            <p className="text-white/40 text-xs">Tap a line marked ❔ to see how it worked.</p>
+            {[...view.log].reverse().map(e => (
+              e.why?.length ? (
+                <div key={e.n}>
+                  <button type="button" className="text-left w-full hover:text-white" onClick={() => setOpened(opened === e.n ? null : e.n)}>
+                    {opened === e.n ? '▾' : '❔'} {describeLog(e, names)}
+                  </button>
+                  {opened === e.n && <Explanation entry={e} names={names} />}
+                </div>
+              ) : <div key={e.n} className="pl-5">{describeLog(e, names)}</div>
+            ))}
           </div>
           <Button variant="ghost" onClick={() => setShowLog(false)}>Close</Button>
         </Modal>
@@ -486,6 +534,15 @@ function targetName(view, t, names) {
   if (t.type === 'perm') return view.battlefield.find(p => p.id === t.id)?.name ?? '?';
   if (t.type === 'stack') return view.stack.find(i => i.id === t.id)?.card?.name ?? '?';
   return view.seats.flatMap(p => p.graveyard).find(c => c.id === t.id)?.name ?? '?';
+}
+
+/** A log entry's explanation, as bullet points (mana symbols drawn). */
+function Explanation({ entry, names }) {
+  return (
+    <ul className="mt-1 space-y-1 text-white/75 text-[13px] leading-snug list-disc pl-4">
+      {explainLog(entry, names).map((line, i) => <li key={i}><RulesText text={line} size={12} /></li>)}
+    </ul>
+  );
 }
 
 function Modal({ children, onClose }) {
