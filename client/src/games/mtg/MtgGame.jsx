@@ -131,7 +131,10 @@ function MtgSetup({ myDeck, setMyDeck, theirChoice, setTheirChoice, opponent, on
     <button key={d.id} type="button" onClick={onPick}
       className={`text-left rounded-2xl p-3 border transition-all ${selected ? 'border-game-gold bg-white/15 shadow-lg' : 'border-white/10 bg-white/5 hover:bg-white/10'}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className="font-bold text-white">{d.name}</span>
+        <span className="font-bold text-white">
+          {d.name}
+          {d.advanced && <span className="ml-2 align-middle text-[10px] font-semibold uppercase tracking-wide text-game-gold border border-game-gold/50 rounded px-1">Advanced</span>}
+        </span>
         <Pips colors={d.colors} />
       </div>
       <p className="text-white/55 text-xs mt-1 leading-snug">{d.blurb}</p>

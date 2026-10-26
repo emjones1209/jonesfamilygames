@@ -9,16 +9,21 @@
  *          saves combat tricks and counterspells for the right moment
  *
  * A robot's boldness (players.js) makes it attack and trade more readily.
+ *
+ * Artifacts and equipment: it plays mana rocks early, equips its best creature
+ * (one that can attack this turn, if it can), and uses "Sacrifice ~" abilities
+ * when the creature is about to die anyway — or when it's worth it on its own
+ * (a Mogg Fanatic finishing off a creature, Bottle Gnomes when life is low).
  */
 import {
-  defOf, stats, perm, creaturesOf, isCreature, isLand, isInstant, manaValue, parseCost, payment, manaSources,
-  legalTargets, targetSpecs, canBlock, lethalDamage, COLORS,
+  defOf, stats, perm, creaturesOf, isCreature, isLand, isInstant, isPermanentCard, manaValue, parseCost, payment, manaSources,
+  legalTargets, targetSpecs, canBlock, canAttack, lethalDamage, COLORS,
 } from './mtgRules.js';
 import { waitingFor, canCast, canActivate, canPlayLand, attackersFor, isMain, other } from './mtgEngine.js';
 
 const KW_VALUE = {
   flying: 2, firstStrike: 1, doubleStrike: 3, deathtouch: 2, lifelink: 1, trample: 1,
-  vigilance: 0.5, haste: 0.3, unblockable: 2, reach: 0.5, shroud: 1,
+  vigilance: 0.5, haste: 0.3, unblockable: 2, reach: 0.5, shroud: 1, hexproof: 1,
 };
 
 // ── Values ───────────────────────────────────────────────────────────────────
@@ -27,6 +32,7 @@ export function creatureValue(s, p) {
   let v = Math.max(0, st.power) * 1.5 + Math.max(0, st.toughness);
   for (const k of st.kw) v += KW_VALUE[k] ?? 0;
   if (def.abilities) v += 1.5;
+  if (def.triggers) v += 1.5;
   if (def.anthem) v += 3;
   if (def.mana) v += 1;
   if (st.kw.has('defender')) v *= 0.6;
@@ -238,10 +244,18 @@ function mainPhaseSpell(s, seat, level, bold) {
     if (level === 'easy') score = score > -5 ? 5 + Math.random() * 10 : score;
     if (score > 0) options.push({ card, targets: t?.targets ?? targetSpecs(def).map(() => null), score });
   }
+  // Equipment: onto the best creature (one that can attack now, before combat), if it isn't on one
+  for (const p of s.battlefield) {
+    (defOf(p).abilities ?? []).forEach((ab, i) => {
+      if (!ab.equip || p.attachedTo || !canActivate(s, seat, p, i)) return;
+      const best = equipTarget(s, seat, p, first);
+      if (best) options.push({ ability: { perm: p.id, ability: i }, targets: [{ type: 'perm', id: best.id }], score: 9 + (first && canAttack(s, best) ? 4 : 0) });
+    });
+  }
   // Activated abilities at sorcery speed: only a ping that destroys something
   for (const p of s.battlefield) {
     (defOf(p).abilities ?? []).forEach((ab, i) => {
-      if (!ab.tap || !canActivate(s, seat, p, i)) return;
+      if (!ab.tap || ab.sac || !canActivate(s, seat, p, i)) return;
       const t = chooseTargets(s, seat, ab, { level, face: lethal });
       if (t && (t.worth >= 2 || lethal)) options.push({ ability: { perm: p.id, ability: i }, targets: t.targets, score: 6 + t.worth });
     });
@@ -251,6 +265,14 @@ function mainPhaseSpell(s, seat, level, bold) {
   const best = options[0];
   if (best.ability) return { type: 'activate', seat, ...best.ability, targets: best.targets };
   return { type: 'cast', seat, card: best.card.id, targets: best.targets };
+}
+
+/** The creature to carry equipment `eq`: the most valuable, preferring one that can attack this turn. */
+function equipTarget(s, seat, eq, first) {
+  const mine = creaturesOf(s, seat).filter(c => !stats(s, c).kw.has('defender') && !(stats(s, c).cantAttack && stats(s, c).cantBlock));
+  if (!mine.length) return null;
+  const score = c => creatureValue(s, c) + (first && canAttack(s, c) ? 4 : 0) + (defOf(eq).equipment.kw?.includes('haste') && c.sick ? 5 : 0);
+  return mine.reduce((a, b) => (score(b) > score(a) ? b : a));
 }
 
 /** How good casting this now is (≤ 0: don't). */
@@ -271,6 +293,12 @@ function scoreSpell(s, seat, def, t, { first, level, bold, lethal }) {
     return score;
   }
   if (def.anthem) return first ? 8 + myCreatures.length * 2 : 4 + myCreatures.length * 2;
+  if (isPermanentCard(def) && !targetSpecs(def).length && !def.aura) {
+    if (def.mana) return 15;                                           // a mana rock: the sooner the better
+    if (def.equipment) return myCreatures.length ? 9 : 3;
+    if (def.triggers) return 9;                                        // Phyrexian Arena, Bitterblossom
+    return 5;
+  }
   if (def.aura) return t && t.worth >= (roleOf(def, 0) === 'harm' ? 3 : 0) ? 10 + t.worth : 0;
   if (kinds.has('counter')) return 0;                                  // kept for the opponent's spells
   if (kinds.has('pump') || kinds.has('pumpAll')) {
@@ -481,7 +509,8 @@ function respond(s, seat, level, bold) {
     }
     // A damage or -X/-X spell or ability at one of my creatures: pump it out of reach
     if (level !== 'easy') {
-      const effects = def ? def.effect ?? [] : (defOf(perm(s, top.source) ?? { name: top.sourceName })?.abilities?.[top.ability]?.effect ?? []);
+      const effects = def ? def.effect ?? [] : top.kind === 'trigger' ? top.effect
+        : (defOf(perm(s, top.source) ?? { name: top.sourceName, token: top.sourceToken })?.abilities?.[top.ability]?.effect ?? []);
       for (const e of effects) {
         const t = typeof e.to === 'number' ? top.targets[e.to] : typeof e.what === 'number' ? top.targets[e.what] : null;
         const victim = t?.type === 'perm' ? perm(s, t.id) : null;
@@ -492,6 +521,10 @@ function respond(s, seat, level, bold) {
         if (save) return save;
       }
     }
+    // Whatever's aimed at one of my creatures with a "Sacrifice ~" ability: use it before it's lost
+    const doomed = top.targets.filter(t => t?.type === 'perm').map(t => perm(s, t.id)).filter(c => c?.controller === seat);
+    const sac = sacrifice(s, seat, level, doomed);
+    if (sac) return sac;
     return null;
   }
   if (top) return null;                                       // my own spell is waiting: let it resolve
@@ -515,9 +548,13 @@ function respond(s, seat, level, bold) {
     if (!onCreature && theirTurnEnd && t.worth > 0 && (s.seats[opp].life <= 8 || bold > 0.5)) return cast(card, t.targets);
   }
 
+  // Sacrifice abilities: creatures about to die in combat, or worth it anyway
+  const sac = sacrifice(s, seat, level, s.step === 'blocks' ? dyingInCombat(s, seat) : []);
+  if (sac) return sac;
+
   // Pings: at the end of the opponent's turn, or to finish off a creature
   for (const { p, i, ab } of pings) {
-    if (!ab.tap) continue;
+    if (!ab.tap || ab.sac) continue;
     const t = chooseTargets(s, seat, ab, { level });
     if (!t) continue;
     if (t.worth >= 2 || (theirTurnEnd && t.targets[0]?.type === 'player')) return { type: 'activate', seat, perm: p.id, ability: i, targets: t.targets };
@@ -537,6 +574,53 @@ function respond(s, seat, level, bold) {
       const target = mineInCombat[Math.floor(Math.random() * mineInCombat.length)];
       const spec = def.targets[0];
       if (legalTargets(s, seat, spec).some(r => r.id === target.id)) return cast(card, [{ type: 'perm', id: target.id }]);
+    }
+  }
+  return null;
+}
+
+/** My creatures that will die in this combat (as things stand). */
+function dyingInCombat(s, seat) {
+  const out = [];
+  for (const a of s.combat?.attackers ?? []) {
+    const att = perm(s, a.id);
+    const blockers = a.blockers.map(id => perm(s, id)).filter(Boolean);
+    if (!att || !blockers.length) continue;
+    if (att.controller === seat) {
+      const hit = blockers.reduce((n, b) => n + power(s, b), 0);
+      if (dies(stats(s, att).toughness - att.damage, hit, blockers.some(b => stats(s, b).kw.has('deathtouch')))) out.push(att);
+    } else {
+      for (const b of blockers) if (duel(s, att, b).blkDies) out.push(b);
+    }
+  }
+  return out;
+}
+
+/**
+ * A "Sacrifice ~" ability worth using now: for a creature in `doomed` (about to die anyway), or
+ * one worth it on its own. Mind Stone and Sakura-Tribe Elder wait for the end of the opponent's turn.
+ */
+function sacrifice(s, seat, level, doomed) {
+  if (level === 'easy') return null;
+  const opp = other(seat), theirTurnEnd = s.step === 'end' && s.active === opp;
+  const lands = s.battlefield.filter(x => x.controller === seat && isLand(defOf(x))).length;
+  for (const p of s.battlefield) {
+    const abilities = defOf(p).abilities ?? [];
+    for (let i = 0; i < abilities.length; i++) {
+      const ab = abilities[i];
+      if (!ab.sac || !canActivate(s, seat, p, i)) continue;
+      const dying = doomed.some(d => d.id === p.id);
+      const kinds = new Set(ab.effect.map(e => e.do));
+      const act = targets => ({ type: 'activate', seat, perm: p.id, ability: i, targets });
+      if (kinds.has('damage')) {
+        const t = chooseTargets(s, seat, ab, { level, face: s.seats[opp].life <= 1 });
+        if (!t) continue;
+        if (dying || t.worth >= 3 || s.seats[opp].life <= 1) return act(dying && t.worth < 1 ? [{ type: 'player', seat: opp }] : t.targets);
+        continue;
+      }
+      if (kinds.has('gain') && (dying || s.seats[seat].life <= 4)) return act([]);
+      if (kinds.has('fetchLand') && (dying || (theirTurnEnd && lands < 7))) return act([]);
+      if (kinds.has('draw') && (dying || (theirTurnEnd && lands >= 6))) return act([]);
     }
   }
   return null;

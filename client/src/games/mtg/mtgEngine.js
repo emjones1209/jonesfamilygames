@@ -9,7 +9,7 @@
  *   { type: 'choose', seat, cards: [ids] }                   cards to put on the bottom / discard
  *   { type: 'play', seat, card }                             play a land
  *   { type: 'cast', seat, card, targets: [target|null] }      cast a spell
- *   { type: 'activate', seat, perm, ability, targets }       e.g. Prodigal Pyromancer's ping
+ *   { type: 'activate', seat, perm, ability, targets }       e.g. Prodigal Pyromancer's ping, or Equip
  *   { type: 'attack', seat, attackers: [ids] }               in your first main phase ([] = no combat)
  *   { type: 'block', seat, blocks: [{ blocker, attacker }] }
  *   { type: 'pass', seat }                                   done: let the top spell resolve, or move on
@@ -17,8 +17,10 @@
  *   { type: 'resign', seat }
  *
  * The turn, simplified for the screen but true to the rules:
- *   untap, draw → main1 → (attack: 'attacks' → 'declareBlockers' → 'blocks' → damage) → main2 → 'end' → cleanup
+ *   untap, ('upkeep' if something triggers then), draw → main1 → (attack: 'attacks' → 'declareBlockers' → 'blocks' → damage)
+ *   → main2 → 'end' → cleanup
  * Who may act at instant speed in each step, and who first:
+ *   upkeep:      the player whose turn it is
  *   main1/main2: the player whose turn it is (the other player only to respond to a spell)
  *   attacks:     the defending player (after attackers are declared)
  *   blocks:      the attacking player, then the defender (after blockers are declared)
@@ -26,11 +28,16 @@
  * Casting a spell or activating an ability counts as passing priority, so the
  * other player gets the chance to respond; when both pass in a row the top of
  * the stack resolves. A player with nothing they could do passes automatically.
+ *
+ * Triggered abilities ("whenever…", "when … dies", "at the beginning of your
+ * upkeep…", see cardPool.js) are collected as they trigger and put on the stack
+ * the next time a player would get priority — the active player's first, so the
+ * other player's resolve first — and then resolve like spells.
  */
 import { deckById, deckList } from './decks.js';
 import { TOKENS } from './cardPool.js';
 import {
-  defOf, parseCost, isLand, isCreature, isInstant, isPermanentCard, stats, has, perm, creaturesOf, allCreatures,
+  defOf, parseCost, isLand, isCreature, isArtifact, isInstant, isPermanentCard, stats, has, perm, creaturesOf, allCreatures,
   payment, isLegalTarget, targetSpecs, targetsAvailable, canAttack, canBlock, blockProblem,
   combatDamage, hasFirstStrikeStep, HAND_LIMIT, START_LIFE, COLORS,
 } from './mtgRules.js';
@@ -40,6 +47,7 @@ const OPENING_HAND = 7;
 const LOG_LENGTH = 60;
 
 const WINDOWS = {
+  upkeep: { opener: 'active' },
   main1: { opener: 'active' },
   attacks: { opener: 'defender' },
   blocks: { opener: 'active', both: true },
@@ -128,6 +136,7 @@ export function newGame({ decks, first = null, wins = [0, 0], seed = (Math.rando
     priority: null, passes: 0,
     battlefield: [], stack: [], combat: null,
     pending: null,             // a choice someone must make before anything else happens
+    triggered: [],             // triggered abilities waiting to go on the stack
     winner: null, reason: null, wins,
     log: [],
     seats: [],
@@ -173,12 +182,15 @@ export function canCast(s, seat, card) {
 export function canActivate(s, seat, p, index) {
   const ab = defOf(p).abilities?.[index];
   if (!ab || p.controller !== seat || !hasPriority(s, seat)) return false;
+  if (ab.sorcery && !sorcerySpeed(s, seat)) return false;
   if (ab.tap && (p.tapped || (isCreature(defOf(p)) && p.sick && !has(s, p, 'haste')))) return false;
-  if (ab.cost && !payment(s, seat, ab.cost)) return false;
+  if (ab.cost && !payment(s, seat, ab.cost, ab.tap ? p.id : null)) return false;
   return targetsAvailable(s, seat, ab.targets ?? []);
 }
 
 const pumps = effects => (effects ?? []).every(e => e.do === 'pump' || e.do === 'pumpAll');
+/** An ability with no target that isn't urgent (drawing a card, a counter): only worth stopping for at certain times. */
+const quiet = ab => !(ab.targets ?? []).length;
 
 /**
  * What a player could do at instant speed now. Pump effects only count during
@@ -194,7 +206,9 @@ export function instantOptions(s, seat) {
   }
   for (const p of s.battlefield) {
     (defOf(p).abilities ?? []).forEach((ab, i) => {
-      if (canActivate(s, seat, p, i) && (pumpTime || !pumps(ab.effect))) out.push({ type: 'activate', perm: p.id, ability: i });
+      if (ab.sorcery || !canActivate(s, seat, p, i)) return;
+      if (pumps(ab.effect) ? !pumpTime : quiet(ab) && !pumpTime && s.step !== 'end') return;
+      out.push({ type: 'activate', perm: p.id, ability: i });
     });
   }
   return out;
@@ -227,15 +241,32 @@ function draw(s, seat, n = 1) {
   }
 }
 
-/** A permanent leaves the battlefield for its owner's graveyard, hand or exile (tokens just vanish). */
-function leave(s, p, zone) {
+/**
+ * A permanent leaves the battlefield for its owner's graveyard, hand or exile (tokens just vanish).
+ * A creature put into the graveyard dies, which can trigger abilities: its own, and other
+ * permanents' "whenever a creature dies" (`together`: creatures dying at the same time, which
+ * see each other die).
+ */
+function leave(s, p, zone, together = []) {
   s.battlefield = s.battlefield.filter(x => x.id !== p.id);
   if (s.combat) {
     s.combat.attackers = s.combat.attackers.filter(a => a.id !== p.id);
     for (const a of s.combat.attackers) a.blockers = a.blockers.filter(id => id !== p.id);
   }
   if (!p.token) s.seats[p.owner][zone].push({ id: p.id, name: p.name, owner: p.owner });
-  for (const aura of s.battlefield.filter(x => x.attachedTo === p.id)) leave(s, aura, 'graveyard');
+  for (const x of s.battlefield.filter(x => x.attachedTo === p.id)) {
+    if (defOf(x).aura) leave(s, x, 'graveyard');
+    else {
+      x.attachedTo = null;                      // equipment stays, unattached
+      explain(s, `${x.name} stays on the battlefield, no longer attached to anything: it can be equipped to another creature.`);
+    }
+  }
+  if (zone !== 'graveyard' || !isCreature(defOf(p))) return;
+  for (const t of triggersOf(p, 'dies')) trigger(s, p, t);
+  const watchers = [p, ...together.filter(x => x.id !== p.id), ...s.battlefield];
+  for (const q of watchers) {
+    for (const t of triggersOf(q, 'creatureDies')) if (!t.yours || q.controller === p.controller) trigger(s, q, t, { that: p.id });
+  }
 }
 
 function enter(s, card, controller, { tapped = false } = {}) {
@@ -244,7 +275,51 @@ function enter(s, card, controller, { tapped = false } = {}) {
     damage: 0, deathtouched: false, counters: 0, boosts: [], attachedTo: null, token: card.token ?? null,
   };
   s.battlefield.push(p);
+  const def = defOf(p);
+  if (isCreature(def)) {
+    for (const q of s.battlefield) {
+      if (q.id === p.id) continue;
+      for (const t of triggersOf(q, 'creatureEnters')) if (!t.yours || q.controller === controller) trigger(s, q, t, { that: p.id });
+    }
+  }
+  if (isLand(def)) {
+    for (const q of s.battlefield) if (q.controller === controller) for (const t of triggersOf(q, 'landfall')) trigger(s, q, t);
+  }
   return p;
+}
+
+// ── Triggered abilities ──────────────────────────────────────────────────────
+const triggersOf = (p, when) => (defOf(p).triggers ?? []).filter(t => t.when === when);
+
+/** A triggered ability of permanent `p` has triggered: it waits to go on the stack. */
+function trigger(s, p, t, extra = {}) {
+  s.triggered.push({
+    controller: p.controller, sourceId: p.id, sourceName: p.name, sourceToken: p.token ?? null, effect: t.effect, text: t.text, ...extra,
+  });
+}
+
+/** Put waiting triggered abilities on the stack: the active player's first (so the other player's resolve first). */
+function stackTriggers(s) {
+  const waiting = s.triggered;
+  s.triggered = [];
+  const order = [...waiting.filter(t => t.controller === s.active), ...waiting.filter(t => t.controller !== s.active)];
+  for (const t of order) {
+    s.stack.push({ id: newId(s), kind: 'trigger', targets: [], ...t });
+    const ref = { name: t.sourceName, token: t.sourceToken };
+    note(s, `${t.sourceName}'s ability triggers.`, {
+      about: t.controller, card: ref, minor: true,
+      why: [`"${t.text}"`, 'A triggered ability goes on the stack like a spell, so both players can respond before it happens.'],
+    });
+  }
+  s.passes = 0;
+  s.priority = s.active;
+}
+
+/** A player gains life (which can trigger "whenever you gain life"). */
+function gainLife(s, seat, n) {
+  if (n <= 0) return;
+  s.seats[seat].life += n;
+  for (const q of s.battlefield) if (q.controller === seat) for (const t of triggersOf(q, 'gainLife')) trigger(s, q, t);
 }
 
 function makeToken(s, controller, kind) {
@@ -261,20 +336,23 @@ function discard(s, seat, ids) {
 }
 
 // ── Damage, life and state-based actions ─────────────────────────────────────
-/** source: { controller, deathtouch, lifelink } */
+/** source: { id, controller, deathtouch, lifelink } (id: the permanent dealing it, if any) */
 function dealDamage(s, source, to, n) {
   if (n <= 0) return;
-  if (to.type === 'player') s.seats[to.seat].life -= n;
-  else {
+  if (to.type === 'player') {
+    s.seats[to.seat].life -= n;
+    const p = source.id && perm(s, source.id);
+    if (p && to.seat !== source.controller) for (const t of triggersOf(p, 'damagesOpponent')) trigger(s, p, t);
+  } else {
     const p = perm(s, to.id);
     if (!p) return;
     p.damage += n;
     if (source.deathtouch) p.deathtouched = true;
   }
-  if (source.lifelink) s.seats[source.controller].life += n;
+  if (source.lifelink) gainLife(s, source.controller, n);
 }
 
-const creatureSource = (s, p) => ({ controller: p.controller, deathtouch: has(s, p, 'deathtouch'), lifelink: has(s, p, 'lifelink') });
+const creatureSource = (s, p) => ({ id: p.id, controller: p.controller, deathtouch: has(s, p, 'deathtouch'), lifelink: has(s, p, 'lifelink') });
 
 function checkState(s) {
   if (s.phase !== 'playing') return;
@@ -289,18 +367,23 @@ function checkState(s) {
         again = true;
         continue;
       }
-      if (!isCreature(def)) continue;
+    }
+    // Creatures with lethal damage (or no toughness left) all die at the same time
+    const dying = [];
+    for (const p of s.battlefield) {
+      if (!isCreature(defOf(p))) continue;
       const { toughness } = stats(s, p);
       const reason = toughness <= 0 ? `its toughness is down to ${toughness}, and a creature with 0 toughness or less dies`
         : p.deathtouched && p.damage > 0 && p.damage < toughness ? 'it was dealt damage by a creature with deathtouch, and any amount of that is enough'
           : p.damage >= toughness ? `it has ${p.damage} damage and its toughness is ${toughness} — damage equal to toughness destroys a creature` : null;
-      if (reason) {
-        leave(s, p, 'graveyard');
-        const line = `${p.name} dies: ${reason}.${p.token ? ' (A token that leaves the battlefield simply disappears.)' : ''}`;
-        explain(s, line);
-        note(s, `${p.name} dies.`, { why: [line], minor: !!s.why, card: cardRef(p) });
-        again = true;
-      }
+      if (reason) dying.push({ p, reason });
+    }
+    for (const { p, reason } of dying) {
+      leave(s, p, 'graveyard', dying.map(d => d.p));
+      const line = `${p.name} dies: ${reason}.${p.token ? ' (A token that leaves the battlefield simply disappears.)' : ''}`;
+      explain(s, line);
+      note(s, `${p.name} dies.`, { why: [line], minor: !!s.why, card: cardRef(p) });
+      again = true;
     }
   }
   const lost = [0, 1].filter(seat => s.seats[seat].life <= 0 || s.seats[seat].drewFromEmpty);
@@ -329,6 +412,14 @@ function startTurn(s) {
   }
   s.seats[seat].landsPlayed = 0;
   note(s, `Turn ${s.turnNo}: @${seat}${seat === 0 ? 'r' : '\'s'} turn.`);
+  // "At the beginning of your upkeep": those happen (on the stack) before the draw
+  for (const p of s.battlefield) if (p.controller === seat) for (const t of triggersOf(p, 'upkeep')) trigger(s, p, t);
+  if (s.triggered.length) enterStep(s, 'upkeep');
+  else drawStep(s);
+}
+
+function drawStep(s) {
+  const seat = s.active;
   if (!(s.turnNo === 1 && seat === s.first)) draw(s, seat, 1);      // the player going first skips their first draw
   checkState(s);
   enterStep(s, 'main1');
@@ -343,6 +434,7 @@ function enterStep(s, step) {
 /** Everyone has passed with nothing on the stack: on to the next step. */
 function nextStep(s) {
   switch (s.step) {
+    case 'upkeep': drawStep(s); break;
     case 'main1': enterStep(s, 'main2'); break;
     case 'attacks':
       if (!s.combat.attackers.length) { s.combat = null; enterStep(s, 'main2'); } else enterStep(s, 'declareBlockers');
@@ -463,7 +555,9 @@ function pass(s, seat) {
 function advance(s) {
   for (let guard = 0; guard < 500; guard++) {
     checkState(s);
-    if (s.phase !== 'playing' || s.pending) return;
+    if (s.phase !== 'playing') { s.triggered = []; return; }
+    if (s.pending) return;
+    if (s.triggered.length && s.step !== 'declareBlockers') { stackTriggers(s); continue; }
     if (s.step === 'declareBlockers') {
       if (canBlockAny(s)) return;
       block(s, []);
@@ -509,6 +603,18 @@ function resolveTop(s) {
   const seat = item.controller;
   const fizzleWhy = 'When a spell or ability resolves, it checks its targets again. Its target is gone or no longer legal, so it does nothing at all.';
   s.why = [];
+  if (item.kind === 'trigger') {
+    const source = perm(s, item.sourceId);
+    explain(s, `"${item.text}"`);
+    run(s, item.effect, {
+      controller: seat, targets: [], name: item.sourceName, sourceId: item.sourceId, that: item.that,
+      source: source ? creatureSource(s, source) : { controller: seat },
+    });
+    checkState(s);
+    note(s, `${item.sourceName}'s triggered ability resolves.`, { why: s.why, about: seat, card: { name: item.sourceName, token: item.sourceToken } });
+    s.why = null;
+    return;
+  }
   if (item.kind === 'ability') {
     const source = perm(s, item.source);
     const ab = defOf(source ?? { name: item.sourceName, token: item.sourceToken })?.abilities?.[item.ability];
@@ -547,6 +653,8 @@ function resolveTop(s) {
       explain(s, `${card.name} is attached to ${host.name}: "${def.text.split('\n').slice(1).join(' ')}"`);
       if (def.aura.tapOnEnter) host.tapped = true;
       explain(s, `It stays as long as ${host.name} is on the battlefield.`);
+    } else if (def.equipment) {
+      explain(s, `${card.name} is equipment: it stays on the battlefield and does nothing until it's attached to a creature with its Equip ability (in its controller's main phase). Then: "${def.text.split('\n')[0]}"`);
     } else if (!isCreature(def)) {
       explain(s, `${card.name} stays on the battlefield: "${def.text}"`);
     }
@@ -574,7 +682,8 @@ function context(s, item, specs) {
 function run(s, effects, ctx) {
   const seat = ctx.controller;
   const target = i => (typeof i === 'number' ? ctx.targets[i] : null);
-  const permRef = what => (what === 'self' ? perm(s, ctx.sourceId) : target(what)?.type === 'perm' ? perm(s, target(what).id) : null);
+  const permRef = what => (what === 'self' ? perm(s, ctx.sourceId) : what === 'that' ? perm(s, ctx.that)
+    : target(what)?.type === 'perm' ? perm(s, target(what).id) : null);
   const playerOf = who => (who === 'you' ? seat : who === 'opp' ? other(seat) : target(who)?.seat ?? null);
 
   const name = ctx.name ?? 'It';
@@ -624,7 +733,7 @@ function run(s, effects, ctx) {
         explain(s, `${p.name} is exiled: removed from the game entirely (it doesn't even go to the graveyard).`);
         if (e.lifeForPower && power) {
           explain(s, `Its controller gains life equal to its power (${power}).`);
-          life(p.controller, () => { s.seats[p.controller].life += power; });
+          life(p.controller, () => gainLife(s, p.controller, power));
         }
         break;
       }
@@ -642,7 +751,38 @@ function run(s, effects, ctx) {
         if (!p) break;
         p.boosts.push({ p: e.p, t: e.t, kw: e.kw });
         const sign = n => (n >= 0 ? `+${n}` : `${n}`);
-        explain(s, `${p.name} gets ${sign(e.p)}/${sign(e.t)} until end of turn: it's now ${ptText(s, p)}.`);
+        explain(s, `${p.name} gets ${sign(e.p)}/${sign(e.t)}${e.kw ? ` and ${e.kw.join(', ')}` : ''} until end of turn: it's now ${ptText(s, p)}.${e.kw?.includes('haste') ? ' With haste it can attack this turn.' : ''}`);
+        break;
+      }
+      case 'battleCry': {
+        const others = (s.combat?.attackers ?? []).map(a => perm(s, a.id)).filter(p => p && p.id !== ctx.sourceId);
+        for (const p of others) p.boosts.push({ p: 1, t: 0 });
+        explain(s, others.length
+          ? `Battle cry: every other attacking creature gets +1/+0 until end of turn (${others.map(p => `${p.name} is now ${ptText(s, p)}`).join(', ')}).`
+          : 'Battle cry: there are no other attacking creatures, so it does nothing.');
+        break;
+      }
+      case 'attach': {
+        const eq = perm(s, ctx.sourceId), p = permRef(e.what);
+        if (!eq || !p) break;
+        eq.attachedTo = p.id;
+        explain(s, `${eq.name} is attached to ${p.name}: it's now ${ptText(s, p)}${defOf(eq).equipment.kw ? ` with ${defOf(eq).equipment.kw.join(' and ')}` : ''}. If ${p.name} leaves the battlefield, ${eq.name} stays behind, ready to be equipped again.`);
+        break;
+      }
+      case 'countersAll': {
+        const mine = creaturesOf(s, seat).filter(p => !e.artifact || isArtifact(defOf(p)));
+        for (const p of mine) p.counters += e.n;
+        explain(s, mine.length
+          ? `A +1/+1 counter on each artifact creature ${subj(seat, 'control', 'controls')}: ${mine.map(p => `${p.name} (${ptText(s, p)})`).join(', ')}. Counters last.`
+          : 'There are no artifact creatures to put counters on.');
+        break;
+      }
+      case 'discardRandom': {
+        const who = playerOf(e.who), hand = who == null ? [] : s.seats[who].hand;
+        if (!hand.length) { explain(s, `${subj(who, 'have', 'has')} no cards in hand, so nothing is discarded.`); break; }
+        const card = hand[Math.floor(rand(s) * hand.length)];
+        discard(s, who, [card.id]);
+        explain(s, `${subj(who, 'discard', 'discards')} ${card.name}, chosen at random.`);
         break;
       }
       case 'pumpAll': {
@@ -662,7 +802,7 @@ function run(s, effects, ctx) {
         draw(s, seat, e.n);
         explain(s, `${subj(seat, 'draw', 'draws')} ${plural(e.n, 'card')}.`);
         break;
-      case 'gain': life(seat, () => { s.seats[seat].life += e.n; }); break;
+      case 'gain': life(seat, () => gainLife(s, seat, e.n)); break;
       case 'lose': {
         const who = playerOf(e.who);
         if (who != null) life(who, () => { s.seats[who].life -= e.n; });
@@ -758,8 +898,8 @@ function checkTargets(s, seat, specs, targets = [], selfId = null) {
   });
 }
 
-function tapFor(s, seat, cost) {
-  const ids = payment(s, seat, cost);
+function tapFor(s, seat, cost, except = null) {
+  const ids = payment(s, seat, cost, except);
   if (!ids) throw new Error('You don\'t have enough mana for that.');
   for (const id of ids) perm(s, id).tapped = true;
 }
@@ -780,7 +920,7 @@ function castWhy(s, seat, card, targets) {
   if (named.length) why.push(`It targets ${named.join(' and ')}. A target is chosen when the spell is cast.`);
   why.push(isInstant(def)
     ? 'It\'s an instant, so it can be cast at almost any time — even during the other player\'s turn, or in response to another spell.'
-    : `${def.type === 'Sorcery' ? 'Sorceries' : isCreature(def) ? 'Creatures' : 'Enchantments'} can only be cast in their caster's own main phase, when nothing else is waiting.`);
+    : `${def.type === 'Sorcery' ? 'Sorceries' : isCreature(def) ? 'Creatures' : isArtifact(def) ? 'Artifacts' : 'Enchantments'} can only be cast in their caster's own main phase, when nothing else is waiting.`);
   why.push(`It goes on "the stack" first: before it happens, ${seat === 0 ? '@1 gets' : 'you get'} a chance to respond with an instant.`);
   return why;
 }
@@ -920,17 +1060,21 @@ export function act(state, a) {
       if (!p || !canActivate(s, a.seat, p, a.ability)) throw new Error('You can\'t do that right now.');
       const ab = defOf(p).abilities[a.ability];
       const targets = checkTargets(s, a.seat, ab.targets ?? [], a.targets);
-      if (ab.cost) tapFor(s, a.seat, ab.cost);
+      if (ab.equip && targets[0]?.id === p.attachedTo) throw new Error(`${p.name} is already attached to that creature.`);
+      if (ab.cost) tapFor(s, a.seat, ab.cost, ab.tap ? p.id : null);
       if (ab.tap) p.tapped = true;
+      const lines = defOf(p).text.split('\n');
+      const line = lines.find(l => (ab.equip ? l.startsWith('Equip')
+        : l.includes(':') && (ab.tap ? l.includes('{T}') : !l.includes('{T}')) && (!ab.sac || l.includes('Sacrifice')))) ?? defOf(p).text;
+      const why = [`${p.name} has an ability: "${line}"`];
+      if (ab.equip) why.push('Equip attaches it to one of your creatures. It can only be done in your own main phase (like casting a sorcery), but as often as you can pay — moving it from one creature to another.');
+      else if (ab.tap) why.push('The {T} means it taps to use it — so it can only do this once a turn, and not on the turn it arrived.');
+      else if (ab.cost) why.push(`It costs ${ab.cost}, and can be used again as long as there's mana to pay.`);
+      if (ab.sac) why.push(`Sacrificing ${p.name} is part of the cost: it goes to the graveyard straight away${isCreature(defOf(p)) ? ' (it dies)' : ''}, and the ability still happens.`);
+      why.push('Abilities use the stack just like spells, so the other player can respond before it happens.');
       s.stack.push({ id: newId(s), kind: 'ability', source: p.id, sourceName: p.name, sourceToken: p.token, ability: a.ability, controller: a.seat, targets });
-      said(s, a.seat, ['activate', 'activates'], `${p.name}${describeTargets(s, targets)}.`, {
-        card: cardRef(p),
-        why: [
-          `${p.name} has an ability: "${defOf(p).text.split('\n').find(l => l.includes(':') && (ab.tap ? l.includes('{T}') : true)) ?? defOf(p).text}"`,
-          ab.tap ? `The {T} means it taps to use it — so it can only do this once a turn, and not on the turn it arrived.` : `It costs ${ab.cost}, and can be used again as long as there's mana to pay.`,
-          'Abilities use the stack just like spells, so the other player can respond before it happens.',
-        ],
-      });
+      if (ab.sac) leave(s, p, 'graveyard');
+      said(s, a.seat, ['activate', 'activates'], `${p.name}${describeTargets(s, targets)}.`, { card: cardRef(p), why });
       s.passes = 1;
       s.priority = other(a.seat);
       break;
@@ -950,6 +1094,7 @@ export function act(state, a) {
       for (const id of ids) { const p = perm(s, id); if (!has(s, p, 'vigilance')) p.tapped = true; }
       s.combat = { attackers: ids.map(id => ({ id, blockers: [], blocked: false })) };
       said(s, a.seat, ['attack', 'attacks'], `with ${ids.map(id => perm(s, id).name).join(', ')}.`, { why: attackWhy(s, ids) });
+      for (const id of ids) { const p = perm(s, id); for (const t of triggersOf(p, 'attacks')) trigger(s, p, t); }
       enterStep(s, 'attacks');
       break;
     }
