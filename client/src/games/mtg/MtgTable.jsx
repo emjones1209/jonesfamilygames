@@ -19,6 +19,7 @@ import {
 } from './mtgRules';
 import { waitingFor, canCast, canPlayLand, canActivate, instantOptions, attackersFor, describeLog, explainLog, isMain } from './mtgEngine';
 import { deckById } from './decks';
+import { MtgReplay } from './MtgReplay';
 
 const BG = 'from-[#1b1424] to-[#0d1a14]';
 
@@ -372,30 +373,10 @@ export function MtgTable({ view, names, onAction, onExit, error, subtitle, react
       )}
       {overlay}
 
-      {/* What the computer just did, and how it worked: it waits until you've read it */}
+      {/* What the computer just did, acted out step by step: it waits until you've seen it */}
       {explain?.unseen.some(e => !e.minor) && !over && (
-        <div className="fixed z-40 inset-x-2 bottom-2 max-h-[55vh] md:inset-x-auto md:right-3 md:top-16 md:bottom-auto md:w-[26rem] md:max-h-[80vh]
-          flex flex-col rounded-3xl bg-game-card/95 border border-game-gold/40 shadow-2xl backdrop-blur">
-          <div className="px-4 pt-3 pb-2 border-b border-white/10 flex items-center justify-between gap-2">
-            <h2 className="text-game-gold font-bold">What {names[1]} did</h2>
-            <span className="text-white/40 text-xs">{names[1]} waits while you read</span>
-          </div>
-          <div className="overflow-y-auto px-4 py-2 space-y-3">
-            {explain.unseen.map(e => (
-              <div key={e.n} className="flex gap-2">
-                {e.card && <div className="shrink-0"><MiniCard card={e.card} width={48} onClick={() => setDetail({ card: e.card })} /></div>}
-                <div className="min-w-0">
-                  <p className="font-semibold text-white text-sm">{describeLog(e, names)}</p>
-                  {!e.minor && <Explanation entry={e} names={names} />}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="px-4 py-2 border-t border-white/10 flex items-center gap-3">
-            <Button variant="gold" className="flex-1" onClick={explain.done}>Got it</Button>
-            <button className="text-white/40 text-xs underline" onClick={explain.toggle}>Stop explaining</button>
-          </div>
-        </div>
+        <MtgReplay entries={explain.unseen} names={names} width={big ? 92 : 74}
+          onDone={explain.done} onStop={explain.toggle} onCard={c => setDetail({ card: { name: c.name, token: c.token } })} />
       )}
 
       {/* Reading a card */}
