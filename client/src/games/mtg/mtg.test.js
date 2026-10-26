@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { CARDS } from './cardPool';
 import { DECKS, deckList } from './decks';
 import { parseCost, payment, stats, combatDamage, legalTargets, perm, manaValue } from './mtgRules';
-import { newGame, act, waitingFor, canCast, viewFor, describeLog, explainLog } from './mtgEngine';
+import { newGame, act, waitingFor, canCast, viewFor, describeLog, explainLog, beatText } from './mtgEngine';
 import { robotAction, duel } from './mtgAI';
 
 // A game in progress from a description: battlefield [[seat, name, { tapped, sick }]], hands, whose turn
@@ -491,6 +491,34 @@ describe('explanations', () => {
     expect(text).toMatch(/trample.*the other 4 goes through to you/);
     expect(text).toMatch(/lifelink.*Ajax gains 2 life/);
     expect(text).toMatch(/You: 20 → 14 life/);
+  });
+});
+
+describe('the step-by-step replay', () => {
+  const kinds = entry => entry.beats.map(b => b.k);
+  it('acts out a fight: the creatures crash into each other, one dies, life changes', () => {
+    let s = setup({ bf: [[1, 'Hill Giant', { id: 'hg' }], [0, 'Grizzly Bears', { id: 'gb' }], [1, 'Savannah Lions', { id: 'sl' }]], active: 1 });
+    s = act(s, { type: 'attack', seat: 1, attackers: ['hg', 'sl'] });
+    expect(kinds(s.log.at(-1))).toEqual(['attack']);
+    s = act(s, { type: 'block', seat: 0, blocks: [{ blocker: 'gb', attacker: 'hg' }] });
+    expect(kinds(s.log.find(e => e.seat === 0 && e.beats))).toEqual(['block', 'unblocked']);
+    const combat = s.log.find(e => /combat damage/.test(describeLog(e, ['You', 'Phoebe'])));
+    expect(kinds(combat)).toEqual(['clash', 'damage', 'dies', 'life']);
+    const clash = combat.beats[0];
+    expect(clash).toMatchObject({ a: { name: 'Hill Giant', pt: [3, 3] }, b: { name: 'Grizzly Bears', pt: [2, 2] }, toA: 2, toB: 3 });
+    expect(combat.beats[3]).toMatchObject({ seat: 0, from: 20, to: 18 });
+    expect(beatText(clash, ['You', 'Phoebe'])).toMatch(/crash into each other/);
+  });
+
+  it('acts out a spell: cast, aimed, damage, and the creature dies', () => {
+    let s = setup({ bf: [[0, 'Mountain'], [1, 'Grizzly Bears', { id: 'gb' }]], hand0: ['Lightning Bolt'] });
+    s = act(s, { type: 'cast', seat: 0, card: handId(s, 0, 'Lightning Bolt'), targets: [{ type: 'perm', id: 'gb' }] });
+    const cast = s.log.find(e => e.beats?.[0]?.k === 'cast');
+    expect(kinds(cast)).toEqual(['cast', 'aim']);
+    expect(cast.beats[1].to).toMatchObject({ name: 'Grizzly Bears' });
+    const resolved = s.log.find(e => /Lightning Bolt resolves/.test(describeLog(e, ['You', 'Phoebe'])));
+    expect(kinds(resolved)).toEqual(['damage', 'dies']);
+    expect(beatText(resolved.beats[1], ['You', 'Phoebe'])).toBe('Grizzly Bears dies — 3 damage is enough for its toughness of 2.');
   });
 });
 

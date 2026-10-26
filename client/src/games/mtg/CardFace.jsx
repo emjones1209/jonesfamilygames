@@ -147,12 +147,12 @@ function artEmoji(def) {
  * A small card: in your hand (no game state) or on the battlefield (with `p`
  * and `s`: tapped, damage, current power/toughness, keywords).
  */
-export function MiniCard({ card, s = null, p = null, width = 84, glow = null, dim = false, label = null, onClick }) {
+export function MiniCard({ card, s = null, p = null, width = 84, glow = null, dim = false, label = null, onClick, pt: shownPt = null }) {
   const def = defOf(card);
   const { frame } = frameOf(def);
   const [bg, border, ink] = frame;
   const st = p && s ? stats(s, p) : null;
-  const pt = def.pt && (st ? [st.power, st.toughness - p.damage] : def.pt);
+  const pt = shownPt ?? (def.pt && (st ? [st.power, st.toughness - p.damage] : def.pt));
   const kw = st ? [...st.kw] : def.kw ?? [];
   const h = width * 1.36, f = width / 84;
   const tapped = p?.tapped;
