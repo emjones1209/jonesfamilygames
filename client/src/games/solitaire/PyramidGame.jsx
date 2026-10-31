@@ -77,6 +77,7 @@ export default function PyramidGame() {
     if (!x) { setNote('No moves left.'); return; }
     setSel(null);
     setShown(x);
+    setNote(x.why);
   };
 
   const markFor = place => {

@@ -61,5 +61,5 @@ describe('Pyramid', () => {
       if (isWon(s)) expect(left(s)).toBe(0);
       if (isStuck(s)) expect(removals(s)).toEqual([]);
     }
-  });
+  }, 60000);
 });

@@ -191,12 +191,106 @@ function allMoves(s) {
   return out;
 }
 
+/** "7♠" */
+const SYMBOL = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
+export const cardName = c => `${c.rank}${SYMBOL[c.suit]}`;
+
+/** A small binary heap: the item with the highest `v` first. */
+function heap() {
+  const a = [];
+  const up = i => { while (i > 0) { const p = (i - 1) >> 1; if (a[p].v >= a[i].v) break; [a[p], a[i]] = [a[i], a[p]]; i = p; } };
+  const down = i => {
+    for (;;) {
+      const l = i * 2 + 1, r = l + 1;
+      let m = i;
+      if (l < a.length && a[l].v > a[m].v) m = l;
+      if (r < a.length && a[r].v > a[m].v) m = r;
+      if (m === i) return;
+      [a[m], a[i]] = [a[i], a[m]]; i = m;
+    }
+  };
+  return {
+    get size() { return a.length; },
+    push: x => { a.push(x); up(a.length - 1); },
+    pop: () => { const top = a[0], last = a.pop(); if (a.length) { a[0] = last; down(0); } return top; },
+  };
+}
+
 /**
- * A useful move for the Hint button: { from, idx, to }, or null. Looks two moves ahead (with
- * the cards that would go home by themselves) for the most promising position, never going
- * back to one in `seen` (positionKeys of the game so far), so hints don't go round in circles.
+ * Look for a way to win from here: a best-first search over positions (each move followed
+ * by the cards that go home by themselves), most promising first, never revisiting one.
+ * Returns { moves: [[from, idx, to], …] } for a win, { lost: true } when every position
+ * reachable has been tried without one, or null when it ran out of `budget` positions first.
+ * Positions in `avoid` (the game so far) are never gone back to.
  */
-export function hint(s, seen = new Set()) {
+export function solve(s, { budget = 30000, avoid = new Set() } = {}) {
+  const start = s;                       // (as it is: the first move must work on the table you see)
+  if (isWon(start)) return { moves: [] };
+  const visited = new Set([...avoid, positionKey(start)]);
+  const open = heap();
+  open.push({ s: start, path: null, depth: 0, v: promise(start) });
+  for (let n = 0; open.size && n < budget; n++) {
+    const node = open.pop();
+    for (const [from, idx, to] of allMoves(node.s)) {
+      const next = settle(move(node.s, from, idx, to));
+      const key = positionKey(next);
+      if (visited.has(key)) continue;
+      visited.add(key);
+      const path = { step: [from, idx, to], prev: node.path };
+      if (isWon(next)) {
+        const moves = [];
+        for (let p = path; p; p = p.prev) moves.unshift(p.step);
+        return { moves };
+      }
+      open.push({ s: next, path, depth: node.depth + 1, v: promise(next) - (node.depth + 1) * 0.5 });
+    }
+  }
+  return open.size ? null : { lost: true };
+}
+
+/** A sentence saying what a move does: "Move the 7♠ onto the 8♥ — it frees a column." */
+export function describeMove(s, from, idx, to) {
+  const cards = lift(s, from, idx);
+  const what = cards.length > 1 ? `the ${cards.length} cards from the ${cardName(cards[0])} down` : `the ${cardName(cards[0])}`;
+  const col = to.type === 'col' ? s.cols[to.i] : null;
+  const where = to.type === 'home' ? 'up to its foundation' : to.type === 'cell' ? 'into a free cell'
+    : col.length ? `onto the ${cardName(col[col.length - 1])}` : 'into the empty column';
+  const after = move(s, from, idx, to);
+  const left = from.type === 'col' ? after.cols[from.i] : null;
+  let why = '';
+  if (to.type === 'home') why = '';
+  else if (from.type === 'col' && !left.length) why = ' — it empties a column';
+  else if (from.type === 'cell') why = ' — it frees a cell';
+  else if (left?.length) {
+    const freed = left[left.length - 1];
+    if (fitsHome(after, freed)) why = ` — then the ${cardName(freed)} can go up`;
+  }
+  return `Move ${what} ${where}${why}.`;
+}
+
+/**
+ * The Hint button: { from, idx, to, why } for the first move of a way to win from here (when
+ * one can be found), else the most promising move by looking two moves ahead; { lost: true,
+ * why } when no way to win is left; or null when there are no moves at all. Never suggests
+ * going back to a position in `seen` (the game so far), so hints don't go round in circles.
+ */
+export function hint(s, seen = new Set(), { budget = 10000 } = {}) {
+  const found = solve(s, { budget, avoid: seen });
+  if (found?.moves.length) {
+    const [from, idx, to] = found.moves[0];
+    return { from, idx, to, why: `${describeMove(s, from, idx, to)} There's a way to win from here, and this is its first step.` };
+  }
+  const best = lookAhead(s, seen);
+  if (found?.lost) {
+    return best
+      ? { ...best, lost: true, why: `There's no way to win from here any more — try Undo. (Best try: ${describeMove(s, best.from, best.idx, best.to).toLowerCase()})` }
+      : { lost: true, why: 'There\'s no way to win from here any more — try Undo, or start a new game.' };
+  }
+  return best && { ...best, why: describeMove(s, best.from, best.idx, best.to) };
+}
+
+/** The most promising move, looking two moves ahead (when the solver runs out of time). */
+function lookAhead(s, seen) {
   let best = null;
   for (const [from, idx, to] of allMoves(s)) {
     const next = settle(move(s, from, idx, to));

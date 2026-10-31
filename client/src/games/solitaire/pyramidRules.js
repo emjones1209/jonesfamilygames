@@ -90,13 +90,75 @@ export function removals(s) {
 /** Is the game over (nothing to take away, and nothing left to turn)? */
 export const isStuck = s => !isWon(s) && !removals(s).length && !!whyNoDraw(s);
 
-/** A move for the Hint button: { remove: places } (pyramid cards first), { draw: true }, or null. */
+const SYMBOL = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
+const cardName = c => `${c.rank}${SYMBOL[c.suit]}`;
+
+/**
+ * How good a position is for what's left to do, using only what the player can see: pyramid
+ * cards gone count most, cards uncovered help, and a pyramid card is "dead" — it can never be
+ * taken away — once every card that could pair with it (adding to 13) is gone.
+ */
+function outlook(s) {
+  const gone = new Map();
+  for (const c of s.removed) gone.set(VALUE[c.rank], (gone.get(VALUE[c.rank]) ?? 0) + 1);
+  let v = (28 - left(s)) * 10;
+  s.pyramid.forEach((c, i) => {
+    if (!c) return;
+    if (isFree(s, i)) v += 1;
+    const need = 13 - VALUE[c.rank];
+    if (need > 0 && (gone.get(need) ?? 0) >= 4) v -= 40;              // nothing left to pair it with
+  });
+  return v;
+}
+
+/**
+ * The best run of moves from here: searched move by move, keeping the line that leaves the
+ * best outlook. Returns { line: [move…], v } where a move is places to take away or 'draw'.
+ * Turning the stock is only planned once the player has been through it (`seenStock`): from
+ * the second pass on, they've seen every card in it, in the order they'll come again.
+ */
+function bestLine(s, seenStock, budget = { n: 8000 }, memo = new Map()) {
+  const key = `${s.pyramid.map(c => (c ? 1 : 0)).join('')}|${s.stock.length}|${s.waste.length}|${s.pass}`;
+  if (memo.has(key)) return memo.get(key);
+  let best = { line: [], v: outlook(s) };
+  memo.set(key, best);                                      // (no going round in circles)
+  if (budget.n-- > 0) {
+    const moves = removals(s);
+    if (seenStock && !whyNoDraw(s)) moves.push('draw');
+    for (const m of moves) {
+      const sub = bestLine(m === 'draw' ? draw(s) : remove(s, m), seenStock, budget, memo);
+      if (sub.v > best.v) best = { line: [m, ...sub.line], v: sub.v };
+    }
+  }
+  memo.set(key, best);
+  return best;
+}
+
+/**
+ * A move for the Hint button: { remove: places, why }, { draw: true, why }, or null. Plans
+ * ahead with the cards in view (never the stock's hidden order): the take-away that starts
+ * the best run, steering clear of using up the cards that something else still needs.
+ */
 export function hint(s) {
-  const all = removals(s);
-  // Taking pyramid cards matters more than using up the waste; lower rows open up the rest
-  const score = places => places.reduce((v, p) => v + (p.type === 'pyr' ? 10 + rowOf(p.i) : 0), 0);
-  const best = all.sort((a, b) => score(b) - score(a))[0];
-  if (best) return { remove: best };
-  if (!whyNoDraw(s)) return { draw: true };
-  return null;
+  const { line } = bestLine(s, s.pass > 1);
+  const takes = line.filter(m => m !== 'draw').length;
+  if (line[0] === 'draw') {
+    return { draw: true, why: `Turn the next card: you've seen what's coming, and it leads to taking away ${takes} card${takes === 1 ? '' : 's'}.` };
+  }
+  if (line.length) {
+    const first = line[0];
+    const cards = first.map(p => (p.type === 'waste' ? s.waste[s.waste.length - 1] : s.pyramid[p.i]));
+    const what = cards.length === 1 ? `the ${cardName(cards[0])} (a King goes on its own)` : `the ${cardName(cards[0])} and ${cardName(cards[1])} (${VALUE[cards[0].rank]} + ${VALUE[cards[1].rank]} = 13)`;
+    const after = remove(s, first);
+    const opened = after.pyramid.filter((c, i) => c && isFree(after, i) && !isFree(s, i)).length;
+    const more = takes - 1;
+    const why = more ? ` — it leads to ${more} more after it` : opened ? ` — it uncovers ${opened === 1 ? 'a card' : `${opened} cards`}` : '';
+    return { remove: first, why: `Take away ${what}${why}.` };
+  }
+  if (!whyNoDraw(s)) return { draw: true, why: s.stock.length ? 'Nothing worth taking: turn the next card from the stock.' : 'Turn the waste back over to go through it again.' };
+  // The stock's used up: the least bad take-away there is
+  const options = removals(s);
+  if (!options.length) return null;
+  const best = options.reduce((a, b) => (outlook(remove(s, b)) > outlook(remove(s, a)) ? b : a));
+  return { remove: best, why: 'Take these away — it\'s the last thing left to try.' };
 }
