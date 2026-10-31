@@ -62,7 +62,6 @@ export default function TriPeaksGame() {
     const x = hint(game);
     if (!x) { setNote('No moves left.'); return; }
     setShown(x);
-    setNote(x.why);
   };
 
   const stuck = isStuck(game);

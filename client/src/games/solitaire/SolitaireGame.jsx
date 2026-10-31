@@ -288,7 +288,6 @@ export default function SolitaireGame() {
     setSelected(null);
     if (!x) { setShown(null); setNote('Nothing useful left to do. Try Undo, or start a new game.'); return; }
     setShown(x);
-    setNote(x.why);
   };
   const hintFrom = (type, colIdx, rowIdx) => !!shown?.from && shown.from.type === type
     && (type === 'waste' || (shown.from.colIdx === colIdx && rowIdx >= shown.from.rowIdx));

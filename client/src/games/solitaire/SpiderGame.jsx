@@ -110,7 +110,6 @@ export default function SpiderGame() {
     if (!h2) { setNote('Nothing useful left to do. Try Undo, or start a new game.'); return; }
     setSel(null);
     setShown(h2);
-    setNote(h2.why);
   };
 
   // How far apart cards sit in a column: closer together when a column gets long
