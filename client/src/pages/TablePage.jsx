@@ -89,6 +89,7 @@ const GAMES = {
   handfoot: {
     name: 'Hand and Foot', Table: HandFootTable, rotate: rotateHandFoot, minSeats: 3,
     seatNote: 'Four players: seats 1 & 3 are partners, and so are seats 2 & 4. Or three, each for themselves (leave a seat empty).',
+    teams: true,        // (with three players nobody is partnered: the seat note says so)
   },
   dice: {
     name: 'Five Dice', Table: DiceTable, rotate: rotateDice, minSeats: 2,

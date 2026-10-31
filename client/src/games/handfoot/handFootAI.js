@@ -60,10 +60,19 @@ export function chooseDraw(s, level, bold = 0) {
   return { type: 'takePile', ids };
 }
 
-/** Does this plan get to the end of the turn (a discard, or going out)? */
+/**
+ * Does this plan get to the end of the turn (a discard, or going out)? Emptying the hand
+ * counts too: the turn carries on from the foot, which the player hasn't seen yet — so
+ * it mustn't be part of the decision.
+ */
 function turnWorks(s, plan) {
   let cur = s;
-  for (const step of plan) { cur = attempt(cur, step); if (!cur) return false; }
+  const seat = s.turn, footBefore = s.inFoot[seat];
+  for (const step of plan) {
+    cur = attempt(cur, step);
+    if (!cur) return false;
+    if (!footBefore && cur.inFoot[seat]) return true;
+  }
   return plan.length > 0 && cur.phase !== 'play';
 }
 

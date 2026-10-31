@@ -497,6 +497,41 @@ describe('Hand and Foot game engine', () => {
     }
   });
 
+  it('computer players never peek: reshuffling the cards they can\'t see never changes what they do', () => {
+    // The cards a player can't see — everyone else's hands, every foot (their own too, until they
+    // pick it up), the stock — are swapped for each other at random. A fair player decides the same.
+    const scramble = (s, seat) => {
+      const hidden = [...s.stock, ...s.feet.flat(), ...s.hands.flatMap((h, i) => (i === seat ? [] : h))];
+      for (let i = hidden.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [hidden[i], hidden[j]] = [hidden[j], hidden[i]];
+      }
+      let at = 0;
+      const take = n => hidden.slice(at, (at += n));
+      return {
+        ...s, robotPlan: null, turnStart: null,
+        stock: take(s.stock.length),
+        feet: s.feet.map(f => take(f.length)),
+        hands: s.hands.map((h, i) => (i === seat ? h : take(h.length))),
+      };
+    };
+    const decision = a => JSON.stringify({ ...a, plan: undefined });
+    let checked = 0;
+    for (const level of ['medium', 'hard']) {
+      for (let g = 0; g < 3; g++) {
+        let s = newGame();
+        for (let step = 0; step < 3000 && s.phase !== 'handOver' && s.phase !== 'gameOver'; step++) {
+          const seat = waitingFor(s);
+          const fresh = { ...s, robotPlan: null, turnStart: null };
+          expect(decision(robotAction(scramble(s, seat), seat, level)), `${level}, step ${step}`).toBe(decision(robotAction(fresh, seat, level)));
+          checked++;
+          s = act(s, robotAction(s, seat, level));
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(500);
+  });
+
   it('plays three-player games, everyone for themselves', () => {
     const start = newGame({ players: 3 });
     expect(start.hands).toHaveLength(3);
