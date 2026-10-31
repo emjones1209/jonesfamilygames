@@ -1,5 +1,5 @@
 /**
- * Pieces shared by the solitaire games (Spider, FreeCell, Pyramid, TriPeaks): cards that
+ * Pieces shared by the solitaire games (Klondike, Spider, FreeCell, Pyramid, TriPeaks): cards that
  * size themselves to the screen, empty places, the header and the "You win" box.
  *
  * Cards are sized in pixels from the width of the screen, so ten columns of Spider fit a

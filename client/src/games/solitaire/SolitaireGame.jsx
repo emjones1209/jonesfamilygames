@@ -1,484 +1,233 @@
-import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useDrag, useDrop } from 'react-dnd';
-import { ArrowLeft, RefreshCw, Undo2, Lightbulb } from 'lucide-react';
-import { buildDeck, shuffle, SUITS, RANK_VALUES } from '../../utils/cardEngine';
-import { PlayingCard, EmptyCardSlot } from '../../components/PlayingCard';
+/**
+ * Klondike, the classic Solitaire (rules in klondikeRules.js).
+ *
+ * Tap a card (with any cards on it) to move it: up to its foundation when it can go, or onto
+ * the only card it fits (a King goes into an empty column); when there's a choice, the places
+ * light up — tap one. Tap a picked-up card again to send it to the best place. Tap the stock
+ * to turn a card. Cards nothing could still want go up to the foundations by themselves, and
+ * once every card in the columns is face up, Auto-complete finishes the game.
+ */
+import { useEffect, useState } from 'react';
+import { buildDeck, shuffle, SUITS, SUIT_SYMBOLS } from '../../utils/cardEngine';
+import { destinations, applyMove, runStart, turnStock, autoHomeStep, hint, isWon, positionKey } from './klondikeRules';
+import { autoStep, canAutoComplete, foundationCount } from './autoComplete';
+import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
+import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
+import { CardCascade } from './CardCascade';
 import { Button } from '../../components/Button';
 import api from '../../utils/api';
-import { RulesButton } from '../../components/RulesButton';
-import { autoStep, canAutoComplete } from './autoComplete';
-import { CardCascade } from './CardCascade';
-import { hint as findHint, positionKey } from './klondikeRules';
-import { useNote } from './solitaireHelpers';
 
-/** A gold outline round a card the hint points at. */
-const Hinted = ({ on, children }) => (on ? <div className="rounded-lg ring-4 ring-game-gold ring-offset-1 ring-offset-green-900">{children}</div> : children);
+const COLS = 7;
 
-// The bouncing-cards finale is skipped for anyone who has asked their device for less motion
-const lessMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-
-// Aces are low in Solitaire (the shared table ranks them high for trick-taking games)
-const SOL_RANK = { ...RANK_VALUES, A: 1 };
-
-const DRAG_TYPE = 'CARD_STACK';
-
-// Cards are stacked with pixel offsets, so the layout needs each card's real
-// height at the current screen width (see the md/sm sizes in components/cardSizes.js).
-const CARD_LAYOUTS = [
-  { query: '(min-width: 1024px)', size: 'md', height: 144, step: 38 },
-  { query: '(min-width: 768px)',  size: 'md', height: 120, step: 34 },
-  { query: null,                  size: 'sm', height: 64,  step: 22 },
-];
-const pickLayout = () => CARD_LAYOUTS.find(l => !l.query || window.matchMedia(l.query).matches);
-
-function useCardLayout() {
-  const [layout, setLayout] = useState(pickLayout);
-  useEffect(() => {
-    const onChange = () => setLayout(pickLayout());
-    const queries = CARD_LAYOUTS.filter(l => l.query).map(l => window.matchMedia(l.query));
-    queries.forEach(q => q.addEventListener('change', onChange));
-    return () => queries.forEach(q => q.removeEventListener('change', onChange));
-  }, []);
-  return layout;
-}
-
-function initGame() {
+function fresh() {
   const deck = shuffle(buildDeck());
-
-  // 7 tableau columns
-  const tableau = [];
-  let idx = 0;
-  for (let col = 0; col < 7; col++) {
-    const cards = [];
-    for (let row = 0; row <= col; row++) {
-      cards.push({ ...deck[idx++], faceUp: row === col });
-    }
-    tableau.push(cards);
-  }
-
-  // Remaining cards go to stock
-  const stock = deck.slice(idx).map(c => ({ ...c, faceUp: false }));
-  const waste  = [];
-  const foundations = { spades: [], hearts: [], diamonds: [], clubs: [] };
-
-  return { tableau, stock, waste, foundations, moves: 0, startTime: Date.now() };
+  let i = 0;
+  const tableau = Array.from({ length: COLS }, (_, c) => Array.from({ length: c + 1 }, (_, r) => ({ ...deck[i++], faceUp: r === c })));
+  return {
+    tableau, stock: deck.slice(i).map(c => ({ ...c, faceUp: false })), waste: [],
+    foundations: { spades: [], hearts: [], diamonds: [], clubs: [] }, moves: 0, started: Date.now(),
+  };
 }
 
-// ── Draggable card ────────────────────────────────────────────────────
-function DraggableCard({ card, from, cards, selected, onSelect, size = 'sm' }) {
-  const [{ isDragging }, drag] = useDrag(() => ({
-    type: DRAG_TYPE,
-    item: { cards, from },
-    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
-  }), [cards, from]); // deps required: without them react-dnd keeps the first render's stack
-  return (
-    <div ref={drag} style={{ opacity: isDragging ? 0.4 : 1 }}
-         onClick={onSelect}>
-      {/* (Selected cards don't lift here: see `lift` in PlayingCard) */}
-      <PlayingCard card={card} size={size} faceDown={!card.faceUp} selected={selected} lift={false} />
-    </div>
-  );
-}
-
-// ── Droppable tableau column ──────────────────────────────────────────
-function DroppableTableau({ colIdx, canDrop: canDropFn, onDrop, children, style }) {
-  const [{ isOver, canAccept }, drop] = useDrop(() => ({
-    accept: DRAG_TYPE,
-    drop: (item) => onDrop(item, colIdx),
-    canDrop: (item) => canDropFn(item.cards[0], colIdx),
-    collect: (monitor) => ({ isOver: monitor.isOver(), canAccept: monitor.canDrop() }),
-  }), [colIdx, canDropFn, onDrop]); // deps required: otherwise drops apply to the initial deal
-  return (
-    <div ref={drop} style={style}
-         className={`relative flex-1 min-w-0 rounded-lg transition-colors ${isOver && canAccept ? 'ring-2 ring-primary-400' : ''}`}>
-      {children}
-    </div>
-  );
-}
-
-// ── Droppable foundation ──────────────────────────────────────────────
-function DroppableFoundation({ suit, canDrop: canDropFn, onDrop, children }) {
-  const [{ isOver, canAccept }, drop] = useDrop(() => ({
-    accept: DRAG_TYPE,
-    drop: (item) => onDrop(item, suit),
-    canDrop: (item) => item.cards.length === 1 && canDropFn(item.cards[0], suit),
-    collect: (monitor) => ({ isOver: monitor.isOver(), canAccept: monitor.canDrop() }),
-  }), [suit, canDropFn, onDrop]);
-  return (
-    <div ref={drop} className={`cursor-pointer rounded-lg transition-colors ${isOver && canAccept ? 'ring-2 ring-primary-400' : ''}`}>
-      {children}
-    </div>
-  );
-}
+/** The same pile (and, for `exact`, the same card in a column)? */
+const same = (a, b, exact = false) => !!a && !!b && a.type === b.type
+  && (a.type === 'foundation' ? a.suit === b.suit : a.type === 'waste' || (a.colIdx === b.colIdx && (!exact || a.rowIdx === b.rowIdx)));
 
 export default function SolitaireGame() {
-  const navigate = useNavigate();
-  const [game, setGame] = useState(() => initGame());
-  const [history, setHistory] = useState([]);
+  const [game, setGame] = useState(fresh);
+  const [sel, setSel] = useState(null);            // the cards picked up: a place (waste, column + row, foundation)
+  const [shown, setShown] = useState(null);        // a hint: { from, to } or { draw: true }
+  const [auto, setAuto] = useState(false);         // auto-complete running
   const [won, setWon] = useState(false);
-  const [selected, setSelected] = useState(null); // { from, cards }
-  const [auto, setAuto] = useState(false);          // auto-complete playing the game out
-  const [cascading, setCascading] = useState(false); // the cards bouncing off the table after a win
-  const [spilled, setSpilled] = useState({});       // suit → cards that have bounced off its foundation
-  const { size, height: cardH, step } = useCardLayout();
-  const [shown, setShown] = useState(null);         // the hint being shown: { from, to, why } or { draw: true, why }
+  const [cascading, setCascading] = useState(false);
+  const [spilled, setSpilled] = useState({});      // suit → cards bounced off its foundation
   const [note, setNote] = useNote();
+  const history = useHistory();
+  const board = useBoardWidth(800);
 
-  const saveHistory = (g) => setHistory(h => [...h.slice(-20), JSON.stringify(g)]);
+  const gap = board < 500 ? 4 : 8;
+  const w = Math.floor((board - gap * (COLS - 1)) / COLS);
+  const h = cardHeight(w);
 
-  const update = useCallback((newGame, checkWin = true) => {
-    const updated = { ...newGame, moves: newGame.moves + 1 };
-    if (checkWin) {
-      const total = Object.values(updated.foundations).reduce((s, f) => s + f.length, 0);
-      if (total === 52) {
-        setWon(true);
-        setCascading(!lessMotion());
-        api.post('/scores', { game: 'solitaire', score: Math.max(0, 10000 - (updated.moves * 10)), durationS: Math.floor((Date.now() - updated.startTime) / 1000) }).catch(() => {});
-      }
-    }
-    setGame(updated);
-    setSelected(null);
-    setShown(null);
-  }, []);
-
-  // Draw from stock
-  const drawStock = () => {
-    if (game.stock.length === 0) {
-      saveHistory(game);
-      const newStock = [...game.waste].reverse().map(c => ({ ...c, faceUp: false }));
-      update({ ...game, stock: newStock, waste: [] }, false);
-      return;
-    }
-    saveHistory(game);
-    const card = { ...game.stock[0], faceUp: true };
-    update({ ...game, stock: game.stock.slice(1), waste: [card, ...game.waste] }, false);
-  };
-
-  // Can a card be placed on a tableau column
-  const canPlaceOnTableau = (card, targetCol) => {
-    const col = game.tableau[targetCol];
-    if (col.length === 0) return card.rank === 'K';
-    const top = col[col.length - 1];
-    if (!top.faceUp) return false;
-    const isRed = (s) => s === 'hearts' || s === 'diamonds';
-    const colorsDiffer = isRed(card.suit) !== isRed(top.suit);
-    return colorsDiffer && SOL_RANK[card.rank] === SOL_RANK[top.rank] - 1;
-  };
-
-  // Can a card be placed on a foundation
-  const canPlaceOnFoundation = (card) => {
-    const pile = game.foundations[card.suit];
-    if (pile.length === 0) return card.rank === 'A';
-    return SOL_RANK[card.rank] === SOL_RANK[pile[pile.length - 1].rank] + 1;
-  };
-
-  const handleCardClick = (card, from) => {
-    if (!selected) {
-      setSelected({ card, from });
-      return;
-    }
-
-    // Try to place selected cards
-    const { card: selCard, from: selFrom } = selected;
-
-    // Tapping the selected card again sends it to its foundation when it can go
-    // there (e.g. tap an Ace twice), like "tap again to play" in the card games
-    if (selCard.id === card.id) {
-      const selCards = getSelectedCards(game, selFrom, selCard);
-      if (selFrom.type !== 'foundation' && selCards.length === 1 && canPlaceOnFoundation(selCard)) {
-        saveHistory(game);
-        const newGame = removeCards(game, selFrom, selCards);
-        newGame.foundations[selCard.suit] = [...newGame.foundations[selCard.suit], selCard];
-        update(newGame);
-      } else {
-        setSelected(null);                // second tap on a card that can't go up: deselect
-      }
-      return;
-    }
-
-    if (from.type === 'foundation') {
-      if (canPlaceOnFoundation(selCard) && selCard.suit === from.suit && selFrom.type !== 'foundation') {
-        saveHistory(game);
-        const newGame = removeCards(game, selFrom, [selCard]);
-        newGame.foundations[selCard.suit] = [...newGame.foundations[selCard.suit], selCard];
-        update(newGame);
-        return;
-      }
-    }
-    // Tapping the bottom card of another column moves the selection onto it
-    if (from.type === 'tableau' && !(selFrom.type === 'tableau' && selFrom.colIdx === from.colIdx)) {
-      const col = game.tableau[from.colIdx];
-      const selCards = getSelectedCards(game, selFrom, selCard);
-      if (col[col.length - 1]?.id === card.id && canPlaceOnTableau(selCards[0], from.colIdx)) {
-        handleTableauClick(from.colIdx);
-        return;
-      }
-    }
-    setSelected({ card, from });
-  };
-
-  const handleFoundationClick = (suit) => {
-    if (!selected) return;
-    const { card: selCard, from: selFrom } = selected;
-    if (canPlaceOnFoundation(selCard) && selCard.suit === suit) {
-      // Only move single cards to foundation
-      const selCards = getSelectedCards(game, selFrom, selCard);
-      if (selCards.length !== 1) { setSelected(null); return; }
-      saveHistory(game);
-      const newGame = removeCards(game, selFrom, selCards);
-      newGame.foundations[suit] = [...newGame.foundations[suit], selCard];
-      update(newGame);
-    } else {
-      setSelected(null);
-    }
-  };
-
-  const handleTableauClick = (colIdx) => {
-    if (!selected) return;
-    const { card: selCard, from: selFrom } = selected;
-    const selCards = getSelectedCards(game, selFrom, selCard);
-    if (canPlaceOnTableau(selCards[0], colIdx)) {
-      saveHistory(game);
-      const newGame = removeCards(game, selFrom, selCards);
-      newGame.tableau[colIdx] = [...newGame.tableau[colIdx], ...selCards];
-      update(newGame);
-    } else {
-      setSelected(null);
-    }
-  };
-
-  const handleDrop = useCallback((item, colIdx) => {
-    const { cards: dragCards, from: dragFrom } = item;
-    if (!canPlaceOnTableau(dragCards[0], colIdx)) return;
-    saveHistory(game);
-    const newGame = removeCards(game, dragFrom, dragCards);
-    newGame.tableau[colIdx] = [...newGame.tableau[colIdx], ...dragCards];
-    update(newGame);
-  }, [game, canPlaceOnTableau]);
-
-  const handleFoundationDrop = useCallback((item, suit) => {
-    const { cards: dragCards, from: dragFrom } = item;
-    if (dragCards.length !== 1) return;
-    const card = dragCards[0];
-    if (!canPlaceOnFoundation(card) || card.suit !== suit) return;
-    saveHistory(game);
-    const newGame = removeCards(game, dragFrom, dragCards);
-    newGame.foundations[suit] = [...newGame.foundations[suit], card];
-    update(newGame);
-  }, [game, canPlaceOnFoundation]);
-
-  const canDropOnTableau = useCallback((card, colIdx) => canPlaceOnTableau(card, colIdx), [game]);
-  const canDropOnFoundation = useCallback((card, suit) => canPlaceOnFoundation(card) && card.suit === suit, [game]);
-
-  const undo = () => {
-    if (history.length === 0 || auto) return;
-    const prev = JSON.parse(history[history.length - 1]);
-    setHistory(h => h.slice(0, -1));
-    setGame(prev);
-    setSelected(null);
-    setShown(null);
-  };
-
-  // A hint: looks a few moves ahead with the cards in view, never back to where you've been
-  const showHint = () => {
-    if (auto || won) return;
-    const x = findHint(game, new Set([...history.map(h => JSON.parse(h)), game].map(positionKey)));
-    setSelected(null);
-    if (!x) { setShown(null); setNote('Nothing useful left to do. Try Undo, or start a new game.'); return; }
-    setShown(x);
-  };
-  const hintFrom = (type, colIdx, rowIdx) => !!shown?.from && shown.from.type === type
-    && (type === 'waste' || (shown.from.colIdx === colIdx && rowIdx >= shown.from.rowIdx));
-  const hintTo = (type, key) => !!shown?.to && shown.to.type === type && (type === 'foundation' ? shown.to.suit === key : shown.to.colIdx === key);
-
-  const restart = () => {
-    setGame(initGame());
-    setHistory([]);
-    setSelected(null);
-    setShown(null);
-    setWon(false);
-    setAuto(false);
-    setCascading(false);
-    setSpilled({});
-  };
-
-  // Auto-complete: once every card in the columns is face up, play the game out a card at a
-  // time (quickly, so you can watch it), drawing through the stock as needed
-  const startAuto = () => { saveHistory(game); setSelected(null); setAuto(true); };
+  // Hints fade after a moment
   useEffect(() => {
-    if (!auto) return;
-    const next = autoStep(game);
+    if (!shown) return;
+    const t = setTimeout(() => setShown(null), 2500);
+    return () => clearTimeout(t);
+  }, [shown]);
+
+  const finish = g => {
+    if (!isWon(g) || won) return;
+    setWon(true);
+    setAuto(false);
+    setCascading(!lessMotion());
+    api.post('/scores', { game: 'solitaire', score: Math.max(0, 10000 - g.moves * 10), durationS: secondsSince(g.started) }).catch(() => {});
+  };
+
+  // After each move: cards nothing could still want go up by themselves, one at a time
+  // (auto-complete plays everything out, drawing through the stock). These count with the move for Undo.
+  useEffect(() => {
+    if (won) return;
+    const next = auto ? autoStep(game) : autoHomeStep(game);
+    if (!next && !auto) return;
     const t = setTimeout(() => {
       if (!next) { setAuto(false); return; }
-      const { kind, ...g } = next;
-      update(g, kind === 'up');
-    }, next?.kind === 'draw' ? 60 : 110);
+      const { kind: _kind, ...g } = next;
+      setGame(g);
+      finish(g);
+    }, auto ? (next?.kind === 'draw' ? 60 : 100) : 160);
     return () => clearTimeout(t);
-  }, [auto, game, update]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, auto, won]);
 
-  // Auto-move to foundation
-  const autoMove = () => {
-    let changed = false;
-    const g = JSON.parse(JSON.stringify(game));
-    // Check waste
-    if (g.waste.length > 0) {
-      const top = g.waste[0];
-      if (canPlaceOnFoundationG(top, g)) {
-        g.foundations[top.suit].push(top);
-        g.waste.shift();
-        changed = true;
-      }
-    }
-    // Check tableau tops
-    for (let i = 0; i < 7; i++) {
-      const col = g.tableau[i];
-      if (col.length > 0) {
-        const top = col[col.length - 1];
-        if (top.faceUp && canPlaceOnFoundationG(top, g)) {
-          g.foundations[top.suit].push(top);
-          g.tableau[i].pop();
-          // Flip next
-          if (g.tableau[i].length > 0) g.tableau[i][g.tableau[i].length - 1].faceUp = true;
-          changed = true;
-        }
-      }
-    }
-    if (changed) { saveHistory(game); update(g); }
+  const change = next => {
+    history.push(game);
+    const g = { ...next, moves: game.moves + 1 };
+    setGame(g);
+    setSel(null);
+    setShown(null);
+    finish(g);
+  };
+  const play = (from, to) => change(applyMove(game, { from, to }));
+  const restart = () => { setGame(fresh()); history.clear(); setSel(null); setShown(null); setAuto(false); setWon(false); setCascading(false); setSpilled({}); };
+  const undo = () => { const last = history.pop(); if (last) { setGame(last); setSel(null); setShown(null); setAuto(false); } };
+
+  const draw = () => {
+    if (auto || won) return;
+    const next = turnStock(game);
+    if (next) change(next); else setSel(null);
   };
 
+  // Tap a card (the waste's top card, one in a column, or a foundation's)
+  const tap = from => {
+    if (auto || won) return;
+    // Something picked up already: this pile is where it goes (if it fits)
+    if (sel && !same(sel.from, from)) {
+      const to = from.type === 'tableau' ? { type: 'tableau', colIdx: from.colIdx } : from.type === 'foundation' ? from : null;
+      if (to && destinations(game, sel.from).some(d => same(d, to))) { play(sel.from, to); return; }
+    }
+    if (sel && same(sel.from, from, true)) {
+      const best = destinations(game, from)[0];
+      if (best) play(from, best); else setSel(null);
+      return;
+    }
+    if (from.type === 'tableau') {
+      const col = game.tableau[from.colIdx];
+      if (!col[from.rowIdx].faceUp) { setSel(null); return; }
+      if (from.rowIdx < runStart(col)) { setSel(null); setNote('Only cards in order (down, alternating colours) move together.'); return; }
+    }
+    const dests = destinations(game, from);
+    if (!dests.length) { setSel(null); setNote('There\'s nowhere for that to go yet.'); return; }
+    // (A card on a foundation is only picked up — taking one back down is never by accident)
+    if (from.type !== 'foundation') {
+      const up = dests.find(d => d.type === 'foundation');
+      const onCards = dests.filter(d => d.type === 'tableau' && game.tableau[d.colIdx].length);
+      if (up) { play(from, up); return; }
+      if (onCards.length === 1) { play(from, onCards[0]); return; }
+      if (!onCards.length) { play(from, dests[0]); return; }     // (a King: any empty column will do)
+    }
+    setSel({ from });
+  };
+  // Tap an empty place (a column, a foundation, or the space below a column)
+  const tapPlace = to => {
+    if (!sel || auto) return;
+    if (destinations(game, sel.from).some(d => same(d, to))) play(sel.from, to);
+    else setSel(null);
+  };
+  const showHint = () => {
+    if (auto || won) return;
+    const x = hint(game, new Set([...history.states, game].map(positionKey)));   // (never back to a position you've had)
+    setSel(null);
+    if (!x) { setNote('Nothing useful left to do. Try Undo, or start a new game.'); return; }
+    setShown(x);
+  };
+
+  const targets = sel ? destinations(game, sel.from) : [];
+  const isTarget = p => targets.some(d => same(d, p));
+  const isHintTo = p => !!shown?.to && same(shown.to, p);
+  const markFor = (place, last) => {
+    if (sel && same(sel.from, place) && (place.type !== 'tableau' || place.rowIdx >= sel.from.rowIdx)) return 'selected';
+    if (shown?.from && same(shown.from, place) && (place.type !== 'tableau' || place.rowIdx >= shown.from.rowIdx)) return 'hint';
+    if (last && isHintTo(place)) return 'hint';
+    if (last && isTarget(place)) return 'target';
+    return null;
+  };
+  const slotMark = p => (isHintTo(p) ? 'hint' : isTarget(p) ? 'target' : null);
+
+  // How far apart cards sit in a column: closer together when a column gets long
+  const room = Math.max(h * 3, window.innerHeight - h - 200);
+  const layout = col => {
+    const down = col.filter(c => !c.faceUp).length;
+    let downStep = Math.round(w * 0.22), upStep = Math.round(w * 0.5);
+    const up = Math.max(0, col.length - down - 1);
+    const need = down * downStep + up * upStep;
+    if (need + h > room && need > 0) {
+      const f = (room - h) / need;
+      downStep = Math.max(3, Math.floor(downStep * f));
+      upStep = Math.max(Math.round(w * 0.32), Math.floor(upStep * f));
+    }
+    let y = 0;
+    const tops = col.map((c, i) => { const t = y; y += i < col.length - 1 ? (c.faceUp ? upStep : downStep) : 0; return t; });
+    return { tops, height: (tops.at(-1) ?? 0) + h };
+  };
+
+  const waste = game.waste[0];
   return (
     <div className="min-h-screen bg-green-900 p-3 select-none">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={() => navigate('/')} className="text-white/60 hover:text-white p-1">
-          <ArrowLeft size={20} />
-        </button>
-        <div className="text-white font-semibold">Solitaire · {game.moves} moves</div>
-        <div className="flex gap-2">
-          <RulesButton game="solitaire" title="Solitaire" />
-          <button onClick={showHint} disabled={auto || won} aria-label="Hint" className="p-1 text-white/60 hover:text-white disabled:opacity-30">
-            <Lightbulb size={18} />
-          </button>
-          <button onClick={undo} disabled={!history.length || auto} className="p-1 text-white/60 hover:text-white disabled:opacity-30">
-            <Undo2 size={18} />
-          </button>
-          <button onClick={restart} className="p-1 text-white/60 hover:text-white">
-            <RefreshCw size={18} />
-          </button>
+      <SolitaireHeader title="Solitaire" rulesGame="solitaire" status={`${foundationCount(game)} of 52 up · ${count(game.moves, 'move')}`}
+        onUndo={undo} canUndo={history.canUndo && !won && !auto} onRestart={restart} onHint={showHint} />
+
+      {/* The stock and the waste, then the foundations — lined up with the columns */}
+      <div className="flex justify-center mb-3" style={{ gap }}>
+        <div onClick={draw} className="cursor-pointer" aria-label={game.stock.length ? 'Turn a card' : 'Turn the waste back over'}>
+          {game.stock.length
+            ? <SCard card={{ faceUp: false }} faceDown w={w} mark={shown?.draw ? 'hint' : null} />
+            : <Slot w={w} label={game.waste.length ? '↺' : ''} mark={shown?.draw ? 'hint' : null} />}
         </div>
-      </div>
-
-      <p className="text-center text-amber-300 text-sm min-h-[1.25rem] -mt-1 mb-2">{note}</p>
-
-      {/* Top area: stock, waste, spacers, foundations */}
-      <div className="flex gap-2 mb-3 justify-between">
-        {/* Stock */}
-        <div onClick={drawStock} className="cursor-pointer">
-          <Hinted on={!!shown?.draw}>
-            {game.stock.length > 0
-              ? <PlayingCard card={{ suit: 'spades', rank: 'A', faceUp: false }} faceDown size={size} />
-              : <EmptyCardSlot size={size} label="↩️" onClick={drawStock} />}
-          </Hinted>
-        </div>
-
-        {/* Waste */}
-        {/* (Keyed by card, so each card turned over is drawn afresh: reusing the last one's
-            element slid the new card down from where a selected card had lifted, and Safari
-            left a strip of the old card's green outline showing above it) */}
-        {game.waste.length > 0
-          ? <Hinted on={hintFrom('waste')}>
-              <DraggableCard
-                key={game.waste[0].id}
-                card={game.waste[0]}
-                from={{ type: 'waste' }}
-                cards={[game.waste[0]]}
-                size={size}
-                selected={selected?.from?.type === 'waste'}
-                onSelect={() => handleCardClick(game.waste[0], { type: 'waste' })}
-              />
-            </Hinted>
-          : <EmptyCardSlot size={size} />}
-
-        <div className="flex-1" />
-
-        {/* Foundations */}
+        {/* (Keyed by card, so each card turned over is drawn afresh) */}
+        {waste
+          ? <SCard key={waste.id} card={waste} w={w} mark={markFor({ type: 'waste' }, true)} onClick={() => tap({ type: 'waste' })} />
+          : <Slot w={w} />}
+        <div style={{ width: w }} />
         {SUITS.map(suit => {
           const pile = game.foundations[suit];
-          const top = pile[pile.length - 1 - (spilled[suit] ?? 0)];   // (the finale bounces them off one by one)
-          const symbols = { spades:'♠', hearts:'♥', diamonds:'♦', clubs:'♣' };
+          const left = pile.length - (spilled[suit] ?? 0);      // (the finale bounces them off one by one)
+          const place = { type: 'foundation', suit };
           return (
-            <DroppableFoundation key={suit} suit={suit}
-              canDrop={canDropOnFoundation} onDrop={handleFoundationDrop}>
-              <div onClick={() => handleFoundationClick(suit)} data-cascade={suit} className="cursor-pointer">
-                <Hinted on={hintTo('foundation', suit)}>
-                  {top
-                    ? <PlayingCard card={top} size={size} lift={false} />
-                    : <EmptyCardSlot size={size} label={symbols[suit]} />}
-                </Hinted>
-              </div>
-            </DroppableFoundation>
+            <div key={suit} data-cascade={suit}>
+              {left > 0
+                ? <SCard card={pile[left - 1]} w={w} mark={markFor(place, true)} onClick={() => tap(place)} />
+                : <Slot w={w} label={SUIT_SYMBOLS[suit]} mark={slotMark(place)} onClick={() => tapPlace(place)} />}
+            </div>
           );
         })}
       </div>
 
-      {/* Tableau */}
-      <div className="flex gap-1.5 overflow-x-auto pb-4">
+      <p className="text-center text-amber-300 text-sm min-h-[1.25rem] mb-1">{note}</p>
+
+      <div className="flex justify-center" style={{ gap }}>
         {game.tableau.map((col, colIdx) => {
-          const colHeight = Math.max(120, (Math.max(col.length, 1) - 1) * step + cardH + 48);   // cards + the tap zone below them
+          const { tops, height } = layout(col);
+          const place = { type: 'tableau', colIdx };
           return (
-            <DroppableTableau key={colIdx} colIdx={colIdx}
-              canDrop={canDropOnTableau} onDrop={handleDrop}
-              style={{ minHeight: `${colHeight}px`, position: 'relative' }}>
-              {col.length === 0 && (
-                <EmptyCardSlot size={size} className={`absolute inset-0 w-full ${hintTo('tableau', colIdx) ? 'ring-4 ring-game-gold' : ''}`}
-                  onClick={() => handleTableauClick(colIdx)} />
-              )}
-              {col.map((card, rowIdx) => {
-                const isSelected = selected?.from?.type === 'tableau'
-                  && selected.from.colIdx === colIdx
-                  && selected.from.rowIdx <= rowIdx
-                  && card.faceUp;
-                const dragCards = col.slice(rowIdx);
-                return (
-                  <div key={card.id} style={{ position: 'absolute', top: `${rowIdx * step}px`, zIndex: rowIdx }}>
-                    <Hinted on={card.faceUp && (hintFrom('tableau', colIdx, rowIdx) || (hintTo('tableau', colIdx) && rowIdx === col.length - 1))}>
-                    {card.faceUp ? (
-                      <DraggableCard
-                        card={card}
-                        from={{ type: 'tableau', colIdx, rowIdx }}
-                        cards={dragCards}
-                        size={size}
-                        selected={isSelected}
-                        onSelect={() => card.faceUp && handleCardClick(card, { type: 'tableau', colIdx, rowIdx })}
-                      />
-                    ) : (
-                      <PlayingCard card={card} size={size} faceDown />
-                    )}
-                    </Hinted>
-                  </div>
-                );
-              })}
-              {/* Invisible drop/click zone just below the last card (starting it
-                  any higher would cover the card and swallow taps on it) */}
-              <div
-                style={{ position: 'absolute', top: `${col.length ? (col.length - 1) * step + cardH : 0}px`, zIndex: col.length + 1, width: '100%', height: '48px', cursor: 'pointer' }}
-                onClick={() => handleTableauClick(colIdx)}
-              />
-            </DroppableTableau>
+            <div key={colIdx} data-column={colIdx} className="relative" style={{ width: w, height: height + h * 0.6 }}
+              onClick={() => tapPlace(place)}>
+              {!col.length && <Slot w={w} label="K" mark={slotMark(place)} />}
+              {col.map((card, rowIdx) => (
+                <div key={card.id} data-col={colIdx} data-idx={rowIdx} className="absolute left-0" style={{ top: tops[rowIdx], zIndex: rowIdx }}
+                  onClick={e => { e.stopPropagation(); tap({ type: 'tableau', colIdx, rowIdx }); }}>
+                  <SCard card={card} w={w} mark={card.faceUp ? markFor({ type: 'tableau', colIdx, rowIdx }, rowIdx === col.length - 1) : null} />
+                </div>
+              ))}
+            </div>
           );
         })}
       </div>
 
       {/* Once every card in the columns is face up, the game can finish itself */}
-      <div className="flex justify-center mt-4">
-        {auto || won ? (
-          <Button variant="ghost" disabled className="text-sm">✨ Finishing…</Button>
-        ) : canAutoComplete(game) ? (
-          <Button variant="gold" onClick={startAuto} className="text-sm animate-pulse">✨ Auto-complete</Button>
-        ) : (
-          <Button variant="ghost" onClick={autoMove} className="text-sm">Auto-Move to Foundation ✨</Button>
+      <div className="flex justify-center mt-2">
+        {canAutoComplete(game) && !auto && !won && (
+          <Button variant="gold" className="text-sm animate-pulse" onClick={() => { history.push(game); setSel(null); setShown(null); setAuto(true); }}>✨ Auto-complete</Button>
         )}
       </div>
 
@@ -487,61 +236,7 @@ export default function SolitaireGame() {
           onLaunch={suit => setSpilled(sp => ({ ...sp, [suit]: (sp[suit] ?? 0) + 1 }))}
           onDone={() => setCascading(false)} />
       )}
-
-
-      {/* Win modal */}
-      <AnimatePresence>
-        {won && !cascading && (
-          <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <motion.div className="card-panel text-center max-w-sm w-full"
-              initial={{ scale: 0.5 }} animate={{ scale: 1 }} transition={{ type: 'spring' }}>
-              <div className="text-5xl mb-3">🃏</div>
-              <h2 className="text-2xl font-bold text-game-gold mb-2">You Win!</h2>
-              <p className="text-white/60 mb-6">{game.moves} moves</p>
-              <div className="flex gap-3">
-                <Button variant="secondary" className="flex-1" onClick={() => navigate('/')}>Home</Button>
-                <Button variant="primary" className="flex-1" onClick={restart}>Play Again</Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <WinBox show={won && !cascading} onAgain={restart} lines={[count(game.moves, 'move')]} />
     </div>
   );
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-function getSelectedCards(game, from, selCard) {
-  if (from.type === 'waste') return [selCard];
-  if (from.type === 'tableau') {
-    const col = game.tableau[from.colIdx];
-    const idx = col.findIndex(c => c.id === selCard.id);
-    return col.slice(idx);
-  }
-  return [selCard];
-}
-
-function removeCards(game, from, cards) {
-  const g = JSON.parse(JSON.stringify(game));
-  if (from.type === 'waste') {
-    g.waste = g.waste.slice(1);
-  } else if (from.type === 'tableau') {
-    const idx = g.tableau[from.colIdx].findIndex(c => c.id === cards[0].id);
-    const col = g.tableau[from.colIdx].slice(0, idx);
-    // Turn over the card that's now on top of the column. Doing it here means
-    // every move (to another column or to a foundation, by tap or drag) does it.
-    if (col.length && !col[col.length - 1].faceUp) col[col.length - 1] = { ...col[col.length - 1], faceUp: true };
-    g.tableau[from.colIdx] = col;
-  } else if (from.type === 'foundation') {
-    g.foundations[from.suit].pop();
-  }
-  return g;
-}
-
-function canPlaceOnFoundationG(card, g) {
-  const pile = g.foundations[card.suit];
-  if (pile.length === 0) return card.rank === 'A';
-  return SOL_RANK[card.rank] === SOL_RANK[pile[pile.length - 1].rank] + 1;
 }

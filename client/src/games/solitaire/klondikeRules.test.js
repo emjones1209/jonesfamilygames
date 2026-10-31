@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildDeck, shuffle } from '../../utils/cardEngine';
-import { legalMoves, applyMove, hint, turnStock, positionKey, fitsColumn } from './klondikeRules';
+import { legalMoves, applyMove, hint, turnStock, positionKey, fitsColumn, destinations, autoHomeStep } from './klondikeRules';
 
 const deal = () => {
   const deck = shuffle(buildDeck());
@@ -34,6 +34,53 @@ describe('Klondike moves', () => {
     const moves = legalMoves(g);
     expect(moves).toContainEqual({ from: { type: 'tableau', colIdx: 0, rowIdx: 0 }, to: { type: 'foundation', suit: 'hearts' } });
     expect(moves.some(m => m.from.colIdx === 1 && m.from.rowIdx === 0)).toBe(false);
+  });
+});
+
+describe('Klondike taps', () => {
+  it('send a card up first, then onto a card, then a King into an empty column', () => {
+    const g = empty();
+    g.foundations.hearts = [card('A', 'hearts')];
+    g.tableau[0] = [card('2', 'hearts')];
+    g.tableau[1] = [card('3', 'spades')];
+    g.tableau[3] = [card('3', 'clubs')];
+    expect(destinations(g, { type: 'tableau', colIdx: 0, rowIdx: 0 })).toEqual([
+      { type: 'foundation', suit: 'hearts' }, { type: 'tableau', colIdx: 1 }, { type: 'tableau', colIdx: 3 },
+    ]);
+    g.waste = [card('K', 'clubs')];
+    expect(destinations(g, { type: 'waste' })).toEqual([2, 4, 5, 6].map(colIdx => ({ type: 'tableau', colIdx })));
+  });
+
+  it('never move a whole column into an empty one, or a card out of the middle of a muddle', () => {
+    const g = empty();
+    g.tableau[0] = [card('K', 'spades'), card('Q', 'hearts')];
+    g.tableau[1] = [card('9', 'clubs'), card('4', 'hearts')];
+    expect(destinations(g, { type: 'tableau', colIdx: 0, rowIdx: 0 })).toEqual([]);
+    expect(destinations(g, { type: 'tableau', colIdx: 1, rowIdx: 0 })).toEqual([]);
+  });
+
+  it('take a card back down from a foundation', () => {
+    const g = empty();
+    g.foundations.hearts = [card('A', 'hearts'), card('2', 'hearts')];
+    g.tableau[0] = [card('3', 'spades')];
+    const to = destinations(g, { type: 'foundation', suit: 'hearts' });
+    expect(to).toEqual([{ type: 'tableau', colIdx: 0 }]);
+    const after = applyMove(g, { from: { type: 'foundation', suit: 'hearts' }, to: to[0] });
+    expect(after.foundations.hearts).toHaveLength(1);
+    expect(after.tableau[0].map(c => c.rank)).toEqual(['3', '2']);
+  });
+
+  it('send up by themselves only the cards nothing could want', () => {
+    const g = empty();
+    g.foundations.hearts = [card('A', 'hearts'), card('2', 'hearts')];
+    g.foundations.spades = [card('A', 'spades')];
+    g.tableau[0] = [card('3', 'hearts')];                        // the 2♠ isn't up: a 3♥ could still hold it
+    expect(autoHomeStep(g)).toBe(null);
+    g.waste = [card('2', 'spades')];                             // 2s always go
+    const next = autoHomeStep(g);
+    expect(next.foundations.spades).toHaveLength(2);
+    next.foundations.clubs = [card('A', 'clubs'), card('2', 'clubs')];      // both black 2s up: the 3♥ can go
+    expect(autoHomeStep(next).foundations.hearts).toHaveLength(3);
   });
 });
 
