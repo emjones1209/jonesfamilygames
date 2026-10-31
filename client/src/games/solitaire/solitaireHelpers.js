@@ -18,12 +18,12 @@ export function useBoardWidth(max = 1000) {
 }
 export const cardHeight = w => Math.round(w * 1.4);
 
-/** A short message that shows for a moment ("Fill every empty column before dealing."). */
+/** A short message that shows for a moment ("Fill every empty column before dealing."): longer ones stay longer. */
 export function useNote() {
   const [note, setNote] = useState(null);
   useEffect(() => {
     if (!note) return;
-    const t = setTimeout(() => setNote(null), 2500);
+    const t = setTimeout(() => setNote(null), Math.max(2500, note.length * 55));
     return () => clearTimeout(t);
   }, [note]);
   return [note, setNote];

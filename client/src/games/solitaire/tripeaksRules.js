@@ -68,17 +68,45 @@ export const isWon = s => left(s) === 0;
 export const playable = s => s.peaks.map((_, i) => i).filter(i => canPlay(s, i));
 export const isStuck = s => !isWon(s) && !playable(s).length && !s.stock.length;
 
+const SYMBOL = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
+const cardName = c => `${c.rank}${SYMBOL[c.suit]}`;
+
 /**
- * A move for the Hint button: { play: i }, { draw: true }, or null. Prefers a card that
- * keeps a streak going (one whose next card can be played too), then one that turns a card over.
+ * The longest streak from here using only the cards in view: cards that would turn over
+ * along the way stay unknown (the hint doesn't peek), but turning them counts for something.
+ * Returns { line: [places…], v } (v: cards played × 10, turned × 4, peaks cleared × 6).
+ */
+function bestStreak(s) {
+  const known = new Set(s.peaks.map((c, i) => (c && c.faceUp ? i : -1)).filter(i => i >= 0));
+  let budget = 20000;
+  const search = (gone, top) => {
+    let best = { line: [], v: 0 };
+    if (--budget < 0) return best;
+    for (const i of known) {
+      if (gone.has(i) || !coveredBy(i).every(j => !s.peaks[j] || gone.has(j)) || !adjacent(s.peaks[i], top)) continue;
+      const now = new Set(gone).add(i);
+      // Cards this uncovers: they turn over (still unknown to us)
+      let turned = 0;
+      for (let j = 0; j < 18; j++) if (s.peaks[j] && !known.has(j) && !now.has(j) && coveredBy(j).includes(i) && coveredBy(j).every(k => !s.peaks[k] || now.has(k))) turned++;
+      const sub = search(now, s.peaks[i]);
+      const v = 10 + turned * 4 + (i < 3 ? 6 : 0) + sub.v;
+      if (v > best.v) best = { line: [i, ...sub.line], v };
+    }
+    return best;
+  };
+  return search(new Set(s.peaks.map((c, i) => (c ? -1 : i)).filter(i => i >= 0)), s.waste[s.waste.length - 1]);
+}
+
+/**
+ * A move for the Hint button: { play: i, why }, { draw: true, why }, or null. Plans the longest
+ * streak with the cards in view (turning cards over along the way counts too).
  */
 export function hint(s) {
-  const options = playable(s);
-  if (!options.length) return s.stock.length ? { draw: true } : null;
-  const value = i => {
-    const after = play(s, i);
-    const turned = after.peaks.filter((c, j) => c && c.faceUp && !s.peaks[j].faceUp).length;
-    return playable(after).length * 2 + turned * 3 + (3 - placeOf(i).row);
-  };
-  return { play: options.sort((a, b) => value(b) - value(a))[0] };
+  const { line } = bestStreak(s);
+  if (line.length) {
+    const i = line[0], card = s.peaks[i];
+    const why = line.length > 1 ? ` — it starts a run of ${line.length} cards in a row` : '';
+    return { play: i, why: `Play the ${cardName(card)}${why}.` };
+  }
+  return s.stock.length ? { draw: true, why: 'Nothing fits: turn the next card from the stock.' } : null;
 }

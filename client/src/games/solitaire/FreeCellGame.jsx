@@ -114,7 +114,8 @@ export default function FreeCellGame() {
     const x = hint(game, new Set([...history.states, game].map(positionKey)));   // (never back to a position you've had)
     if (!x) { setNote('No moves left. Try Undo, or start a new game.'); return; }
     setSel(null);
-    setShown(x);
+    if (!x.from) setNote(x.why);                     // (no way to win, and nothing to point at)
+    if (x.from) setShown(x);
   };
 
   const targets = sel ? destinations(game, sel.from, sel.idx) : [];

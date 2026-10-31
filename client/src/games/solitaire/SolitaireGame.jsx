@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDrag, useDrop } from 'react-dnd';
-import { ArrowLeft, RefreshCw, Undo2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Undo2, Lightbulb } from 'lucide-react';
 import { buildDeck, shuffle, SUITS, RANK_VALUES } from '../../utils/cardEngine';
 import { PlayingCard, EmptyCardSlot } from '../../components/PlayingCard';
 import { Button } from '../../components/Button';
@@ -10,6 +10,11 @@ import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
 import { autoStep, canAutoComplete } from './autoComplete';
 import { CardCascade } from './CardCascade';
+import { hint as findHint, positionKey } from './klondikeRules';
+import { useNote } from './solitaireHelpers';
+
+/** A gold outline round a card the hint points at. */
+const Hinted = ({ on, children }) => (on ? <div className="rounded-lg ring-4 ring-game-gold ring-offset-1 ring-offset-green-900">{children}</div> : children);
 
 // The bouncing-cards finale is skipped for anyone who has asked their device for less motion
 const lessMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -118,6 +123,8 @@ export default function SolitaireGame() {
   const [cascading, setCascading] = useState(false); // the cards bouncing off the table after a win
   const [spilled, setSpilled] = useState({});       // suit → cards that have bounced off its foundation
   const { size, height: cardH, step } = useCardLayout();
+  const [shown, setShown] = useState(null);         // the hint being shown: { from, to, why } or { draw: true, why }
+  const [note, setNote] = useNote();
 
   const saveHistory = (g) => setHistory(h => [...h.slice(-20), JSON.stringify(g)]);
 
@@ -133,6 +140,7 @@ export default function SolitaireGame() {
     }
     setGame(updated);
     setSelected(null);
+    setShown(null);
   }, []);
 
   // Draw from stock
@@ -270,12 +278,26 @@ export default function SolitaireGame() {
     setHistory(h => h.slice(0, -1));
     setGame(prev);
     setSelected(null);
+    setShown(null);
   };
+
+  // A hint: looks a few moves ahead with the cards in view, never back to where you've been
+  const showHint = () => {
+    if (auto || won) return;
+    const x = findHint(game, new Set([...history.map(h => JSON.parse(h)), game].map(positionKey)));
+    setSelected(null);
+    if (!x) { setShown(null); setNote('Nothing useful left to do. Try Undo, or start a new game.'); return; }
+    setShown(x);
+  };
+  const hintFrom = (type, colIdx, rowIdx) => !!shown?.from && shown.from.type === type
+    && (type === 'waste' || (shown.from.colIdx === colIdx && rowIdx >= shown.from.rowIdx));
+  const hintTo = (type, key) => !!shown?.to && shown.to.type === type && (type === 'foundation' ? shown.to.suit === key : shown.to.colIdx === key);
 
   const restart = () => {
     setGame(initGame());
     setHistory([]);
     setSelected(null);
+    setShown(null);
     setWon(false);
     setAuto(false);
     setCascading(false);
@@ -336,6 +358,9 @@ export default function SolitaireGame() {
         <div className="text-white font-semibold">Solitaire · {game.moves} moves</div>
         <div className="flex gap-2">
           <RulesButton game="solitaire" title="Solitaire" />
+          <button onClick={showHint} disabled={auto || won} aria-label="Hint" className="p-1 text-white/60 hover:text-white disabled:opacity-30">
+            <Lightbulb size={18} />
+          </button>
           <button onClick={undo} disabled={!history.length || auto} className="p-1 text-white/60 hover:text-white disabled:opacity-30">
             <Undo2 size={18} />
           </button>
@@ -345,13 +370,17 @@ export default function SolitaireGame() {
         </div>
       </div>
 
+      <p className="text-center text-amber-300 text-sm min-h-[1.25rem] -mt-1 mb-2">{note}</p>
+
       {/* Top area: stock, waste, spacers, foundations */}
       <div className="flex gap-2 mb-3 justify-between">
         {/* Stock */}
         <div onClick={drawStock} className="cursor-pointer">
-          {game.stock.length > 0
-            ? <PlayingCard card={{ suit: 'spades', rank: 'A', faceUp: false }} faceDown size={size} />
-            : <EmptyCardSlot size={size} label="↩️" onClick={drawStock} />}
+          <Hinted on={!!shown?.draw}>
+            {game.stock.length > 0
+              ? <PlayingCard card={{ suit: 'spades', rank: 'A', faceUp: false }} faceDown size={size} />
+              : <EmptyCardSlot size={size} label="↩️" onClick={drawStock} />}
+          </Hinted>
         </div>
 
         {/* Waste */}
@@ -359,15 +388,17 @@ export default function SolitaireGame() {
             element slid the new card down from where a selected card had lifted, and Safari
             left a strip of the old card's green outline showing above it) */}
         {game.waste.length > 0
-          ? <DraggableCard
-              key={game.waste[0].id}
-              card={game.waste[0]}
-              from={{ type: 'waste' }}
-              cards={[game.waste[0]]}
-              size={size}
-              selected={selected?.from?.type === 'waste'}
-              onSelect={() => handleCardClick(game.waste[0], { type: 'waste' })}
-            />
+          ? <Hinted on={hintFrom('waste')}>
+              <DraggableCard
+                key={game.waste[0].id}
+                card={game.waste[0]}
+                from={{ type: 'waste' }}
+                cards={[game.waste[0]]}
+                size={size}
+                selected={selected?.from?.type === 'waste'}
+                onSelect={() => handleCardClick(game.waste[0], { type: 'waste' })}
+              />
+            </Hinted>
           : <EmptyCardSlot size={size} />}
 
         <div className="flex-1" />
@@ -381,9 +412,11 @@ export default function SolitaireGame() {
             <DroppableFoundation key={suit} suit={suit}
               canDrop={canDropOnFoundation} onDrop={handleFoundationDrop}>
               <div onClick={() => handleFoundationClick(suit)} data-cascade={suit} className="cursor-pointer">
-                {top
-                  ? <PlayingCard card={top} size={size} lift={false} />
-                  : <EmptyCardSlot size={size} label={symbols[suit]} />}
+                <Hinted on={hintTo('foundation', suit)}>
+                  {top
+                    ? <PlayingCard card={top} size={size} lift={false} />
+                    : <EmptyCardSlot size={size} label={symbols[suit]} />}
+                </Hinted>
               </div>
             </DroppableFoundation>
           );
@@ -399,7 +432,7 @@ export default function SolitaireGame() {
               canDrop={canDropOnTableau} onDrop={handleDrop}
               style={{ minHeight: `${colHeight}px`, position: 'relative' }}>
               {col.length === 0 && (
-                <EmptyCardSlot size={size} className="absolute inset-0 w-full"
+                <EmptyCardSlot size={size} className={`absolute inset-0 w-full ${hintTo('tableau', colIdx) ? 'ring-4 ring-game-gold' : ''}`}
                   onClick={() => handleTableauClick(colIdx)} />
               )}
               {col.map((card, rowIdx) => {
@@ -410,6 +443,7 @@ export default function SolitaireGame() {
                 const dragCards = col.slice(rowIdx);
                 return (
                   <div key={card.id} style={{ position: 'absolute', top: `${rowIdx * step}px`, zIndex: rowIdx }}>
+                    <Hinted on={card.faceUp && (hintFrom('tableau', colIdx, rowIdx) || (hintTo('tableau', colIdx) && rowIdx === col.length - 1))}>
                     {card.faceUp ? (
                       <DraggableCard
                         card={card}
@@ -422,6 +456,7 @@ export default function SolitaireGame() {
                     ) : (
                       <PlayingCard card={card} size={size} faceDown />
                     )}
+                    </Hinted>
                   </div>
                 );
               })}

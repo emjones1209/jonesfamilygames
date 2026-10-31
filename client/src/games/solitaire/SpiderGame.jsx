@@ -8,7 +8,7 @@
  * Tap the stock to deal a row.
  */
 import { useEffect, useState } from 'react';
-import { newSpider, runStart, move, deal, whyNoDeal, destinations, hint, isWon, RANKS, COLUMNS } from './spiderRules';
+import { newSpider, runStart, move, deal, whyNoDeal, destinations, hint, isWon, positionKey, RANKS, COLUMNS } from './spiderRules';
 import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
 import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
 import { CardCascade } from './CardCascade';
@@ -106,8 +106,8 @@ export default function SpiderGame() {
     else setSel(null);
   };
   const showHint = () => {
-    const h2 = hint(game);
-    if (!h2) { setNote('No moves left. Try Undo, or start a new game.'); return; }
+    const h2 = hint(game, new Set([...history.states, game].map(positionKey)));   // (not back to where you've been)
+    if (!h2) { setNote('Nothing useful left to do. Try Undo, or start a new game.'); return; }
     setSel(null);
     setShown(h2);
   };

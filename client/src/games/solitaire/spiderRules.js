@@ -125,38 +125,134 @@ export function destinations(s, from, idx) {
   return fits.sort((a, b) => a.rank - b.rank || a.to - b.to).map(f => f.to);
 }
 
+/** Is moving the cards from `idx` in column `from` to `to` worth anything at all? (Not shuffling a run between equal places.) */
+function pointless(s, from, idx, to) {
+  const col = s.tableau[from], target = s.tableau[to];
+  const top = target[target.length - 1], below = col[idx - 1];
+  const sameSuit = top && top.suit === col[idx].suit;
+  const settled = below && below.faceUp && RANK[below.rank] === RANK[col[idx].rank] + 1;
+  if (settled && !(sameSuit && below.suit !== col[idx].suit)) return true;   // it already sat on a card one higher
+  if (!top && idx === 0) return true;                                        // a whole column to an empty one
+  return idx > runStart(col) && !sameSuit;                                   // splitting a run, for nothing
+}
+
+/** The position as the player sees it: face-down cards are blanks (they stay unknown when they turn over). */
+function visible(s) {
+  return { ...s, stock: [], tableau: s.tableau.map(col => col.map(c => (c.faceUp ? c : { id: c.id, rank: '?', suit: '?', faceUp: false }))) };
+}
+
 /**
- * A move worth making, for the Hint button — { from, idx, to } or { deal: true }, or null
- * when there's nothing useful left. Prefers moves that turn up a face-down card or join
- * a run of one suit; leaves out moves that just shuffle a run between equal places.
+ * How good a position looks: cards turned up, empty columns, runs in one suit, finished runs.
+ * (`empties`: what an empty column is worth.)
  */
-export function hint(s) {
-  let best = null;
+function outlook(s, empties = 10) {
+  let v = s.done.length * 200;
+  for (const col of s.tableau) {
+    if (!col.length) { v += empties; continue; }
+    for (let i = 0; i < col.length; i++) {
+      const c = col[i];
+      if (!c.faceUp) { v -= 8; continue; }
+      const below = col[i - 1];
+      if (below?.faceUp && RANK[below.rank] === RANK[c.rank] + 1) v += below.suit === c.suit ? 3 : 1;
+    }
+  }
+  return v;
+}
+
+const tableKey = s => s.tableau.map(c => c.map(x => `${x.id}${x.faceUp ? '' : '_'}`).join()).join('|') + `#${s.stock.length}`;
+
+/** Every move worth considering: [from, idx, to]. */
+function usefulMoves(s) {
+  const out = [];
   for (let from = 0; from < COLUMNS; from++) {
     const col = s.tableau[from];
     if (!col.length) continue;
-    const start = runStart(col);
-    for (let idx = start; idx < col.length; idx++) {
-      for (const to of destinations(s, from, idx)) {
-        const target = s.tableau[to];
-        const top = target[target.length - 1];
-        const below = col[idx - 1];
-        const sameSuit = top && top.suit === col[idx].suit;
-        let value = 0;
-        if (sameSuit) value += 3;                                     // keeps the run growing
-        if (idx === 0 && top) value += 2;                             // empties a column
-        if (below && !below.faceUp) value += 4;                       // turns a card up
-        // Moving off a card that already held it in the same place gains nothing
-        const settled = below && below.faceUp && RANK[below.rank] === RANK[col[idx].rank] + 1;
-        if (settled && !(sameSuit && below.suit !== col[idx].suit)) continue;
-        if (!top && idx === 0) continue;                              // a whole column to an empty one
-        if (!top && !(below && !below.faceUp)) value -= 1;            // an empty column is worth keeping
-        if (idx > start && !sameSuit) continue;                       // splitting a run, for nothing
-        if (!best || value > best.value) best = { from, idx, to, value };
-      }
+    for (let idx = runStart(col); idx < col.length; idx++) {
+      for (const to of destinations(s, from, idx)) if (!pointless(s, from, idx, to)) out.push([from, idx, to]);
     }
   }
-  if (best && best.value > 0) return { from: best.from, idx: best.idx, to: best.to };
-  if (!whyNoDeal(s)) return { deal: true };
-  return best ? { from: best.from, idx: best.idx, to: best.to } : null;
+  return out;
+}
+
+/** "the 7♠" / "the run from the 9♥ down" */
+const SYMBOL = { spades: '♠', hearts: '♥', diamonds: '♦', clubs: '♣' };
+const cardName = c => `${c.rank}${SYMBOL[c.suit]}`;
+
+/**
+ * A move worth making, for the Hint button — { from, idx, to, why } or { deal: true, why }, or
+ * null when there's nothing left to do. Looks a few moves ahead with the cards in view (cards
+ * that would turn over stay unknown: the hint doesn't peek) for the line that turns up the
+ * most cards, empties columns and builds runs in one suit — and never goes back to a position
+ * in `seen` (the game so far), so hints don't go round in circles.
+ */
+export function hint(s, seen = new Set(), { depth = 3 } = {}) {
+  const view = visible(s);
+  const hidden = t => t.tableau.reduce((n, col) => n + col.filter(c => !c.faceUp).length, 0);
+  const base = { v: outlook(view), hidden: hidden(view), done: view.done.length };
+  // Real progress can't be undone: a card turned up, or a run finished
+  const progress = t => hidden(t) < base.hidden || t.done.length > base.done;
+  const memo = new Map();
+  let budget = 4000;
+  // The best a line from here leads to: { v } for any line, { p } for one that makes real progress
+  const search = (t, d) => {
+    const key = tableKey(t);
+    const known = memo.get(key);
+    if (known && known.d >= d) return known;
+    let v = outlook(t), p = progress(t) ? v : -Infinity;
+    if (d > 0 && budget-- > 0) {
+      for (const [from, idx, to] of usefulMoves(t)) {
+        const sub = search(move(t, from, idx, to), d - 1);
+        v = Math.max(v, sub.v - 0.5);
+        p = Math.max(p, sub.p - 0.5);
+      }
+    }
+    const out = { v, p, d };
+    memo.set(key, out);
+    return out;
+  };
+  // A move is worth making if it's better straight away, or sets up real progress. (When the
+  // next deal is waiting for a column to be filled, only real progress counts: otherwise filling
+  // a column and emptying it again would look like progress for ever.)
+  const toDeal = s.stock.length > 0 && s.tableau.some(c => !c.length);
+  let best = null;
+  for (const [from, idx, to] of usefulMoves(view)) {
+    if (seen.has(tableKey(move(s, from, idx, to)))) continue;
+    const after = move(view, from, idx, to);
+    const line = search(after, depth - 1);
+    const v = (outlook(after) > base.v && !toDeal ? line.v : line.p) + (outlook(after) - base.v) * 0.1;   // (soonest gain first)
+    if (v > base.v && (!best || v > best.v)) best = { from, idx, to, v };
+  }
+  if (best) return { from: best.from, idx: best.idx, to: best.to, why: describeMove(s, best.from, best.idx, best.to) };
+  if (!whyNoDeal(s)) return { deal: true, why: 'Nothing useful left to move: deal a new row.' };
+  // The stock can't be dealt while a column's empty: fill it, breaking up as little as possible
+  if (s.stock.length) {
+    const to = s.tableau.findIndex(c => !c.length);
+    let fill = null;
+    for (let from = 0; from < COLUMNS; from++) {
+      const col = s.tableau[from];
+      if (col.length < 2) continue;
+      for (let idx = Math.max(1, runStart(col)); idx < col.length; idx++) {      // (leaving a card behind)
+        const v = outlook(move(view, from, idx, to));
+        if (!fill || v > fill.v) fill = { from, idx, v };
+      }
+    }
+    if (fill) return { from: fill.from, idx: fill.idx, to, why: `${describeMove(s, fill.from, fill.idx, to)} Fill every empty column, then you can deal.` };
+  }
+  return null;
+}
+
+/** A position's key, for the game so far (pass them to `hint` as `seen`). */
+export const positionKey = tableKey;
+
+/** "Move the 7♠ onto the 8♠ — it turns over a card." */
+export function describeMove(s, from, idx, to) {
+  const col = s.tableau[from], target = s.tableau[to];
+  const what = idx < col.length - 1 ? `the run from the ${cardName(col[idx])} down` : `the ${cardName(col[idx])}`;
+  const top = target[target.length - 1];
+  const where = top ? `onto the ${cardName(top)}` : 'into the empty column';
+  const below = col[idx - 1];
+  const why = below && !below.faceUp ? ' — it turns over a card'
+    : idx === 0 ? ' — it empties a column'
+      : top && top.suit === col[idx].suit ? ' — it builds a run in one suit' : '';
+  return `Move ${what} ${where}${why}.`;
 }

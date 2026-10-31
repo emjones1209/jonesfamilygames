@@ -100,14 +100,15 @@ describe('FreeCell', () => {
     expect(tried).toBe(200);
   });
 
-  it('hints lead through games without going back to a position, and often win', () => {
+  it('hints lead through games without going back to a position, and nearly always win', () => {
     let wins = 0;
-    for (let g = 0; g < 20; g++) {
+    for (let g = 0; g < 8; g++) {
       let s = newFreecell();
       const seen = new Set([positionKey(s)]);
       for (let n = 0; n < 400 && !isWon(s); n++) {
         const h = hint(s, seen);
-        if (!h) break;
+        if (!h?.from) break;
+        expect(h.why).toMatch(/^Move /);
         s = move(s, h.from, h.idx, h.to);
         for (let x = autoHomeStep(s); x; x = autoHomeStep(s)) s = x;
         expect(seen.has(positionKey(s))).toBe(false);
@@ -116,7 +117,7 @@ describe('FreeCell', () => {
       }
       if (isWon(s)) wins++;
     }
-    // (Hints aren't a solver, but following them alone wins about 1 game in 3)
-    expect(wins).toBeGreaterThan(0);
-  });
+    // (The hint finds a way to win and follows it: almost every FreeCell deal can be won)
+    expect(wins).toBeGreaterThanOrEqual(7);
+  }, 120000);
 });
