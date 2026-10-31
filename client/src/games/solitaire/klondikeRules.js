@@ -50,6 +50,7 @@ export function applyMove(game, { from, to }) {
   const g = { ...game, tableau: game.tableau.map(c => [...c]), waste: [...game.waste], foundations: { ...game.foundations } };
   let cards;
   if (from.type === 'waste') cards = [g.waste.shift()];
+  else if (from.type === 'foundation') { cards = [g.foundations[from.suit].at(-1)]; g.foundations[from.suit] = g.foundations[from.suit].slice(0, -1); }
   else {
     const col = g.tableau[from.colIdx];
     cards = col.slice(from.rowIdx);
@@ -61,6 +62,54 @@ export function applyMove(game, { from, to }) {
   else g.tableau[to.colIdx] = [...g.tableau[to.colIdx], ...cards];
   return g;
 }
+
+/** Where an ordered run starts at the bottom of a column (only it moves, all together from any card in it). */
+export function runStart(col) {
+  let i = col.length - 1;
+  while (i > 0 && col[i - 1].faceUp && follows(col[i], col[i - 1])) i--;
+  return i;
+}
+
+/**
+ * Where the cards from `from` (waste, a column from rowIdx down, or a foundation's top card)
+ * can go, best first: up to the foundation, onto a card, then into an empty column. (A whole
+ * column doesn't move to an empty one: that changes nothing.)
+ */
+export function destinations(game, from) {
+  const card = from.type === 'waste' ? game.waste[0]
+    : from.type === 'foundation' ? game.foundations[from.suit].at(-1)
+    : game.tableau[from.colIdx][from.rowIdx];
+  if (!card?.faceUp) return [];
+  if (from.type === 'tableau' && from.rowIdx < runStart(game.tableau[from.colIdx])) return [];
+  const single = from.type !== 'tableau' || from.rowIdx === game.tableau[from.colIdx].length - 1;
+  const out = [];
+  if (single && from.type !== 'foundation' && fitsFoundation(card, game)) out.push({ type: 'foundation', suit: card.suit });
+  const cols = game.tableau.map((_, c) => c).filter(c => !(from.type === 'tableau' && c === from.colIdx) && fitsColumn(game, card, c));
+  for (const c of cols) if (game.tableau[c].length) out.push({ type: 'tableau', colIdx: c });
+  if (!(from.type === 'tableau' && from.rowIdx === 0)) for (const c of cols) if (!game.tableau[c].length) out.push({ type: 'tableau', colIdx: c });
+  return out;
+}
+
+/**
+ * The next card that's safe to send up by itself (from the waste or a column), as the
+ * game after it, or null: nothing could ever want to sit on it, as both cards of the other
+ * colour one lower are up already (and Aces and 2s always are).
+ */
+export function autoHomeStep(game) {
+  const safe = card => {
+    if (!card?.faceUp || !fitsFoundation(card, game)) return false;
+    const r = RANK[card.rank];
+    return r <= 2 || Object.keys(game.foundations).filter(suit => red({ suit }) !== red(card)).every(suit => game.foundations[suit].length >= r - 1);
+  };
+  if (safe(game.waste[0])) return applyMove(game, { from: { type: 'waste' }, to: { type: 'foundation', suit: game.waste[0].suit } });
+  for (let c = 0; c < game.tableau.length; c++) {
+    const col = game.tableau[c];
+    if (col.length && safe(col.at(-1))) return applyMove(game, { from: { type: 'tableau', colIdx: c, rowIdx: col.length - 1 }, to: { type: 'foundation', suit: col.at(-1).suit } });
+  }
+  return null;
+}
+
+export const isWon = game => foundationCount(game) === 52;
 
 /** A position, as a string (for the game so far: pass them to `hint` as `seen`). */
 export const positionKey = g => [
