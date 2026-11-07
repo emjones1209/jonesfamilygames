@@ -84,6 +84,24 @@ describe('Klondike taps', () => {
   });
 });
 
+describe('Klondike stock', () => {
+  it('turns one card at a time, or three, and turns the waste back over in order', () => {
+    const stock = ['A', '2', '3', '4', '5'].map(rank => card(rank, 'clubs', false));
+    const one = turnStock({ ...empty(), stock });
+    expect(one.waste.map(c => c.rank)).toEqual(['A']);
+    let g = { ...empty(), stock, drawCount: 3 };
+    g = turnStock(g);
+    expect(g.waste.map(c => c.rank)).toEqual(['3', '2', 'A']);   // (the third card turned on top)
+    expect(g.waste.every(c => c.faceUp)).toBe(true);
+    g = turnStock(g);
+    expect(g.waste.map(c => c.rank)).toEqual(['5', '4', '3', '2', 'A']);
+    expect(g.stock).toEqual([]);
+    g = turnStock(g);                                              // back over: the same order again
+    expect(g.stock.map(c => c.rank)).toEqual(['A', '2', '3', '4', '5']);
+    expect(g.waste).toEqual([]);
+  });
+});
+
 describe('Klondike hints', () => {
   it('turn over face-down cards first, and say why', () => {
     const g = empty();

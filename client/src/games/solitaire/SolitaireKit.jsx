@@ -8,7 +8,7 @@
  * the card: nothing is drawn outside a card (iPhones could leave that behind on screen).
  */
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Undo2, Lightbulb } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Undo2, Lightbulb, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SUIT_SYMBOLS } from '../../utils/cardEngine';
 import { RulesButton } from '../../components/RulesButton';
@@ -64,10 +64,11 @@ export function Slot({ w, label = '', mark = null, onClick, children }) {
   );
 }
 
-/** Back, the game's name and a status line, then Rules, Hint, Undo and New game. */
-export function SolitaireHeader({ title, status, rulesGame, onUndo, canUndo, onRestart, onHint }) {
+/** Back, the game's name and a status line, then Rules, Settings (if the game has any), Hint, Undo and New game. */
+export function SolitaireHeader({ title, status, rulesGame, onUndo, canUndo, onRestart, onHint, onSettings }) {
   const navigate = useNavigate();
-  const icon = 'p-2 text-white/70 hover:text-white disabled:opacity-30 min-h-[40px] min-w-[40px] flex items-center justify-center';
+  // (Narrower on phones, so the status line keeps to one line beside them)
+  const icon = 'px-1.5 py-2 sm:p-2 text-white/70 hover:text-white disabled:opacity-30 min-h-[40px] min-w-[34px] sm:min-w-[40px] flex items-center justify-center';
   return (
     <div className="flex items-center justify-between gap-2 mb-2">
       <button onClick={() => navigate('/')} className={icon} aria-label="Back"><ArrowLeft size={20} /></button>
@@ -77,6 +78,7 @@ export function SolitaireHeader({ title, status, rulesGame, onUndo, canUndo, onR
       </div>
       <div className="flex items-center gap-0.5 shrink-0">
         <RulesButton game={rulesGame} title={title} />
+        {onSettings && <button onClick={onSettings} className={icon} aria-label="Settings"><Settings size={18} /></button>}
         {onHint && <button onClick={onHint} className={icon} aria-label="Hint"><Lightbulb size={18} /></button>}
         <button onClick={onUndo} disabled={!canUndo} className={icon} aria-label="Undo"><Undo2 size={18} /></button>
         <button onClick={onRestart} className={icon} aria-label="New game"><RefreshCw size={18} /></button>
@@ -96,6 +98,25 @@ export function AutoHomeToggle({ on, onChange }) {
       </span>
       Auto-move to foundations
     </button>
+  );
+}
+
+/** A box of settings over the game, closed by Done or a tap outside it. */
+export function SettingsBox({ show, onClose, children }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6" onClick={onClose}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          <motion.div className="card-panel max-w-sm w-full flex flex-col gap-4" role="dialog" aria-label="Settings"
+            onClick={e => e.stopPropagation()} initial={{ scale: 0.9 }} animate={{ scale: 1 }}>
+            <h2 className="text-lg font-bold text-white">Settings</h2>
+            {children}
+            <Button variant="primary" onClick={onClose}>Done</Button>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

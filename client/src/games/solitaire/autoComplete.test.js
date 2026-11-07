@@ -62,4 +62,34 @@ describe('Solitaire auto-complete', () => {
     g.tableau[0] = [card('5', 'spades', false), ...g.tableau[0]];
     expect(canAutoComplete(g)).toBe(false);
   });
+
+  it('turning three at a time, is offered exactly when playing it out finishes the game', () => {
+    for (let trial = 0; trial < 300; trial++) {
+      let g = { ...endGame(), drawCount: 3 };
+      const ok = canAutoComplete(g);
+      for (let steps = 0; steps < 2000; steps++) {
+        const next = autoStep(g);
+        if (!next) break;
+        g = next;
+      }
+      if (ok) expect(foundationCount(g)).toBe(52);
+      else expect(foundationCount(g)).toBeLessThan(52);
+    }
+  });
+
+  it('turning three at a time, isn\'t offered with a card stuck out of reach in the stock', () => {
+    // Everything up but the spades from the 2: the 2♠ is 2nd of three in the stock, so turning
+    // three at a time only ever shows the 4♠ (and the 5♠ to K♠ in the column can't help)
+    const full = suit => DOWN.map(rank => card(rank, suit)).reverse();
+    const g = {
+      tableau: [['K', 'Q', 'J', '10', '9', '8', '7', '6', '5'].map(rank => card(rank, 'spades')), [], [], [], [], [], []],
+      stock: ['3', '2', '4'].map(rank => card(rank, 'spades', false)),
+      waste: [],
+      foundations: { spades: [card('A', 'spades')], hearts: full('hearts'), diamonds: full('diamonds'), clubs: full('clubs') },
+    };
+    expect(canAutoComplete(g)).toBe(true);                     // (one at a time: fine)
+    expect(canAutoComplete({ ...g, drawCount: 3 })).toBe(false);
+    // …but turned 2♠, 3♠, 4♠ from the top of the waste, they all go up
+    expect(canAutoComplete({ ...g, drawCount: 3, stock: ['4', '3', '2'].map(rank => card(rank, 'spades', false)) })).toBe(true);
+  });
 });

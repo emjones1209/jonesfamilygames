@@ -13,7 +13,7 @@ import { SUITS, SUIT_SYMBOLS } from '../../utils/cardEngine';
 import { winnableDeal } from './klondikeSolver';
 import { destinations, applyMove, runStart, turnStock, autoHomeStep, hint, isWon, positionKey } from './klondikeRules';
 import { autoStep, canAutoComplete, foundationCount } from './autoComplete';
-import { SCard, Slot, SolitaireHeader, WinBox, AutoHomeToggle } from './SolitaireKit';
+import { SCard, Slot, SolitaireHeader, WinBox, AutoHomeToggle, SettingsBox } from './SolitaireKit';
 import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, useAutoHome, lessMotion, secondsSince, count } from './solitaireHelpers';
 import { CardCascade } from './CardCascade';
@@ -22,11 +22,11 @@ import api from '../../utils/api';
 
 const COLS = 7;
 
-// Only deals that can be won (see klondikeSolver.js)
-function fresh() {
-  const { tableau, stock } = winnableDeal();
+// Only deals that can be won (see klondikeSolver.js), turning the stock `drawCount` cards at a time
+function fresh(drawCount = 1) {
+  const { tableau, stock } = winnableDeal({ draw: drawCount });
   return {
-    tableau, stock, waste: [],
+    tableau, stock, waste: [], drawCount,
     foundations: { spades: [], hearts: [], diamonds: [], clubs: [] }, moves: 0, started: Date.now(),
   };
 }
@@ -35,8 +35,13 @@ function fresh() {
 const same = (a, b, exact = false) => !!a && !!b && a.type === b.type
   && (a.type === 'foundation' ? a.suit === b.suit : a.type === 'waste' || (a.colIdx === b.colIdx && (!exact || a.rowIdx === b.rowIdx)));
 
+const DRAW_KEY = 'klondikeDraw';
+const loadDraw = () => { try { return Number(localStorage.getItem(DRAW_KEY)) === 3 ? 3 : 1; } catch { return 1; } };
+
 export default function SolitaireGame() {
-  const [game, setGame] = useState(fresh);
+  const [drawCount, setDrawCount] = useState(loadDraw);
+  const [settings, setSettings] = useState(false);
+  const [game, setGame] = useState(() => fresh(loadDraw()));
   const [sel, setSel] = useState(null);            // the cards picked up: a place (waste, column + row, foundation)
   const [shown, setShown] = useState(null);        // a hint: { from, to } or { draw: true }
   const [auto, setAuto] = useState(false);         // auto-complete running
@@ -66,7 +71,7 @@ export default function SolitaireGame() {
     setWon(true);
     setAuto(false);
     setCascading(!lessMotion());
-    api.post('/scores', { game: 'solitaire', score: Math.max(0, 10000 - g.moves * 10), durationS: secondsSince(g.started) }).catch(() => {});
+    api.post('/scores', { game: 'solitaire', score: Math.max(0, 10000 - g.moves * 10), difficulty: `draw ${g.drawCount ?? 1}`, durationS: secondsSince(g.started) }).catch(() => {});
   };
 
   // After each move: cards nothing could still want go up by themselves, one at a time, if that's
@@ -96,7 +101,15 @@ export default function SolitaireGame() {
     finish(g);
   };
   const play = (from, to) => change(applyMove(game, { from, to }));
-  const restart = () => { setGame(fresh()); history.clear(); setSel(null); setShown(null); setAuto(false); setWon(false); setCascading(false); setSpilled({}); };
+  const restart = (n = drawCount) => { setGame(fresh(n)); history.clear(); setSel(null); setShown(null); setAuto(false); setWon(false); setCascading(false); setSpilled({}); };
+  // Settings: turn the stock one card at a time, or three (a new game)
+  const chooseDraw = n => {
+    if (n === drawCount) return;
+    if (game.moves > 0 && !won && !window.confirm(`Start a new game, turning ${n === 3 ? 'three cards' : 'one card'} at a time?`)) return;
+    try { localStorage.setItem(DRAW_KEY, String(n)); } catch { /* private mode */ }
+    setDrawCount(n);
+    restart(n);
+  };
   const undo = () => { const last = history.pop(); if (last) { setGame(last); setSel(null); setShown(null); setAuto(false); } };
 
   const draw = () => {
@@ -190,7 +203,7 @@ export default function SolitaireGame() {
   return (
     <div className="min-h-screen bg-green-900 p-3 select-none">
       <SolitaireHeader title="Solitaire" rulesGame="solitaire" status={`${foundationCount(game)} of 52 up · ${count(game.moves, 'move')}`}
-        onUndo={undo} canUndo={history.canUndo && !won && !auto} onRestart={restart} onHint={showHint} />
+        onUndo={undo} canUndo={history.canUndo && !won && !auto} onRestart={() => restart()} onHint={showHint} onSettings={() => setSettings(true)} />
 
       {/* The stock and the waste, then the foundations — lined up with the columns */}
       <div className="flex justify-center mb-3" style={{ gap }}>
@@ -199,14 +212,23 @@ export default function SolitaireGame() {
             ? <SCard card={{ faceUp: false }} faceDown w={w} mark={shown?.draw ? 'hint' : null} />
             : <Slot w={w} label={game.waste.length ? '↺' : ''} mark={shown?.draw ? 'hint' : null} />}
         </div>
-        {/* (Keyed by card, so each card turned over is drawn afresh) */}
-        {waste
-          ? <div key={waste.id} className={canLift({ type: 'waste' }) ? 'touch-none' : ''} {...drag.bind({ type: 'waste' }, canLift({ type: 'waste' }))}
-              style={lifted({ type: 'waste' }) ? carried(drag) : undefined}>
-              <SCard card={waste} w={w} mark={markFor({ type: 'waste' }, true)} onClick={() => tap({ type: 'waste' })} />
-            </div>
-          : <Slot w={w} />}
-        <div style={{ width: w }} />
+        {/* The waste: its top card (and, turning three at a time, the two under it fanned out
+            beside it, over the space before the foundations). Keyed by card, so each card turned
+            over is drawn afresh. */}
+        <div className="relative" style={{ width: w * 2 + gap, height: h }}>
+          {!waste && <Slot w={w} />}
+          {game.waste.slice(0, (game.drawCount ?? 1) > 1 ? 3 : 1).reverse().map((card, k, shown3) => {
+            const top = k === shown3.length - 1;
+            const place = { type: 'waste' };
+            const ok = top && canLift(place);
+            return (
+              <div key={card.id} className={`absolute top-0 ${ok ? 'touch-none' : ''}`} {...drag.bind(place, ok)}
+                style={{ left: k * Math.floor((w + gap) / 2), zIndex: k, ...(top && lifted(place) ? carried(drag) : {}) }}>
+                <SCard card={card} w={w} plain={!top} mark={top ? markFor(place, true) : null} onClick={top ? () => tap(place) : undefined} />
+              </div>
+            );
+          })}
+        </div>
         {SUITS.map(suit => {
           const pile = game.foundations[suit];
           const left = pile.length - (spilled[suit] ?? 0);      // (the finale bounces them off one by one)
@@ -262,7 +284,22 @@ export default function SolitaireGame() {
           onLaunch={suit => setSpilled(sp => ({ ...sp, [suit]: (sp[suit] ?? 0) + 1 }))}
           onDone={() => setCascading(false)} />
       )}
-      <WinBox show={won && !cascading} onAgain={restart} lines={[count(game.moves, 'move')]} />
+      <WinBox show={won && !cascading} onAgain={() => restart()} lines={[`Turning ${game.drawCount === 3 ? 'three cards' : 'one card'} at a time`, count(game.moves, 'move')]} />
+
+      <SettingsBox show={settings} onClose={() => setSettings(false)}>
+        <div className="flex flex-col gap-2">
+          <span className="text-white/80 text-sm">Turn the stock</span>
+          <div className="flex gap-2">
+            {[1, 3].map(n => (
+              <button key={n} onClick={() => chooseDraw(n)} aria-pressed={n === drawCount}
+                className={`flex-1 px-3 min-h-[40px] rounded-full font-semibold text-sm ${n === drawCount ? 'bg-game-gold text-game-bg' : 'bg-white/10 text-white/70'}`}>
+                {n === 1 ? '1 card' : '3 cards'}
+              </button>
+            ))}
+          </div>
+          <span className="text-white/50 text-xs">Three at a time is the harder, classic game: only every third card comes to the top. Changing it starts a new game. Every game can still be won.</span>
+        </div>
+      </SettingsBox>
     </div>
   );
 }

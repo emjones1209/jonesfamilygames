@@ -1,7 +1,7 @@
 /**
  * Klondike (the classic Solitaire) moves and its Hint, on the game state SolitaireGame.jsx
  * keeps: { tableau: [[card…]×7], stock (stock[0] turns next), waste (waste[0] on top),
- * foundations: { suit: [card…] } }.
+ * foundations: { suit: [card…] }, drawCount (cards the stock turns at a time: 1, or 3) }.
  *
  * Places: { type: 'waste' }, { type: 'tableau', colIdx, rowIdx } (moving from rowIdx down),
  * { type: 'foundation', suit } and, as a destination, { type: 'tableau', colIdx }.
@@ -191,12 +191,20 @@ export function hint(game, seen = new Set(), { depth = 3 } = {}) {
   // Turn the stock — unless that's been round the whole stock with nothing new to do
   const drawn = turnStock(game);
   if (!drawn || seen.has(positionKey(drawn))) return null;
-  return { draw: true, why: game.stock.length ? 'Nothing useful to move: turn the next card from the stock.' : 'Turn the waste back over to go through the stock again.' };
+  return { draw: true, why: game.stock.length ? `Nothing useful to move: turn the next ${(game.drawCount ?? 1) > 1 ? 'cards' : 'card'} from the stock.` : 'Turn the waste back over to go through the stock again.' };
 }
 
-/** Turn the next card from the stock (or, with the stock empty, turn the waste back over); null when there's nothing to turn. */
+/**
+ * Turn the next card from the stock — or the next three, if the game turns three at a time
+ * (`game.drawCount`) — or, with the stock empty, turn the waste back over; null when there's
+ * nothing to turn.
+ */
 export function turnStock(game) {
-  if (game.stock.length) return { ...game, stock: game.stock.slice(1), waste: [{ ...game.stock[0], faceUp: true }, ...game.waste] };
+  if (game.stock.length) {
+    const n = Math.min(game.drawCount ?? 1, game.stock.length);
+    const turned = game.stock.slice(0, n).map(c => ({ ...c, faceUp: true })).reverse();   // (the last turned on top)
+    return { ...game, stock: game.stock.slice(n), waste: [...turned, ...game.waste] };
+  }
   if (game.waste.length) return { ...game, stock: [...game.waste].reverse().map(c => ({ ...c, faceUp: false })), waste: [] };
   return null;
 }
