@@ -112,9 +112,12 @@ export function ReactionPicker({ choices, open, onToggle, onPick, extra }) {
     <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3">
       <AnimatePresence>
         {open && (
-          <motion.div className="card-panel p-3 grid grid-cols-4 gap-2 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-7rem)] overflow-y-auto origin-bottom-right"
+          // The spring-open animation is on this outer panel, and the scrolling on a plain box
+          // inside it: iPhones won't always scroll a box that is itself being scaled
+          <motion.div className="card-panel p-0 overflow-hidden w-80 max-w-[calc(100vw-2rem)] origin-bottom-right"
             initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.3, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 22 }}>
+          <div className="p-3 grid grid-cols-4 gap-2 max-h-[calc(var(--screen-h)-7rem)] overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch]">
             {choices.map((r, i) => (
               <motion.button key={r} onClick={() => onPick(r)}
                 initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: i * 0.03, type: 'spring', stiffness: 500, damping: 18 }}
@@ -125,6 +128,7 @@ export function ReactionPicker({ choices, open, onToggle, onPick, extra }) {
               </motion.button>
             ))}
             {extra}
+          </div>
           </motion.div>
         )}
       </AnimatePresence>
