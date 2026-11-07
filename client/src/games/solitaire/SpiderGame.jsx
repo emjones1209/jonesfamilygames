@@ -5,11 +5,12 @@
  * the same suit, or the only card it fits — it goes straight there. Otherwise it's picked
  * up and the places it can go light up; tap one. (Into an empty column always asks, so a
  * column isn't filled by accident.) Tap a picked-up card again to send it to the best place.
- * Tap the stock to deal a row.
+ * Or drag cards where they're to go. Tap the stock to deal a row.
  */
 import { useEffect, useState } from 'react';
 import { newSpider, runStart, move, deal, whyNoDeal, destinations, hint, isWon, positionKey, RANKS, COLUMNS } from './spiderRules';
 import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
+import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
 import { CardCascade } from './CardCascade';
 import api from '../../utils/api';
@@ -30,6 +31,8 @@ export default function SpiderGame() {
   const [spilled, setSpilled] = useState({});      // run → cards bounced off it
   const [note, setNote] = useNote();
   const history = useHistory();
+  // (Picking cards up by dragging shows where they can go, as a tap does)
+  const drag = useCardDrag({ onStart: f => { setSel(f); setShown(null); }, onDrop: (f, to) => drop(f, to) });
   const board = useBoardWidth();
 
   const gap = board < 500 ? 3 : 6;
@@ -103,6 +106,13 @@ export default function SpiderGame() {
   const tapColumn = to => {
     if (!sel) return;
     if (destinations(game, sel.from, sel.idx).includes(to)) change(move(game, sel.from, sel.idx, to));
+    else setSel(null);
+  };
+  // Drag cards (a run of one suit) onto another column
+  const canLift = (from, idx) => !won && game.tableau[from][idx].faceUp && idx >= runStart(game.tableau[from])
+    && destinations(game, from, idx).length > 0;
+  const drop = ({ from, idx }, to) => {
+    if (to && to.col !== from && destinations(game, from, idx).includes(to.col)) change(move(game, from, idx, to.col));
     else setSel(null);
   };
   const showHint = () => {
@@ -182,14 +192,17 @@ export default function SpiderGame() {
           const { tops, height } = layout(col);
           const isTarget = targets.includes(from) || shown?.to === from;
           return (
-            <div key={from} data-column={from} className="relative" style={{ width: w, height: height + h * 0.6 }} onClick={() => tapColumn(from)}>
+            <div key={from} data-column={from} data-drop={JSON.stringify({ col: from })} className="relative" style={{ width: w, height: height + h * 0.6 }} onClick={() => tapColumn(from)}>
               {!col.length && <Slot w={w} mark={isTarget ? (shown?.to === from ? 'hint' : 'target') : null} />}
               {col.map((card, idx) => {
                 const picked = sel && sel.from === from && idx >= sel.idx;
                 const hinted = shown && !shown.deal && ((shown.from === from && idx >= shown.idx) || (shown.to === from && idx === col.length - 1));
                 const mark = picked ? 'selected' : hinted ? 'hint' : isTarget && idx === col.length - 1 ? 'target' : null;
+                const ok = canLift(from, idx);
+                const lifted = drag.active && drag.active.from.from === from && idx >= drag.active.from.idx;
                 return (
-                  <div key={card.id} data-col={from} data-idx={idx} className="absolute left-0" style={{ top: tops[idx], zIndex: idx }}
+                  <div key={card.id} data-col={from} data-idx={idx} className={`absolute left-0 ${ok ? 'touch-none' : ''}`} {...drag.bind({ from, idx }, ok)}
+                    style={{ top: tops[idx], zIndex: idx, ...(lifted ? carried(drag, idx) : {}) }}
                     onClick={e => { e.stopPropagation(); tapCard(from, idx); }}>
                     <SCard card={card} w={w} mark={mark} />
                   </div>

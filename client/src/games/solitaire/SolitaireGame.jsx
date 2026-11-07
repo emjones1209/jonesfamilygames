@@ -3,17 +3,19 @@
  *
  * Tap a card (with any cards on it) to move it: up to its foundation when it can go, or onto
  * the only card it fits (a King goes into an empty column); when there's a choice, the places
- * light up — tap one. Tap a picked-up card again to send it to the best place. Tap the stock
- * to turn a card. Cards nothing could still want go up to the foundations by themselves, and
- * once every card in the columns is face up, Auto-complete finishes the game.
+ * light up — tap one. Tap a picked-up card again to send it to the best place. Or drag cards
+ * where they're to go. Tap the stock to turn a card. Cards nothing could still want go up to
+ * the foundations by themselves (unless that's switched off), and once every card in the
+ * columns is face up, Auto-complete finishes the game.
  */
 import { useEffect, useState } from 'react';
 import { SUITS, SUIT_SYMBOLS } from '../../utils/cardEngine';
 import { winnableDeal } from './klondikeSolver';
 import { destinations, applyMove, runStart, turnStock, autoHomeStep, hint, isWon, positionKey } from './klondikeRules';
 import { autoStep, canAutoComplete, foundationCount } from './autoComplete';
-import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
-import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
+import { SCard, Slot, SolitaireHeader, WinBox, AutoHomeToggle } from './SolitaireKit';
+import { useCardDrag, carried } from './useCardDrag';
+import { useBoardWidth, cardHeight, useNote, useHistory, useAutoHome, lessMotion, secondsSince, count } from './solitaireHelpers';
 import { CardCascade } from './CardCascade';
 import { Button } from '../../components/Button';
 import api from '../../utils/api';
@@ -43,6 +45,9 @@ export default function SolitaireGame() {
   const [spilled, setSpilled] = useState({});      // suit → cards bounced off its foundation
   const [note, setNote] = useNote();
   const history = useHistory();
+  const [autoHome, setAutoHome] = useAutoHome();
+  // (Picking cards up by dragging shows where they can go, as a tap does)
+  const drag = useCardDrag({ onStart: from => { setSel({ from }); setShown(null); }, onDrop: (from, to) => drop(from, to) });
   const board = useBoardWidth(800);
 
   const gap = board < 500 ? 4 : 8;
@@ -64,10 +69,12 @@ export default function SolitaireGame() {
     api.post('/scores', { game: 'solitaire', score: Math.max(0, 10000 - g.moves * 10), durationS: secondsSince(g.started) }).catch(() => {});
   };
 
-  // After each move: cards nothing could still want go up by themselves, one at a time
-  // (auto-complete plays everything out, drawing through the stock). These count with the move for Undo.
+  // After each move: cards nothing could still want go up by themselves, one at a time, if that's
+  // switched on (auto-complete plays everything out, drawing through the stock). These count with
+  // the move for Undo. (Not while cards are being dragged.)
+  const dragging = !!drag.active;
   useEffect(() => {
-    if (won) return;
+    if (won || dragging || (!auto && !autoHome)) return;
     const next = auto ? autoStep(game) : autoHomeStep(game);
     if (!next && !auto) return;
     const t = setTimeout(() => {
@@ -78,7 +85,7 @@ export default function SolitaireGame() {
     }, auto ? (next?.kind === 'draw' ? 60 : 100) : 160);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, auto, won]);
+  }, [game, auto, won, autoHome, dragging]);
 
   const change = next => {
     history.push(game);
@@ -134,6 +141,14 @@ export default function SolitaireGame() {
     if (destinations(game, sel.from).some(d => same(d, to))) play(sel.from, to);
     else setSel(null);
   };
+  // Drag cards (from the waste, a column, or a foundation) to where they're to go
+  const canLift = from => !auto && !won && destinations(game, from).length > 0;
+  const drop = (from, to) => {
+    if (to && !same(from, to) && destinations(game, from).some(d => same(d, to))) play(from, to);
+    else setSel(null);
+  };
+  const lifted = (place, rowIdx) => !!drag.active && same(drag.active.from, place)
+    && (place.type !== 'tableau' || rowIdx >= drag.active.from.rowIdx);
   const showHint = () => {
     if (auto || won) return;
     const x = hint(game, new Set([...history.states, game].map(positionKey)));   // (never back to a position you've had)
@@ -186,7 +201,10 @@ export default function SolitaireGame() {
         </div>
         {/* (Keyed by card, so each card turned over is drawn afresh) */}
         {waste
-          ? <SCard key={waste.id} card={waste} w={w} mark={markFor({ type: 'waste' }, true)} onClick={() => tap({ type: 'waste' })} />
+          ? <div key={waste.id} className={canLift({ type: 'waste' }) ? 'touch-none' : ''} {...drag.bind({ type: 'waste' }, canLift({ type: 'waste' }))}
+              style={lifted({ type: 'waste' }) ? carried(drag) : undefined}>
+              <SCard card={waste} w={w} mark={markFor({ type: 'waste' }, true)} onClick={() => tap({ type: 'waste' })} />
+            </div>
           : <Slot w={w} />}
         <div style={{ width: w }} />
         {SUITS.map(suit => {
@@ -194,9 +212,11 @@ export default function SolitaireGame() {
           const left = pile.length - (spilled[suit] ?? 0);      // (the finale bounces them off one by one)
           const place = { type: 'foundation', suit };
           return (
-            <div key={suit} data-cascade={suit}>
+            <div key={suit} data-cascade={suit} data-drop={JSON.stringify(place)}>
               {left > 0
-                ? <SCard card={pile[left - 1]} w={w} mark={markFor(place, true)} onClick={() => tap(place)} />
+                ? <div className={canLift(place) ? 'touch-none' : ''} {...drag.bind(place, canLift(place))} style={lifted(place) ? carried(drag) : undefined}>
+                  <SCard card={pile[left - 1]} w={w} mark={markFor(place, true)} onClick={() => tap(place)} />
+                </div>
                 : <Slot w={w} label={SUIT_SYMBOLS[suit]} mark={slotMark(place)} onClick={() => tapPlace(place)} />}
             </div>
           );
@@ -210,25 +230,31 @@ export default function SolitaireGame() {
           const { tops, height } = layout(col);
           const place = { type: 'tableau', colIdx };
           return (
-            <div key={colIdx} data-column={colIdx} className="relative" style={{ width: w, height: height + h * 0.6 }}
+            <div key={colIdx} data-column={colIdx} data-drop={JSON.stringify(place)} className="relative" style={{ width: w, height: height + h * 0.6 }}
               onClick={() => tapPlace(place)}>
               {!col.length && <Slot w={w} label="K" mark={slotMark(place)} />}
-              {col.map((card, rowIdx) => (
-                <div key={card.id} data-col={colIdx} data-idx={rowIdx} className="absolute left-0" style={{ top: tops[rowIdx], zIndex: rowIdx }}
-                  onClick={e => { e.stopPropagation(); tap({ type: 'tableau', colIdx, rowIdx }); }}>
-                  <SCard card={card} w={w} mark={card.faceUp ? markFor({ type: 'tableau', colIdx, rowIdx }, rowIdx === col.length - 1) : null} />
-                </div>
-              ))}
+              {col.map((card, rowIdx) => {
+                const from = { type: 'tableau', colIdx, rowIdx };
+                const ok = card.faceUp && rowIdx >= runStart(col) && canLift(from);
+                return (
+                  <div key={card.id} data-col={colIdx} data-idx={rowIdx} className={`absolute left-0 ${ok ? 'touch-none' : ''}`} {...drag.bind(from, ok)}
+                    style={{ top: tops[rowIdx], zIndex: rowIdx, ...(lifted(place, rowIdx) ? carried(drag, rowIdx) : {}) }}
+                    onClick={e => { e.stopPropagation(); tap(from); }}>
+                    <SCard card={card} w={w} mark={card.faceUp ? markFor(from, rowIdx === col.length - 1) : null} />
+                  </div>
+                );
+              })}
             </div>
           );
         })}
       </div>
 
       {/* Once every card in the columns is face up, the game can finish itself */}
-      <div className="flex justify-center mt-2">
+      <div className="flex flex-col items-center gap-1 mt-2">
         {canAutoComplete(game) && !auto && !won && (
           <Button variant="gold" className="text-sm animate-pulse" onClick={() => { history.push(game); setSel(null); setShown(null); setAuto(true); }}>✨ Auto-complete</Button>
         )}
+        <AutoHomeToggle on={autoHome} onChange={setAutoHome} />
       </div>
 
       {cascading && (

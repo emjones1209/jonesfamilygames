@@ -2,11 +2,13 @@
  * TriPeaks (rules in tripeaksRules.js).
  *
  * Tap any uncovered card that's one higher or one lower than the waste card to play it
- * (King and Ace go round). Tap the stock to turn a new card when nothing fits.
+ * (King and Ace go round), or drag it onto the waste. Tap the stock to turn a new card when
+ * nothing fits.
  */
 import { useEffect, useState } from 'react';
 import { newTripeaks, isFree, canPlay, play, draw, hint, isWon, isStuck, left, placeOf } from './tripeaksRules';
 import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
+import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
 import { CardCascade } from './CardCascade';
 import { Button } from '../../components/Button';
@@ -22,6 +24,8 @@ export default function TriPeaksGame() {
   const [spilled, setSpilled] = useState(0);
   const [note, setNote] = useNote();
   const history = useHistory();
+  // Drag an uncovered card onto the waste
+  const drag = useCardDrag({ onDrop: (i, to) => { if (to?.type === 'waste') tap(i); } });
   const board = useBoardWidth(900);
 
   const gap = board < 500 ? 3 : 6;
@@ -79,7 +83,8 @@ export default function TriPeaksGame() {
           if (!card) return null;
           const { row, x } = placeOf(i);
           return (
-            <div key={card.id} data-peak={i} className="absolute" style={{ left: x * (w + gap), top: row * h * 0.5, zIndex: row }}>
+            <div key={card.id} data-peak={i} {...drag.bind(i, !won && isFree(game, i))} className={`absolute ${isFree(game, i) ? 'touch-none' : ''}`}
+              style={{ left: x * (w + gap), top: row * h * 0.5, zIndex: row, ...(drag.active?.from === i ? carried(drag) : {}) }}>
               <SCard card={card} w={w} faceDown={!card.faceUp} mark={shown?.play === i ? 'hint' : null} onClick={() => tap(i)} />
             </div>
           );
@@ -98,7 +103,7 @@ export default function TriPeaksGame() {
           </div>
           <span className="text-white/50 text-xs">{game.stock.length} left</span>
         </div>
-        <div data-cascade="waste">
+        <div data-cascade="waste" data-drop={JSON.stringify({ type: 'waste' })}>
           {waste.length ? <SCard card={waste.at(-1)} w={big} /> : <Slot w={big} />}
         </div>
       </div>

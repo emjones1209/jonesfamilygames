@@ -2,13 +2,15 @@
  * Pyramid (rules in pyramidRules.js).
  *
  * Tap a King to take it away. For a pair, tap one card (it's picked up) and then a card
- * that makes 13 with it. The waste's top card pairs too. Tap the stock to turn a card.
+ * that makes 13 with it, or drag one onto the other. The waste's top card pairs too. Tap the
+ * stock to turn a card.
  */
 import { useEffect, useState } from 'react';
 import {
   newPyramid, isFree, canRemove, remove, draw, whyNoDraw, hint, isWon, isStuck, left, rowOf, indexOf, VALUE, ROWS, PASSES,
 } from './pyramidRules';
 import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
+import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
 import { CardCascade } from './CardCascade';
 import { Button } from '../../components/Button';
@@ -26,6 +28,7 @@ export default function PyramidGame() {
   const [spilled, setSpilled] = useState(0);
   const [note, setNote] = useNote();
   const history = useHistory();
+  const drag = useCardDrag({ onStart: from => { setSel(from); setShown(null); }, onDrop: (from, to) => drop(from, to) });
   const board = useBoardWidth(760);
 
   const gap = board < 500 ? 4 : 8;
@@ -72,6 +75,13 @@ export default function PyramidGame() {
     if (why) { setNote(why); return; }
     change(draw(game));
   };
+  // Drag a card onto one that makes 13 with it
+  const canLift = place => !won && (place.type === 'waste' ? game.waste.length > 0 : isFree(game, place.i));
+  const drop = (from, to) => {
+    if (to && !same(from, to) && canRemove(game, [from, to])) change(remove(game, [from, to]));
+    else setSel(null);
+  };
+  const lifted = place => !!drag.active && same(drag.active.from, place);
   const showHint = () => {
     const x = hint(game);
     if (!x) { setNote('No moves left.'); return; }
@@ -100,8 +110,11 @@ export default function PyramidGame() {
           if (!card) return null;
           const r = rowOf(i), c = i - indexOf(r, 0);
           const free = isFree(game, i);
+          const place = { type: 'pyr', i };
           return (
-            <div key={card.id} data-pyr={i} className="absolute" style={{ left: ((ROWS - 1 - r) / 2 + c) * (w + gap), top: r * h * 0.5, zIndex: r }}>
+            <div key={card.id} data-pyr={i} data-drop={free ? JSON.stringify(place) : undefined} {...drag.bind(place, canLift(place))}
+              className={`absolute ${free ? 'touch-none' : ''}`}
+              style={{ left: ((ROWS - 1 - r) / 2 + c) * (w + gap), top: r * h * 0.5, zIndex: r, ...(lifted(place) ? carried(drag) : {}) }}>
               <SCard card={card} w={w} dim={!free} plain={!free} mark={markFor({ type: 'pyr', i })} onClick={() => tap({ type: 'pyr', i })} />
             </div>
           );
@@ -125,7 +138,9 @@ export default function PyramidGame() {
           {waste.map((card, k) => {
             const top = k === waste.length - 1;
             return (
-              <div key={card.id} data-waste={top || undefined} className="absolute top-0" style={{ left: k * w * 0.3 }}>
+              <div key={card.id} data-waste={top || undefined} data-drop={top ? JSON.stringify({ type: 'waste' }) : undefined}
+                {...drag.bind({ type: 'waste' }, top && canLift({ type: 'waste' }))}
+                className={`absolute top-0 ${top ? 'touch-none' : ''}`} style={{ left: k * w * 0.3, ...(top && lifted({ type: 'waste' }) ? carried(drag) : {}) }}>
                 <SCard card={card} w={w} dim={!top} mark={top ? markFor({ type: 'waste' }) : null}
                   onClick={top ? () => tap({ type: 'waste' }) : undefined} />
               </div>
