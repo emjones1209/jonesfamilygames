@@ -95,7 +95,7 @@ function Burst({ reaction, you, players, name }) {
  */
 export function ReactionBursts({ reactions, you, players, nameOf }) {
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
+    <div className="fixed inset-0 z-[70] pointer-events-none overflow-hidden">
       <AnimatePresence>
         {reactions.map(r => (
           <Burst key={r.id} reaction={r} you={you ?? 0} players={players} name={r.seat === you ? 'You' : nameOf(r.seat)} />
@@ -109,7 +109,7 @@ export function ReactionBursts({ reactions, you, players, nameOf }) {
 /** `extra` goes at the bottom of the choices (e.g. a setting). */
 export function ReactionPicker({ choices, open, onToggle, onPick, extra }) {
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">
+    <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3">
       <AnimatePresence>
         {open && (
           <motion.div className="card-panel p-3 grid grid-cols-4 gap-2 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-7rem)] overflow-y-auto origin-bottom-right"
