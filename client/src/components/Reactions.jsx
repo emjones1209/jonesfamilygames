@@ -14,6 +14,8 @@ const EMOJI_FILES = {
   '👍': '1f44d', '😂': '1f602', '😮': '1f62e', '😬': '1f62c', '🥺': '1f97a', '🤦': '1f926',
   '🎉': '1f389', '👏': '1f44f', '😄': '1f604', '✨': '2728', '🙃': '1f643', '😭': '1f62d', '😎': '1f60e',
   '🤔': '1f914', '😱': '1f631', '🔥': '1f525', '🙈': '1f648', '🥳': '1f973',
+  '😅': '1f605', '😮‍💨': '1f62e-200d-1f4a8', '🤩': '1f929', '😴': '1f634', '😤': '1f624', '🙏': '1f64f',
+  '❤️': '2764', '🤞': '1f91e',
 };
 
 /** An emoji as a sharp picture (falling back to the font for any we haven't a picture of). */
@@ -109,7 +111,7 @@ export function ReactionPicker({ choices, open, onToggle, onPick, extra }) {
     <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">
       <AnimatePresence>
         {open && (
-          <motion.div className="card-panel p-3 grid grid-cols-4 gap-2 w-80 max-w-[calc(100vw-2rem)] origin-bottom-right"
+          <motion.div className="card-panel p-3 grid grid-cols-4 gap-2 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-7rem)] overflow-y-auto origin-bottom-right"
             initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.3, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 22 }}>
             {choices.map((r, i) => (
