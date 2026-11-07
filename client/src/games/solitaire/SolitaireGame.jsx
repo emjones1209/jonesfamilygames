@@ -8,7 +8,8 @@
  * once every card in the columns is face up, Auto-complete finishes the game.
  */
 import { useEffect, useState } from 'react';
-import { buildDeck, shuffle, SUITS, SUIT_SYMBOLS } from '../../utils/cardEngine';
+import { SUITS, SUIT_SYMBOLS } from '../../utils/cardEngine';
+import { winnableDeal } from './klondikeSolver';
 import { destinations, applyMove, runStart, turnStock, autoHomeStep, hint, isWon, positionKey } from './klondikeRules';
 import { autoStep, canAutoComplete, foundationCount } from './autoComplete';
 import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
@@ -19,12 +20,11 @@ import api from '../../utils/api';
 
 const COLS = 7;
 
+// Only deals that can be won (see klondikeSolver.js)
 function fresh() {
-  const deck = shuffle(buildDeck());
-  let i = 0;
-  const tableau = Array.from({ length: COLS }, (_, c) => Array.from({ length: c + 1 }, (_, r) => ({ ...deck[i++], faceUp: r === c })));
+  const { tableau, stock } = winnableDeal();
   return {
-    tableau, stock: deck.slice(i).map(c => ({ ...c, faceUp: false })), waste: [],
+    tableau, stock, waste: [],
     foundations: { spades: [], hearts: [], diamonds: [], clubs: [] }, moves: 0, started: Date.now(),
   };
 }

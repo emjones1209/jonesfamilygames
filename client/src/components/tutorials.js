@@ -9,7 +9,7 @@ export const TUTORIALS = {
     { emoji: '⭐', heading: 'Difficulty Levels', body: 'Easy: basic knowledge\nMedium: moderate challenge\nHard: deep expertise required (biblical scholars beware — these are tough!)' },
   ],
   solitaire: [
-    { emoji: '🃏', heading: 'Goal', body: 'Move all 52 cards to the four foundation piles, one per suit, from Ace up to King.' },
+    { emoji: '🃏', heading: 'Goal', body: 'Move all 52 cards to the four foundation piles, one per suit, from Ace up to King.\nEvery game is dealt so it can be won — but you\'ll still need to play it well!' },
     { emoji: '📐', heading: 'Tableau Rules', body: 'Build columns in descending order, alternating red/black colors. Only Kings may be placed on empty columns.' },
     { emoji: '👆', heading: 'Moving Cards', body: 'Tap a card to select it (highlighted), then tap the card or empty space you want to move it onto. Tap a selected card again to send it up to its foundation. Or drag-and-drop cards directly!' },
     { emoji: '🃏', heading: 'Stock Pile', body: 'Tap the face-down stock pile to flip cards to the waste. When stock is empty, tap it again to recycle the waste.' },
