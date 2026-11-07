@@ -49,3 +49,18 @@ export const secondsSince = t => Math.floor((Date.now() - t) / 1000);
 
 /** "1 move", "3 moves" */
 export const count = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** A setting kept on this device (in localStorage, if it can be): [value, setValue]. */
+export function useSetting(key, initial) {
+  const [value, setValue] = useState(() => {
+    try { const v = localStorage.getItem(key); return v == null ? initial : JSON.parse(v); } catch { return initial; }
+  });
+  const set = v => {
+    setValue(v);
+    try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* private mode */ }
+  };
+  return [value, set];
+}
+
+/** Whether cards nothing could still want go up to the foundations by themselves (Klondike and FreeCell share it). */
+export const useAutoHome = () => useSetting('solitaireAutoHome', true);

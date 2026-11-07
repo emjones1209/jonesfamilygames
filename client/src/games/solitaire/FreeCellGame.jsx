@@ -3,17 +3,18 @@
  *
  * Tap a card (with any run below it) to move it: up to its foundation when it can go, or
  * onto the only column it fits; when there's a choice, the places light up — tap one. Tap a
- * picked-up card again to send it to the best place. Cards nothing could still want go up
- * to the foundations by themselves, and once every column runs downwards, Auto-complete
- * finishes the game.
+ * picked-up card again to send it to the best place. Or drag cards where they're to go.
+ * Cards nothing could still want go up to the foundations by themselves (unless that's
+ * switched off), and once every column runs downwards, Auto-complete finishes the game.
  */
 import { useEffect, useState } from 'react';
 import { SUITS, SUIT_SYMBOLS } from '../../utils/cardEngine';
 import {
   newFreecell, runStart, move, destinations, autoHomeStep, canAutoComplete, finishStep, hint, isWon, homeCount, positionKey, CELLS, COLS,
 } from './freecellRules';
-import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
-import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
+import { SCard, Slot, SolitaireHeader, WinBox, AutoHomeToggle } from './SolitaireKit';
+import { useCardDrag, carried } from './useCardDrag';
+import { useBoardWidth, cardHeight, useNote, useHistory, useAutoHome, lessMotion, secondsSince, count } from './solitaireHelpers';
 import { CardCascade } from './CardCascade';
 import { Button } from '../../components/Button';
 import api from '../../utils/api';
@@ -31,6 +32,9 @@ export default function FreeCellGame() {
   const [spilled, setSpilled] = useState({});
   const [note, setNote] = useNote();
   const history = useHistory();
+  const [autoHome, setAutoHome] = useAutoHome();
+  // (Picking cards up by dragging shows where they can go, as a tap does)
+  const drag = useCardDrag({ onStart: f => { setSel(f); setShown(null); }, onDrop: (f, to) => drop(f, to) });
   const board = useBoardWidth(860);
 
   const gap = board < 500 ? 4 : 8;
@@ -51,10 +55,12 @@ export default function FreeCellGame() {
     api.post('/scores', { game: 'freecell', score: Math.max(0, 10000 - g.moves * 10), durationS: secondsSince(g.started) }).catch(() => {});
   };
 
-  // After each move: cards nothing could still want go up by themselves, one at a time
-  // (auto-complete sends up any card that fits). These count with the move for Undo.
+  // After each move: cards nothing could still want go up by themselves, one at a time, if that's
+  // switched on (auto-complete sends up any card that fits). These count with the move for Undo.
+  // (Not while cards are being dragged.)
+  const dragging = !!drag.active;
   useEffect(() => {
-    if (won) return;
+    if (won || dragging || (!auto && !autoHome)) return;
     const next = auto ? finishStep(game) : autoHomeStep(game);
     if (!next && !auto) return;
     const t = setTimeout(() => {
@@ -64,7 +70,7 @@ export default function FreeCellGame() {
     }, auto ? 90 : 160);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game, auto, won]);
+  }, [game, auto, won, autoHome, dragging]);
 
   const play = (from, idx, to) => {
     history.push(game);
@@ -110,6 +116,19 @@ export default function FreeCellGame() {
     if (destinations(game, sel.from, sel.idx).some(d => same(d, to))) play(sel.from, sel.idx, to);
     else setSel(null);
   };
+  // Drag cards (from a column, a cell or a foundation) to where they're to go
+  const canLift = (from, idx) => !auto && !won && (from.type !== 'col' || idx >= runStart(game.cols[from.i]))
+    && destinations(game, from, idx).length > 0;
+  const drop = ({ from, idx }, to) => {
+    if (to && !same(from, to) && destinations(game, from, idx).some(d => same(d, to))) play(from, idx, to);
+    else setSel(null);
+  };
+  const lifted = (place, idx) => !!drag.active && same(drag.active.from.from, place) && idx >= drag.active.from.idx;
+  // A card that can be dragged: in a wrapper that moves with the finger
+  const liftable = (place, idx, extra = {}) => {
+    const ok = canLift(place, idx);
+    return { className: ok ? 'touch-none' : '', ...drag.bind({ from: place, idx }, ok), style: { ...extra, ...(lifted(place, idx) ? carried(drag, idx) : {}) } };
+  };
   const showHint = () => {
     const x = hint(game, new Set([...history.states, game].map(positionKey)));   // (never back to a position you've had)
     if (!x) { setNote('No moves left. Try Undo, or start a new game.'); return; }
@@ -142,18 +161,22 @@ export default function FreeCellGame() {
         {Array.from({ length: CELLS }, (_, i) => {
           const c = game.cells[i];
           const place = { type: 'cell', i };
-          return c
-            ? <SCard key={`cell${i}`} card={c} w={w} mark={markFor(place, 0, true)} onClick={() => tap(place, 0)} />
-            : <Slot key={`cell${i}`} w={w} label="" mark={isTarget(place) ? (shown && same(shown.to, place) ? 'hint' : 'target') : null} onClick={() => tapPlace(place)} />;
+          return (
+            <div key={`cell${i}`} data-drop={JSON.stringify(place)}>
+              {c
+                ? <div {...liftable(place, 0)}><SCard card={c} w={w} mark={markFor(place, 0, true)} onClick={() => tap(place, 0)} /></div>
+                : <Slot w={w} label="" mark={isTarget(place) ? (shown && same(shown.to, place) ? 'hint' : 'target') : null} onClick={() => tapPlace(place)} />}
+            </div>
+          );
         })}
         {SUITS.map(suit => {
           const pile = game.home[suit];
           const left = pile.length - (spilled[`fc-${suit}`] ?? 0);
           const place = { type: 'home', suit };
           return (
-            <div key={suit} data-cascade={`fc-${suit}`} className={suit === SUITS[0] ? 'ml-2' : ''}>
+            <div key={suit} data-cascade={`fc-${suit}`} data-drop={JSON.stringify(place)} className={suit === SUITS[0] ? 'ml-2' : ''}>
               {left > 0
-                ? <SCard card={pile[left - 1]} w={w} mark={markFor(place, 0, true)} onClick={() => tap(place, 0)} />
+                ? <div {...liftable(place, 0)}><SCard card={pile[left - 1]} w={w} mark={markFor(place, 0, true)} onClick={() => tap(place, 0)} /></div>
                 : <Slot w={w} label={SUIT_SYMBOLS[suit]} mark={isTarget(place) ? 'target' : null} onClick={() => tapPlace(place)} />}
             </div>
           );
@@ -167,15 +190,18 @@ export default function FreeCellGame() {
           const step = stepFor(col.length);
           const place = { type: 'col', i };
           return (
-            <div key={i} data-column={i} className="relative" style={{ width: w, height: Math.max(h, (col.length - 1) * step + h) + h * 0.6 }}
+            <div key={i} data-column={i} data-drop={JSON.stringify(place)} className="relative" style={{ width: w, height: Math.max(h, (col.length - 1) * step + h) + h * 0.6 }}
               onClick={() => tapPlace(place)}>
               {!col.length && <Slot w={w} mark={isTarget(place) ? (shown && same(shown.to, place) ? 'hint' : 'target') : null} />}
-              {col.map((card, idx) => (
-                <div key={card.id} data-col={i} data-idx={idx} className="absolute left-0" style={{ top: idx * step, zIndex: idx }}
-                  onClick={e => { e.stopPropagation(); tap(place, idx); }}>
-                  <SCard card={card} w={w} mark={markFor(place, idx, idx === col.length - 1)} />
-                </div>
-              ))}
+              {col.map((card, idx) => {
+                const lift = liftable(place, idx, { top: idx * step, zIndex: idx });
+                return (
+                  <div key={card.id} data-col={i} data-idx={idx} {...lift} className={`absolute left-0 ${lift.className}`}
+                    onClick={e => { e.stopPropagation(); tap(place, idx); }}>
+                    <SCard card={card} w={w} mark={markFor(place, idx, idx === col.length - 1)} />
+                  </div>
+                );
+              })}
             </div>
           );
         })}
@@ -187,6 +213,7 @@ export default function FreeCellGame() {
           <Button variant="gold" className="text-sm animate-pulse" onClick={() => { history.push(game); setSel(null); setAuto(true); }}>✨ Auto-complete</Button>
         )}
       </div>
+      <AutoHomeToggle on={autoHome} onChange={setAutoHome} />
 
       {cascading && (
         <CardCascade piles={homes}
