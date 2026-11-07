@@ -14,6 +14,9 @@ const EMOJI_FILES = {
   '👍': '1f44d', '😂': '1f602', '😮': '1f62e', '😬': '1f62c', '🥺': '1f97a', '🤦': '1f926',
   '🎉': '1f389', '👏': '1f44f', '😄': '1f604', '✨': '2728', '🙃': '1f643', '😭': '1f62d', '😎': '1f60e',
   '🤔': '1f914', '😱': '1f631', '🔥': '1f525', '🙈': '1f648', '🥳': '1f973',
+  '😅': '1f605', '😮‍💨': '1f62e-200d-1f4a8', '🤩': '1f929', '😴': '1f634', '😤': '1f624', '🙏': '1f64f',
+  '❤️': '2764', '🤞': '1f91e',
+  '😏': '1f60f', '😜': '1f61c', '🥱': '1f971', '💅': '1f485', '👀': '1f440', '🧂': '1f9c2', '😈': '1f608', '🤫': '1f92b',
 };
 
 /** An emoji as a sharp picture (falling back to the font for any we haven't a picture of). */
@@ -92,7 +95,7 @@ function Burst({ reaction, you, players, name }) {
  */
 export function ReactionBursts({ reactions, you, players, nameOf }) {
   return (
-    <div className="fixed inset-0 z-50 pointer-events-none overflow-hidden">
+    <div className="fixed inset-0 z-[70] pointer-events-none overflow-hidden">
       <AnimatePresence>
         {reactions.map(r => (
           <Burst key={r.id} reaction={r} you={you ?? 0} players={players} name={r.seat === you ? 'You' : nameOf(r.seat)} />
@@ -106,10 +109,10 @@ export function ReactionBursts({ reactions, you, players, nameOf }) {
 /** `extra` goes at the bottom of the choices (e.g. a setting). */
 export function ReactionPicker({ choices, open, onToggle, onPick, extra }) {
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3">
+    <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-3">
       <AnimatePresence>
         {open && (
-          <motion.div className="card-panel p-3 grid grid-cols-4 gap-2 w-80 max-w-[calc(100vw-2rem)] origin-bottom-right"
+          <motion.div className="card-panel p-3 grid grid-cols-4 gap-2 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-7rem)] overflow-y-auto origin-bottom-right"
             initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.3, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 22 }}>
             {choices.map((r, i) => (

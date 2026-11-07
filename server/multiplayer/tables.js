@@ -121,8 +121,11 @@ const robotName = table => pickRobots(1, { taken: table.seats.filter(s => s?.typ
 const personalityAt = (table, seat) => (table.seats[seat]?.type === 'robot' ? robotNamed(table.seats[seat].name) : null);
 
 const REACTIONS = [
-  '👍', '😂', '🙃', '🤦', '😮', '😬', '🥺', '😭', '🤔', '😱', '🙈', '😎', '🎉', '🥳', '👏', '🔥',
-  'Nice!', 'Oops!', 'Ouch!', 'Good one!', 'Hurry up! 😄',
+  '👍', '😂', '🙃', '🤦', '😮', '😬', '😅', '😮‍💨', '🥺', '😭', '🤔', '😱', '🙈', '😤', '😴', '🤞',
+  '🙏', '😎', '🤩', '❤️', '🎉', '🥳', '👏', '🔥',
+  '😏', '😜', '🥱', '💅', '👀', '🧂', '😈', '🤫',
+  'Nice!', 'Oops!', 'Ouch!', 'Whew!', 'Good one!', 'So close!', 'Well played!', 'Hurry up! 😄',
+  'Too easy! 😎', 'Bring it on!', 'Is that all? 🥱', 'Watch and learn!',
 ];
 const LEVELS = ['easy', 'medium', 'hard'];
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ';        // no I, L or O (easily confused)
