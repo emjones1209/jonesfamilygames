@@ -13,7 +13,7 @@ export const TUTORIALS = {
     { emoji: '📐', heading: 'Tableau Rules', body: 'Build columns in descending order, alternating red/black colors. Only Kings may be placed on empty columns.' },
     { emoji: '👆', heading: 'Moving Cards', body: 'Tap a card to select it (highlighted), then tap the card or empty space you want to move it onto. Tap a selected card again to send it up to its foundation. Or drag-and-drop cards directly!' },
     { emoji: '🃏', heading: 'Stock Pile', body: 'Tap the face-down stock pile to flip cards to the waste. When stock is empty, tap it again to recycle the waste.' },
-    { emoji: '✨', heading: 'Auto-Move', body: 'Cards that nothing could still want go up to the foundations by themselves. Don\'t want that? Switch off "Auto-move to foundations" below the board.\nOnce every card in the columns is face up, the button becomes ✨ Auto-complete: tap it and the game plays itself out to the finish.' },
+    { emoji: '✨', heading: 'Auto-Move', body: 'Cards that nothing could still want go up to the foundations by themselves. Don\'t want that? Switch off "Auto-move to foundations" in the bottom right corner.\nOnce every card in the columns is face up, the button becomes ✨ Auto-complete: tap it and the game plays itself out to the finish.' },
   ],
   spider: [
     { emoji: '🕷️', heading: 'Goal', body: 'Two decks of cards in ten columns. Build runs of one suit from King down to Ace: a finished run leaves the table by itself. Clear all eight runs to win.' },
@@ -28,7 +28,7 @@ export const TUTORIALS = {
     { emoji: '📐', heading: 'Columns', body: 'Build the columns down in alternating colours (a red 6 on a black 7). Any card can go into an empty column.' },
     { emoji: '📥', heading: 'Free Cells', body: 'The four cells at the top left hold one card each, wherever you need to park it. Use them sparingly: they\'re what lets you move more cards at once.' },
     { emoji: '👆', heading: 'Moving Cards', body: 'Tap a card to move it: up to its foundation if it can go, or onto the only column it fits. If there\'s a choice, the places light up: tap one. Tap a picked-up card again to send it to the best place. Or drag cards where you want them.\nYou can move a run in order at once if there\'s room to shuffle it across: (empty free cells + 1), doubled for each empty column.' },
-    { emoji: '✨', heading: 'Help', body: 'Cards that nothing could still want go up to the foundations by themselves (switch off "Auto-move to foundations" below the board if you\'d rather move them yourself). Once every column runs downwards, ✨ Auto-complete finishes the game.\nTap the light bulb for a hint, and Undo as often as you like.' },
+    { emoji: '✨', heading: 'Help', body: 'Cards that nothing could still want go up to the foundations by themselves (switch off "Auto-move to foundations" in the bottom right corner if you\'d rather move them yourself). Once every column runs downwards, ✨ Auto-complete finishes the game.\nTap the light bulb for a hint, and Undo as often as you like.' },
   ],
   pyramid: [
     { emoji: '🔺', heading: 'Goal', body: 'Clear away the pyramid of 28 cards.' },

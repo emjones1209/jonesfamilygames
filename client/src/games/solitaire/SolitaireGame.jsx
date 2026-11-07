@@ -250,12 +250,12 @@ export default function SolitaireGame() {
       </div>
 
       {/* Once every card in the columns is face up, the game can finish itself */}
-      <div className="flex flex-col items-center gap-1 mt-2">
+      <div className="flex justify-center mt-2">
         {canAutoComplete(game) && !auto && !won && (
           <Button variant="gold" className="text-sm animate-pulse" onClick={() => { history.push(game); setSel(null); setShown(null); setAuto(true); }}>✨ Auto-complete</Button>
         )}
-        <AutoHomeToggle on={autoHome} onChange={setAutoHome} />
       </div>
+      <AutoHomeToggle on={autoHome} onChange={setAutoHome} />
 
       {cascading && (
         <CardCascade piles={SUITS.map(suit => ({ key: suit, cards: game.foundations[suit] }))}

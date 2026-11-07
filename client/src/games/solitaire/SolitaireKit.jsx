@@ -85,11 +85,12 @@ export function SolitaireHeader({ title, status, rulesGame, onUndo, canUndo, onR
   );
 }
 
-/** The switch for cards going up to the foundations by themselves. */
+/** The switch for cards going up to the foundations by themselves, kept in the bottom right corner of the screen. */
 export function AutoHomeToggle({ on, onChange }) {
   return (
     <button role="switch" aria-checked={on} onClick={() => onChange(!on)}
-      className="flex items-center gap-2 text-xs text-white/70 hover:text-white min-h-[40px] px-2">
+      style={{ bottom: 'calc(env(safe-area-inset-bottom) + 12px)', right: 'calc(env(safe-area-inset-right) + 12px)' }}
+      className="fixed z-30 flex items-center gap-2 text-xs text-white/80 hover:text-white min-h-[40px] px-3 rounded-full bg-green-950/80 shadow">
       <span className={`relative inline-block w-8 h-[18px] rounded-full transition-colors ${on ? 'bg-primary-500' : 'bg-white/20'}`}>
         <span className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all ${on ? 'left-[16px]' : 'left-[2px]'}`} />
       </span>
