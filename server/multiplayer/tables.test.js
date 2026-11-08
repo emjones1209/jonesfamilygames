@@ -12,7 +12,8 @@ process.env.JWT_SECRET = 'test-secret';
 const { socketAuth } = require('../middleware/auth');
 const { createTables, REACTIONS } = require('./tables');
 const engine = require('../../client/src/games/rook/rookEngine.js');
-const { COMPUTER_NAMES } = require('../../client/src/games/players.js');
+const { COMPUTER_NAMES, robotNamed } = require('../../client/src/games/players.js');
+const { moments, reactionsFor } = require('../../client/src/games/chatter.js');
 
 /** The robots' names at a table: each a different one of the computer players (picked at random). */
 function robotNames(seats) {
@@ -352,6 +353,8 @@ for (const [game, robots] of tablesToPlay) {
     const engine = engines[game];
     const done = v => (game === 'dice' ? v.phase === 'gameOver' : ['handOver', 'gameOver', 'show'].includes(v.phase));
     let sawSomething = false, passedHand = -1;
+    const views = [];                       // (every picture of the game we're sent, to see what the robots had to react to)
+    me.socket.on('mp:table', t => { if (t.view && t.view !== views.at(-1)) views.push(t.view); });
     me.socket.on('mp:table', t => setTimeout(() => {
       const v = t.view;
       if (!v) return;
@@ -377,11 +380,17 @@ for (const [game, robots] of tablesToPlay) {
     await until(() => done(me.table.view), 60000);
     assert.equal(sawSomething, false, `saw cards that should be hidden in ${game}`);
     assert.deepEqual(me.errors, []);
-    // The robots react to how it went (in these tests they always do; really, now and then)
-    if (game !== 'checkers' && game !== 'chess') {
-      await until(() => me.reactions.some(r => r.seat !== 0));
-      assert.ok(me.reactions.every(r => REACTIONS.includes(r.emoji)));
-    }
+    // The robots react to how it went (in these tests they always do; really, now and then) —
+    // whenever something happened worth reacting to: some hands have nothing (a tie, say, or
+    // a score that hardly moved), and then they rightly say nothing
+    const seats = me.table.seats;
+    const lastSaid = new Map();
+    const due = views.slice(1).some((v, i) => reactionsFor(moments(game, views[i], v), {
+      robots: seat => (seats[seat]?.type === 'robot' ? robotNamed(seats[seat].name) : null),
+      isPerson: seat => seats[seat]?.type === 'human', lastSaid, rng: () => 0,
+    }).length > 0);
+    if (due) await until(() => me.reactions.some(r => r.seat !== 0));
+    assert.ok(me.reactions.every(r => REACTIONS.includes(r.emoji)));
   });
 }
 
