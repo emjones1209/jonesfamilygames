@@ -9,7 +9,7 @@ import { RulesButton } from '../../components/RulesButton';
 import { useAuth } from '../../context/AuthContext';
 
 import {
-  ROWS, COLS, FLOWERS, SPECIAL_ICON, LEVELS,
+  ROWS, COLS, FLOWERS, SPECIAL_ICON, LEVELS, CHAPTERS,
   initBoard, getMatchGroups, fullCascade, trySwapBoard, hasValidMove, reshuffleBoard,
   loadReached, saveReached, reachedFromScores,
 } from './match3Logic';
@@ -227,33 +227,45 @@ export default function Match3Game() {
   const levelMap = mapOpen && (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
       onClick={() => setMapOpen(false)}>
-      <div className="bg-game-card rounded-2xl p-5 w-full max-w-sm shadow-xl" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-game-card rounded-2xl p-5 w-full max-w-sm shadow-xl flex flex-col max-h-[90dvh]"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-2">
           <h2 className="text-game-gold font-bold text-xl">🌱 Levels</h2>
           <button className="text-white/50 hover:text-white p-2" aria-label="Close levels"
             onClick={() => setMapOpen(false)}>✕</button>
         </div>
-        <div className="grid grid-cols-5 gap-2">
-          {LEVELS.map((lv, i) => {
-            const open = lv.id <= reached;
-            const won = lv.id < reached;
-            const here = i === lvlIdx && phase !== 'allDone';
-            return (
-              <button key={lv.id} disabled={!open} onClick={() => { movedYet.current = true; loadLevel(i); }}
-                aria-label={open ? `Level ${lv.id}${won ? ' (won)' : ''}` : `Level ${lv.id} (locked)`}
-                className={[
-                  'relative aspect-square rounded-xl font-bold text-lg flex items-center justify-center',
-                  !open ? 'bg-white/5 text-white/25 cursor-not-allowed'
-                    : here ? 'bg-game-gold text-game-bg ring-2 ring-game-gold'
-                    : 'bg-game-accent/50 text-white hover:bg-game-accent/70',
-                ].join(' ')}>
-                {open ? lv.id : '🔒'}
-                {won && <span className="absolute -top-1 -right-1 text-sm">🌸</span>}
-              </button>
-            );
-          })}
+        {/* Scrolls when the levels don't all fit, starting at the current one */}
+        <div className="overflow-y-auto -mx-2 px-2 pt-1">
+          {CHAPTERS.map(ch => (
+            <section key={ch.name} className="mb-3">
+              <h3 className="text-white/60 text-sm font-semibold mb-2">{ch.emoji} {ch.name}</h3>
+              <div className="grid grid-cols-5 gap-2">
+                {LEVELS.slice(ch.from - 1, ch.to).map(lv => {
+                  const i = lv.id - 1;
+                  const open = lv.id <= reached;
+                  const won = lv.id < reached;
+                  const here = i === lvlIdx && phase !== 'allDone';
+                  return (
+                    <button key={lv.id} disabled={!open}
+                      ref={here ? el => el?.scrollIntoView({ block: 'center' }) : undefined}
+                      onClick={() => { movedYet.current = true; loadLevel(i); }}
+                      aria-label={open ? `Level ${lv.id}${won ? ' (won)' : ''}` : `Level ${lv.id} (locked)`}
+                      className={[
+                        'relative aspect-square rounded-xl font-bold text-lg flex items-center justify-center',
+                        !open ? 'bg-white/5 text-white/25 cursor-not-allowed'
+                          : here ? 'bg-game-gold text-game-bg ring-2 ring-game-gold'
+                          : 'bg-game-accent/50 text-white hover:bg-game-accent/70',
+                      ].join(' ')}>
+                      {open ? lv.id : '🔒'}
+                      {won && <span className="absolute -top-1 -right-1 text-sm">🌸</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </div>
-        <p className="text-white/40 text-xs text-center mt-4">
+        <p className="text-white/40 text-xs text-center mt-2">
           Win a level to unlock the next one. Replay any level you've reached.
         </p>
       </div>

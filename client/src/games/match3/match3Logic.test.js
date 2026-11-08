@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   LEVELS, ROWS, COLS, FLOWERS, loadReached, saveReached, reachedFromScores,
-  blastArea, getMatchGroups, processMatches,
+  blastArea, getMatchGroups, processMatches, CHAPTERS,
 } from './match3Logic';
 
 describe('Garden Match levels', () => {
@@ -24,11 +24,22 @@ describe('Garden Match levels', () => {
     }
   });
 
-  it('ask for a little more each time among the score levels', () => {
+  it('ask for a little more each time among the score levels of a chapter', () => {
+    // Levels 1-20 are the first chapter, then each ten is a new one, which starts
+    // a little easier than the last ended
+    const chapter = id => (id <= 20 ? 0 : Math.ceil((id - 20) / 10));
     const score = LEVELS.filter(lv => lv.target.type === 'score');
     for (let i = 1; i < score.length; i++) {
+      if (chapter(score[i].id) !== chapter(score[i - 1].id)) continue;
       expect(score[i].target.value).toBeGreaterThanOrEqual(score[i - 1].target.value);
     }
+  });
+
+  it('go up to level 50, every one in exactly one chapter', () => {
+    expect(LEVELS).toHaveLength(50);
+    let next = 1;
+    for (const ch of CHAPTERS) { expect(ch.from).toBe(next); next = ch.to + 1; }
+    expect(next).toBe(LEVELS.length + 1);
   });
 });
 
