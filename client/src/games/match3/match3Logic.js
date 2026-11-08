@@ -3,7 +3,8 @@
 // ── Theme ─────────────────────────────────────────────────────────────────────
 export const ROWS = 7, COLS = 7;
 export const FLOWERS = ['🌸', '🌻', '🌺', '🌼', '💐', '🌷'];
-export const SPECIAL_ICON = { row: '🌟', col: '💧', area: '☀️' };
+// Bigger matches make bigger blasts: star 7 squares, sun 9, rainbow 13
+export const SPECIAL_ICON = { row: '🌟', area: '☀️', cross: '🌈' };
 
 // ── Levels ────────────────────────────────────────────────────────────────────
 // Tuned by simulating a player who makes the biggest match they can see (no
@@ -112,14 +113,15 @@ const BLAST_POINTS = 60;   // per flower cleared by a special's blast
 
 const specialAt = (b, key) => { const [r, c] = key.split(',').map(Number); return b[r][c].special; };
 
-/** Squares a special clears: its row (star), column (drop) or 3×3 area (sun). Never blockers. */
-function blastArea(b, r, c, kind) {
+/** Squares a special clears: its row (star), 3×3 area (sun) or its row and
+ *  column together (rainbow). Never blockers. */
+export function blastArea(b, r, c, kind) {
   const cells = [];
   const add = (rr, cc) => {
     if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS && !b[rr][cc].isBlocker) cells.push(`${rr},${cc}`);
   };
-  if (kind === 'row') for (let cc = 0; cc < COLS; cc++) add(r, cc);
-  if (kind === 'col') for (let rr = 0; rr < ROWS; rr++) add(rr, c);
+  if (kind === 'row' || kind === 'cross') for (let cc = 0; cc < COLS; cc++) add(r, cc);
+  if (kind === 'cross') for (let rr = 0; rr < ROWS; rr++) if (rr !== r) add(rr, c);
   if (kind === 'area') for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) add(r + dr, c + dc);
   return cells;
 }
@@ -174,7 +176,7 @@ export function processMatches(b, groups, targetType = -1) {
     const key = `${mid.r},${mid.c}`;
     const origType = b[mid.r][mid.c].type;
     if (g.len >= 5 && toRemove.has(key)) {
-      nb[mid.r][mid.c] = mkCell(origType, 'col'); toRemove.delete(key);
+      nb[mid.r][mid.c] = mkCell(origType, 'cross'); toRemove.delete(key);
     } else if (g.len === 4 && toRemove.has(key)) {
       nb[mid.r][mid.c] = mkCell(origType, 'row'); toRemove.delete(key);
     }

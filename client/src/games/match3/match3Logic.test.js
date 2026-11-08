@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { LEVELS, ROWS, COLS, FLOWERS, loadReached, saveReached, reachedFromScores } from './match3Logic';
+import {
+  LEVELS, ROWS, COLS, FLOWERS, loadReached, saveReached, reachedFromScores,
+  blastArea, getMatchGroups, processMatches,
+} from './match3Logic';
 
 describe('Garden Match levels', () => {
   it('are numbered 1, 2, 3, … in order', () => {
@@ -72,5 +75,39 @@ describe('Garden Match progress', () => {
       { metadata: 'garbage' },
     ])).toBe(6);
     expect(reachedFromScores([{ metadata: { level: LEVELS.length } }])).toBe(LEVELS.length + 1);
+  });
+});
+
+describe('Garden Match special tiles', () => {
+  // A board with no matches: flower types cycle so no three line up
+  let id = 0;
+  const board = () => Array.from({ length: ROWS }, (_, r) =>
+    Array.from({ length: COLS }, (_, c) => ({ id: ++id, type: (r * 2 + c) % 3 + (r % 2) * 3, special: null, isBlocker: false })));
+
+  it('blast bigger the harder the match: star 7, sun 9, rainbow 13 squares', () => {
+    const b = board();
+    expect(blastArea(b, 3, 3, 'row')).toHaveLength(7);
+    expect(blastArea(b, 3, 3, 'area')).toHaveLength(9);
+    const cross = blastArea(b, 3, 3, 'cross');
+    expect(cross).toHaveLength(13);
+    expect(new Set(cross).size).toBe(13);
+  });
+
+  it('never blast blockers', () => {
+    const b = board();
+    b[3][0] = { ...b[3][0], type: -1, isBlocker: true };
+    expect(blastArea(b, 3, 3, 'cross')).not.toContain('3,0');
+  });
+
+  it('a match of 4 makes a star, a match of 5 makes a rainbow', () => {
+    for (const [len, kind] of [[4, 'row'], [5, 'cross']]) {
+      const b = board();
+      expect(getMatchGroups(b)).toHaveLength(0);
+      for (let c = 0; c < len; c++) b[6][c] = { ...b[6][c], type: 5 };
+      const groups = getMatchGroups(b);
+      expect(groups).toHaveLength(1);
+      const made = processMatches(b, groups).board[6].filter(cl => cl.special);
+      expect(made.map(cl => cl.special)).toEqual([kind]);
+    }
   });
 });
