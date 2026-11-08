@@ -9,8 +9,9 @@ export const SPECIAL_ICON = { row: '🌟', area: '☀️', cross: '🌈' };
 // ── Levels ────────────────────────────────────────────────────────────────────
 // Tuned by simulating a player who makes the biggest match they can see (no
 // peeking at which flowers will drop in next). That player wins about 99% of the
-// first levels, easing down to about half of level 20. Clear-the-blocker levels
-// are a little easier than their neighbours, as a breather.
+// first levels, easing to about half of level 20. After that, each chapter of
+// ten starts nearer 70% and builds up, ending at about 40% by level 50.
+// Clear-the-blocker levels are a little easier than their neighbours, as a breather.
 export const LEVELS = [
   // Levels 1-5: Sprouts — short and gentle, almost everyone wins
   { id:  1, target: { type: 'score',   value:  3900 }, moves: 12 },
@@ -50,6 +51,77 @@ export const LEVELS = [
     obstacles: [{ row: 0, col: 0 }, { row: 0, col: 6 }, { row: 3, col: 3 }, { row: 6, col: 0 }, { row: 6, col: 6 }] },
   { id: 20, target: { type: 'score',   value: 12900 }, moves: 22,
     obstacles: [{ row: 1, col: 1 }, { row: 1, col: 3 }, { row: 1, col: 5 }, { row: 3, col: 0 }, { row: 3, col: 6 }, { row: 5, col: 1 }, { row: 5, col: 3 }, { row: 5, col: 5 }] },
+  // Levels 21-30: The Orchard — each new chapter starts a little easier than the last one ended
+  { id: 21, target: { type: 'score',   value: 10300 }, moves: 20,
+    obstacles: [{ row: 3, col: 3 }] },
+  { id: 22, target: { type: 'collect', value:    16, flowerType: 4 }, moves: 20,
+    obstacles: [{ row: 0, col: 0 }, { row: 0, col: 6 }, { row: 6, col: 0 }, { row: 6, col: 6 }] },
+  { id: 23, target: { type: 'score',   value: 10900 }, moves: 20,
+    obstacles: [{ row: 1, col: 3 }, { row: 3, col: 1 }, { row: 3, col: 5 }, { row: 5, col: 3 }] },
+  { id: 24, target: { type: 'clear',   value:    12 }, moves: 12,
+    obstacles: [{ row: 2, col: 2 }, { row: 2, col: 3 }, { row: 2, col: 4 }, { row: 3, col: 2 }, { row: 3, col: 4 }, { row: 4, col: 2 }, { row: 4, col: 3 }, { row: 4, col: 4 }, { row: 1, col: 3 }, { row: 3, col: 1 }, { row: 3, col: 5 }, { row: 5, col: 3 }] },
+  { id: 25, target: { type: 'collect', value:    17, flowerType: 5 }, moves: 20,
+    obstacles: [{ row: 2, col: 3 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 4 }, { row: 4, col: 3 }] },
+  { id: 26, target: { type: 'score',   value: 12000 }, moves: 22,
+    obstacles: [{ row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 4 }, { row: 2, col: 5 }, { row: 4, col: 1 }, { row: 4, col: 2 }, { row: 4, col: 4 }, { row: 4, col: 5 }] },
+  { id: 27, target: { type: 'collect', value:    20, flowerType: 0 }, moves: 22,
+    obstacles: [{ row: 1, col: 3 }, { row: 3, col: 1 }, { row: 3, col: 5 }, { row: 5, col: 3 }] },
+  { id: 28, target: { type: 'clear',   value:     8 }, moves: 13,
+    obstacles: [{ row: 1, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 5 }, { row: 2, col: 5 }, { row: 4, col: 1 }, { row: 5, col: 1 }, { row: 4, col: 5 }, { row: 5, col: 5 }] },
+  { id: 29, target: { type: 'score',   value: 12400 }, moves: 22,
+    obstacles: [{ row: 1, col: 1 }, { row: 1, col: 5 }, { row: 2, col: 2 }, { row: 2, col: 4 }, { row: 3, col: 3 }, { row: 4, col: 2 }, { row: 4, col: 4 }, { row: 5, col: 1 }, { row: 5, col: 5 }] },
+  { id: 30, target: { type: 'collect', value:    20, flowerType: 1 }, moves: 22,
+    obstacles: [{ row: 2, col: 2 }, { row: 2, col: 3 }, { row: 2, col: 4 }, { row: 3, col: 2 }, { row: 3, col: 4 }, { row: 4, col: 2 }, { row: 4, col: 3 }, { row: 4, col: 4 }] },
+  // Levels 31-40: The Greenhouse
+  { id: 31, target: { type: 'score',   value: 10600 }, moves: 20,
+    obstacles: [{ row: 0, col: 0 }, { row: 0, col: 6 }, { row: 6, col: 0 }, { row: 6, col: 6 }] },
+  { id: 32, target: { type: 'collect', value:    19, flowerType: 2 }, moves: 22,
+    obstacles: [{ row: 1, col: 1 }, { row: 1, col: 3 }, { row: 1, col: 5 }, { row: 3, col: 1 }, { row: 3, col: 3 }, { row: 3, col: 5 }, { row: 5, col: 1 }, { row: 5, col: 3 }, { row: 5, col: 5 }] },
+  { id: 33, target: { type: 'clear',   value:     9 }, moves: 16,
+    obstacles: [{ row: 0, col: 3 }, { row: 3, col: 0 }, { row: 3, col: 6 }, { row: 6, col: 3 }, { row: 1, col: 1 }, { row: 1, col: 5 }, { row: 5, col: 1 }, { row: 5, col: 5 }, { row: 3, col: 3 }] },
+  { id: 34, target: { type: 'score',   value: 12400 }, moves: 22,
+    obstacles: [{ row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 4 }, { row: 3, col: 5 }, { row: 3, col: 6 }] },
+  { id: 35, target: { type: 'collect', value:    19, flowerType: 3 }, moves: 22,
+    obstacles: [{ row: 2, col: 1 }, { row: 2, col: 2 }, { row: 2, col: 4 }, { row: 2, col: 5 }, { row: 4, col: 1 }, { row: 4, col: 2 }, { row: 4, col: 4 }, { row: 4, col: 5 }] },
+  { id: 36, target: { type: 'score',   value: 12600 }, moves: 22,
+    obstacles: [{ row: 1, col: 2 }, { row: 1, col: 4 }, { row: 2, col: 1 }, { row: 2, col: 5 }, { row: 4, col: 1 }, { row: 4, col: 5 }, { row: 5, col: 2 }, { row: 5, col: 4 }] },
+  { id: 37, target: { type: 'clear',   value:    13 }, moves: 13,
+    obstacles: [{ row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 4 }, { row: 3, col: 5 }, { row: 3, col: 6 }, { row: 1, col: 3 }, { row: 5, col: 3 }, { row: 1, col: 1 }, { row: 1, col: 5 }, { row: 5, col: 1 }, { row: 5, col: 5 }] },
+  { id: 38, target: { type: 'collect', value:    22, flowerType: 4 }, moves: 24,
+    obstacles: [{ row: 1, col: 1 }, { row: 2, col: 1 }, { row: 1, col: 5 }, { row: 2, col: 5 }, { row: 4, col: 1 }, { row: 5, col: 1 }, { row: 4, col: 5 }, { row: 5, col: 5 }] },
+  { id: 39, target: { type: 'score',   value: 14100 }, moves: 24,
+    obstacles: [{ row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 4 }, { row: 1, col: 5 }, { row: 3, col: 0 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 4 }, { row: 3, col: 6 }, { row: 5, col: 1 }, { row: 5, col: 2 }, { row: 5, col: 4 }, { row: 5, col: 5 }] },
+  { id: 40, target: { type: 'collect', value:    23, flowerType: 5 }, moves: 24,
+    obstacles: [{ row: 1, col: 1 }, { row: 1, col: 5 }, { row: 2, col: 2 }, { row: 2, col: 4 }, { row: 3, col: 3 }, { row: 4, col: 2 }, { row: 4, col: 4 }, { row: 5, col: 1 }, { row: 5, col: 5 }] },
+  // Levels 41-50: The Royal Garden
+  { id: 41, target: { type: 'score',   value: 11400 }, moves: 22,
+    obstacles: [{ row: 2, col: 2 }, { row: 2, col: 3 }, { row: 2, col: 4 }, { row: 3, col: 2 }, { row: 3, col: 4 }, { row: 4, col: 2 }, { row: 4, col: 3 }, { row: 4, col: 4 }] },
+  { id: 42, target: { type: 'collect', value:    21, flowerType: 0 }, moves: 24,
+    obstacles: [{ row: 0, col: 0 }, { row: 0, col: 3 }, { row: 0, col: 6 }, { row: 3, col: 0 }, { row: 3, col: 6 }, { row: 6, col: 0 }, { row: 6, col: 3 }, { row: 6, col: 6 }] },
+  { id: 43, target: { type: 'clear',   value:    17 }, moves: 17,
+    obstacles: [{ row: 1, col: 1 }, { row: 1, col: 3 }, { row: 1, col: 5 }, { row: 3, col: 1 }, { row: 3, col: 3 }, { row: 3, col: 5 }, { row: 5, col: 1 }, { row: 5, col: 3 }, { row: 5, col: 5 }, { row: 1, col: 2 }, { row: 1, col: 4 }, { row: 2, col: 1 }, { row: 2, col: 5 }, { row: 4, col: 1 }, { row: 4, col: 5 }, { row: 5, col: 2 }, { row: 5, col: 4 }] },
+  { id: 44, target: { type: 'score',   value: 13800 }, moves: 24,
+    obstacles: [{ row: 1, col: 1 }, { row: 1, col: 3 }, { row: 1, col: 5 }, { row: 3, col: 1 }, { row: 3, col: 3 }, { row: 3, col: 5 }, { row: 5, col: 1 }, { row: 5, col: 3 }, { row: 5, col: 5 }] },
+  { id: 45, target: { type: 'collect', value:    21, flowerType: 1 }, moves: 24,
+    obstacles: [{ row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 4 }, { row: 3, col: 5 }, { row: 3, col: 6 }, { row: 1, col: 3 }, { row: 5, col: 3 }] },
+  { id: 46, target: { type: 'clear',   value:    15 }, moves: 17,
+    obstacles: [{ row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 4 }, { row: 1, col: 5 }, { row: 3, col: 0 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 4 }, { row: 3, col: 6 }, { row: 5, col: 1 }, { row: 5, col: 2 }, { row: 5, col: 4 }, { row: 5, col: 5 }, { row: 0, col: 3 }, { row: 6, col: 3 }] },
+  { id: 47, target: { type: 'score',   value: 14600 }, moves: 24,
+    obstacles: [{ row: 0, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 2 }, { row: 4, col: 4 }, { row: 5, col: 5 }, { row: 6, col: 6 }, { row: 0, col: 6 }, { row: 1, col: 5 }, { row: 2, col: 4 }, { row: 4, col: 2 }, { row: 5, col: 1 }, { row: 6, col: 0 }] },
+  { id: 48, target: { type: 'collect', value:    25, flowerType: 2 }, moves: 26,
+    obstacles: [{ row: 1, col: 1 }, { row: 1, col: 2 }, { row: 1, col: 4 }, { row: 1, col: 5 }, { row: 3, col: 0 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 4 }, { row: 3, col: 6 }, { row: 5, col: 1 }, { row: 5, col: 2 }, { row: 5, col: 4 }, { row: 5, col: 5 }] },
+  { id: 49, target: { type: 'score',   value: 15700 }, moves: 26,
+    obstacles: [{ row: 3, col: 0 }, { row: 3, col: 1 }, { row: 3, col: 2 }, { row: 3, col: 3 }, { row: 3, col: 4 }, { row: 3, col: 5 }, { row: 3, col: 6 }, { row: 1, col: 3 }, { row: 5, col: 3 }] },
+  { id: 50, target: { type: 'collect', value:    26, flowerType: 3 }, moves: 26,
+    obstacles: [{ row: 0, col: 0 }, { row: 1, col: 1 }, { row: 2, col: 2 }, { row: 4, col: 4 }, { row: 5, col: 5 }, { row: 6, col: 6 }, { row: 0, col: 6 }, { row: 1, col: 5 }, { row: 2, col: 4 }, { row: 4, col: 2 }, { row: 5, col: 1 }, { row: 6, col: 0 }] },
+];
+
+/** Groups of levels, shown as sections in the level picker */
+export const CHAPTERS = [
+  { name: 'The Garden',       emoji: '🌱', from:  1, to: 20 },
+  { name: 'The Orchard',      emoji: '🍎', from: 21, to: 30 },
+  { name: 'The Greenhouse',   emoji: '🪴', from: 31, to: 40 },
+  { name: 'The Royal Garden', emoji: '👑', from: 41, to: 50 },
 ];
 
 // ── Board logic ───────────────────────────────────────────────────────────────
