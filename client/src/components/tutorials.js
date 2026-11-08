@@ -217,5 +217,6 @@ export const TUTORIALS = {
     { emoji: '✨', heading: 'Special Tiles', body: '🌟 Match 4 in a line = star (clears its row)\n💧 Match 5 in a line = water drop (clears its column)\n☀️ Match in an L or T shape = sun (clears a 3×3 area)\n\nA special keeps its flower, with a badge in the corner — match it with that flower to set it off. Everything a blast clears scores points, and a blast that hits another special sets it off too!' },
     { emoji: '🪨', heading: 'Blockers', body: 'Brown blocker tiles can\'t be moved or matched. Make a match right next to one to break it.' },
     { emoji: '🎯', heading: 'Level Goals', body: 'Score: reach the target score\nCollect: match a certain flower enough times\nClear: break all the blockers\n\nIf no moves are possible, the board reshuffles for you.' },
+    { emoji: '🗺️', heading: 'Levels', body: 'The game remembers how far you\'ve got, so you carry on where you left off — even on another device.\nTap the level name at the top to replay any level you\'ve reached. Win a level to unlock the next one.' },
   ],
 };
