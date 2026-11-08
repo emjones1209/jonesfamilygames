@@ -127,7 +127,7 @@ export function chooseCard({ legal, trick, seat, difficulty, queenPlayed = false
     const masters = legal.filter(memory.isMaster);
     const moonAt = 14 - Math.round(bold * 6), spare = bold >= 0.8 ? 2 : bold <= -0.5 ? 0 : 1;
     if (pointsTaken[seat] === totalSoFar && totalSoFar >= moonAt && masters.length >= legal.length - spare) {
-      if (trick.length === 0) return highest(masters);
+      if (trick.length === 0 && masters.length) return highest(masters);     // (a daredevil may have none to lead)
       const winners = legal.filter(c => wouldWin(trick, c, seat));
       if (winners.length) return highest(winners);
     }

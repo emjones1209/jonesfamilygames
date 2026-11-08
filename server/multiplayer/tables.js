@@ -217,6 +217,13 @@ function createTables(io, {
           apply(table, engine.robotAction(table.state, seat, table.level, personalityAt(table, seat) ?? undefined));
         } catch (e) {
           console.error(`Robot move refused at table ${table.code} (${table.game}):`, e.message);   // never take the server down
+          // …nor leave the table stuck waiting on a robot that will never move: it makes a plainer move instead
+          if (table.level === 'easy' || !waitingOn(engine, table.state).includes(seat)) return;
+          try {
+            apply(table, engine.robotAction(table.state, seat, 'easy'));
+          } catch (e2) {
+            console.error(`Easy robot move refused too at table ${table.code} (${table.game}):`, e2.message);
+          }
         }
       }, robotMs * (GAMES[table.game].pace ?? 1));
     } else if (s.phase === 'playing' && s.table?.status === 'collecting') {

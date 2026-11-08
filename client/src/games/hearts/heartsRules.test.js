@@ -86,6 +86,16 @@ describe('Hearts AI', () => {
   const pick = (legal, trick, extra = {}) =>
     chooseCard({ legal: cards(legal), trick: trickOf(...trick), seat: 0, difficulty: 'medium', ...extra }).id;
 
+  it('a daredevil going for the moon, with no sure winner to lead, still leads a card', () => {
+    // Every point so far is ours, and a bold robot goes for the moon with two cards to spare —
+    // but neither card in hand is sure to win (this used to throw, and froze the table)
+    const card = chooseCard({
+      legal: cards('8C JC'), trick: [], seat: 0, difficulty: 'hard', bold: 1,
+      pointsTaken: [10, 0, 0, 0], memory: { isMaster: () => false },
+    });
+    expect(['8-clubs', 'J-clubs']).toContain(card.id);
+  });
+
   it('ducks under the current winner with its highest safe card', () => {
     expect(pick('KD 9D 3D', [['10D', 1]])).toBe('9-diamonds');
   });
