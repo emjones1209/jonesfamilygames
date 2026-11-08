@@ -3,12 +3,12 @@ import { solve, canWin, deal, winnableDeal } from './klondikeSolver';
 import { applyMove, turnStock, isWon } from './klondikeRules';
 import { autoStep, canAutoComplete } from './autoComplete';
 
-const game = d => ({ ...d, waste: [], foundations: { spades: [], hearts: [], diamonds: [], clubs: [] }, moves: 0 });
+const game = (d, drawCount = 1) => ({ ...d, waste: [], foundations: { spades: [], hearts: [], diamonds: [], clubs: [] }, moves: 0, drawCount });
 const card = (rank, suit, faceUp = true) => ({ id: `${rank}-${suit}`, rank, suit, faceUp });
 
 /** Play the solver's way to win in the real game (turning the stock to reach a card), then auto-complete. */
-function playOut(d, steps) {
-  let g = game(d);
+function playOut(d, steps, drawCount = 1) {
+  let g = game(d, drawCount);
   for (const { card: c, to } of steps) {
     let from = null;
     for (let turns = 0; !from; turns++) {
@@ -32,7 +32,7 @@ function playOut(d, steps) {
     }
     g = applyMove(g, { from, to: dest });
   }
-  expect(canAutoComplete(g) || isWon(g)).toBe(true);
+  if (drawCount === 1) expect(canAutoComplete(g) || isWon(g)).toBe(true);
   for (let next; (next = autoStep(g));) { const { kind: _k, ...rest } = next; g = rest; }
   return g;
 }
@@ -50,6 +50,27 @@ describe('Klondike solver', () => {
     expect(found).toBeGreaterThan(10);
   });
 
+  it('finds ways to win turning three cards at a time, played out in the game', () => {
+    let found = 0;
+    for (let n = 0; n < 40; n++) {
+      const d = deal();
+      const steps = solve(d, { draw: 3 });
+      if (!steps) continue;
+      found++;
+      expect(isWon(playOut(d, steps, 3))).toBe(true);
+    }
+    expect(found).toBeGreaterThan(8);
+  });
+
+  it('only plays the cards three at a time can reach', () => {
+    // A column wanting the A♠ and nothing else: the A♠ is 2nd in the stock, so turning three
+    // at a time never brings it to the top — until another card is taken out (none can be)
+    const tableau = [[card('2', 'hearts', false), card('K', 'clubs')], [], [], [], [], [], []];
+    const stock = [card('Q', 'diamonds'), card('A', 'spades'), card('9', 'clubs')].map(c => ({ ...c, faceUp: false }));
+    expect(canWin({ tableau, stock }, { draw: 1 })).toBe(true);
+    expect(canWin({ tableau, stock }, { draw: 3 })).toBe(false);
+  });
+
   it("says a deal can't be won when nothing can move", () => {
     // An Ace (or 2) face down under every column's top card, and no top card goes anywhere
     const under = [['A', 'spades'], ['A', 'clubs'], ['A', 'hearts'], ['A', 'diamonds'], ['2', 'spades'], ['2', 'clubs'], ['2', 'hearts']];
@@ -58,6 +79,10 @@ describe('Klondike solver', () => {
     expect(canWin({ tableau, stock: [] })).toBe(false);
     // (A 4♦ from the stock can go on a black 5, but that turns nothing over)
     expect(canWin({ tableau, stock: [card('4', 'diamonds', false)] })).toBe(false);
+  });
+
+  it('deals games it can win turning three at a time', () => {
+    for (let n = 0; n < 3; n++) expect(canWin(winnableDeal({ draw: 3 }), { draw: 3 })).toBe(true);
   });
 
   it('deals games it can win', () => {

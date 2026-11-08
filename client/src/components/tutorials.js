@@ -12,7 +12,7 @@ export const TUTORIALS = {
     { emoji: '🃏', heading: 'Goal', body: 'Move all 52 cards to the four foundation piles, one per suit, from Ace up to King.\nEvery game is dealt so it can be won — but you\'ll still need to play it well!' },
     { emoji: '📐', heading: 'Tableau Rules', body: 'Build columns in descending order, alternating red/black colors. Only Kings may be placed on empty columns.' },
     { emoji: '👆', heading: 'Moving Cards', body: 'Tap a card to select it (highlighted), then tap the card or empty space you want to move it onto. Tap a selected card again to send it up to its foundation. Or drag-and-drop cards directly!' },
-    { emoji: '🃏', heading: 'Stock Pile', body: 'Tap the face-down stock pile to flip cards to the waste. When stock is empty, tap it again to recycle the waste.' },
+    { emoji: '🃏', heading: 'Stock Pile', body: 'Tap the face-down stock pile to flip cards to the waste. When stock is empty, tap it again to recycle the waste.\nIn Settings (the gear) you can turn three cards at a time instead of one: the harder, classic game, where only the top card of the three can be played.' },
     { emoji: '✨', heading: 'Auto-Move', body: 'Cards that nothing could still want go up to the foundations by themselves. Don\'t want that? Switch off "Auto-move to foundations" in the bottom right corner.\nOnce every card in the columns is face up, the button becomes ✨ Auto-complete: tap it and the game plays itself out to the finish.' },
   ],
   spider: [
