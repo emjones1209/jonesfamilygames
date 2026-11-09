@@ -10,7 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 
 import {
   ROWS, COLS, FLOWERS, SPECIAL_ICON, LEVELS, CHAPTERS,
-  initBoard, getMatchGroups, fullCascade, trySwapBoard, hasValidMove, reshuffleBoard,
+  initBoard, getMatchGroups, fullCascade, trySwapBoard, hasValidMove, reshuffleBoard, findHint,
   loadReached, saveReached, reachedFromScores,
 } from './match3Logic';
 
@@ -18,6 +18,7 @@ import {
 const isAdj = (r1, c1, r2, c2) => Math.abs(r1-r2) + Math.abs(c1-c2) === 1;
 const getDiff = id => id <= 7 ? 'easy' : id <= 14 ? 'medium' : 'hard';
 const STEP_MS = 260;   // pause between animation stages
+const HINT_MS = 5000;  // how long the player can sit still before a move is suggested
 const SWIPE_PX = 18;   // how far a finger must move for a swipe
 
 // Tile size: as big as fits (up to 72px) in both the screen's width and its
@@ -60,6 +61,10 @@ export default function Match3Game() {
   const [collected,    setCollected]    = useState(0);
   const [blockersLeft, setBlockersLeft] = useState(0);
   const [jokeOpen,     setJokeOpen]     = useState(false);
+  // A suggested move, remembered with the board and touch it was worked out
+  // for, so it disappears as soon as the board changes or the player touches it
+  const [hint,         setHint]         = useState(null);  // {r1,c1,r2,c2,board,touch}
+  const [touches,      setTouches]      = useState(0);     // counts presses on the board
   const [locked,       setLocked]       = useState(false); // prevent input during cascade
   const [notice,       setNotice]       = useState('');
 
@@ -116,6 +121,27 @@ export default function Match3Game() {
     if (t.type === 'clear'   && bl  <= 0)       return true;
     return false;
   }, [level]);
+
+  // Sitting still? After a few seconds, suggest a move. The wait starts again
+  // after every move, every press on the board and every change of screen.
+  useEffect(() => {
+    if (!board || phase !== 'playing' || locked || jokeOpen || mapOpen || sel) return;
+    const t = setTimeout(() => {
+      const h = findHint(board, level.target);
+      if (h) setHint({ ...h, board, touch: touches });
+    }, HINT_MS);
+    return () => clearTimeout(t);
+  }, [board, phase, locked, jokeOpen, mapOpen, sel, level, touches]);
+
+  const showHint = hint && hint.board === board && hint.touch === touches
+    && phase === 'playing' && !locked && !jokeOpen && !mapOpen && !sel;
+  /** Which way a hinted tile should nudge (toward its partner), or null. */
+  const hintNudge = (r, c) => {
+    if (!showHint) return null;
+    if (hint.r1 === r && hint.c1 === c) return { dr: hint.r2 - r, dc: hint.c2 - c };
+    if (hint.r2 === r && hint.c2 === c) return { dr: hint.r1 - r, dc: hint.c1 - c };
+    return null;
+  };
 
   /** Swap two neighbouring tiles (after a tap-tap or a swipe): they slide into
    *  each other's places, then any matches play out — or they slide back. */
@@ -199,12 +225,14 @@ export default function Match3Game() {
   const swipe = useRef(null);       // { r, c, x, y, swiped }
   const onTilePointerDown = (e, r, c) => {
     swipe.current = { r, c, x: e.clientX, y: e.clientY, swiped: false };
+    setTouches(n => n + 1);   // hides any hint and starts the wait again
     // Keep getting moves past the tile's edge (can throw if the pointer is already gone)
     try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* not essential */ }
   };
   const onTilePointerMove = e => {
     const s = swipe.current;
-    if (!s || s.swiped) return;
+    // A mouse moving with no button held is just pointing, not swiping
+    if (!s || s.swiped || e.buttons === 0) return;
     const dx = e.clientX - s.x, dy = e.clientY - s.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_PX) return;
     s.swiped = true;
@@ -357,6 +385,7 @@ export default function Match3Game() {
           row.map((cl, c) => {
             const isSel = sel?.r === r && sel?.c === c;
             const cleared = !cl.isBlocker && cl.type < 0;
+            const nudge = hintNudge(r, c);
             return (
               <motion.button
                 key={cl.id}
@@ -367,8 +396,14 @@ export default function Match3Game() {
                 onClick={() => onTileClick(r, c)}
                 // New tiles drop in from above; cleared spots pop a sparkle
                 initial={cleared ? { scale: 0.3, opacity: 0 } : { y: -28, opacity: 0 }}
-                animate={{ scale: isSel ? 1.15 : 1, opacity: 1, y: 0 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                // A hinted pair rocks gently toward each other
+                animate={nudge
+                  ? { scale: [1, 1.1, 1], opacity: 1, x: [0, nudge.dc * 6, 0], y: [0, nudge.dr * 6, 0] }
+                  : { scale: isSel ? 1.15 : 1, opacity: 1, x: 0, y: 0 }}
+                transition={nudge
+                  ? { duration: 0.8, repeat: Infinity, repeatDelay: 0.4, ease: 'easeInOut' }
+                  : { type: 'spring', stiffness: 400, damping: 28 }}
+                aria-description={nudge ? 'Hint: swap this flower' : undefined}
                 className={[
                     'relative flex items-center justify-center rounded-lg md:rounded-xl',
                   'transition-colors duration-100 active:opacity-70',
@@ -376,6 +411,8 @@ export default function Match3Game() {
                     ? 'bg-amber-900/60 cursor-not-allowed'
                     : isSel
                       ? 'bg-game-gold/40 ring-2 ring-game-gold'
+                      : nudge
+                        ? 'bg-game-accent/60 ring-2 ring-white/80 cursor-pointer'
                       : cl.special
                         ? 'bg-game-accent/60 ring-2 ring-yellow-300/70 cursor-pointer'   // specials glow
                         : 'bg-game-accent/40 hover:bg-game-accent/60 cursor-pointer',
