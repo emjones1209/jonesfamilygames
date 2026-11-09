@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   LEVELS, ROWS, COLS, FLOWERS, loadReached, saveReached, reachedFromScores,
-  blastArea, getMatchGroups, processMatches, CHAPTERS,
+  blastArea, getMatchGroups, processMatches, CHAPTERS, findHint, trySwapBoard,
 } from './match3Logic';
 
 describe('Garden Match levels', () => {
@@ -120,5 +120,47 @@ describe('Garden Match special tiles', () => {
       const made = processMatches(b, groups).board[6].filter(cl => cl.special);
       expect(made.map(cl => cl.special)).toEqual([kind]);
     }
+  });
+});
+
+describe('Garden Match hints', () => {
+  let id = 0;
+  // A board where flowers never line up and no swap makes a match
+  const stuckBoard = () => Array.from({ length: ROWS }, (_, r) =>
+    Array.from({ length: COLS }, (_, c) => ({ id: ++id, type: (r * 2 + c) % 3 + (r % 2) * 3, special: null, isBlocker: false })));
+  const set = (b, cells, type) => cells.forEach(([r, c]) => { b[r][c] = { ...b[r][c], type }; });
+  // Plant moves: 🌷 (4) along the top makes 3 when (0,2)↔(1,2) swap;
+  // 💐 (5) along the bottom makes 3 (or 5) when (5,2)↔(6,2) swap
+  const plantTop = b => set(b, [[0, 0], [0, 1]], 4);
+  const plantBottom = (b, five) => { set(b, [[6, 0], [6, 1], [5, 2], ...(five ? [[6, 3], [6, 4]] : [])], 5); };
+  const swapOf = h => [h.r1, h.c1, h.r2, h.c2];
+
+  it('finds nothing on a board with no moves', () => {
+    expect(findHint(stuckBoard())).toBeNull();
+  });
+
+  it('suggests the swap that makes a match', () => {
+    const b = stuckBoard(); plantBottom(b);
+    expect(getMatchGroups(b)).toHaveLength(0);
+    const h = findHint(b);
+    expect(Math.abs(h.r1 - h.r2) + Math.abs(h.c1 - h.c2)).toBe(1);   // neighbours
+    expect(getMatchGroups(trySwapBoard(b, ...swapOf(h)))).not.toHaveLength(0);
+  });
+
+  it('prefers the bigger match when going for points', () => {
+    const b = stuckBoard(); plantTop(b); plantBottom(b, true);
+    expect(getMatchGroups(b)).toHaveLength(0);
+    expect(swapOf(findHint(b))).toEqual([5, 2, 6, 2]);
+  });
+
+  it('goes for the flower being collected', () => {
+    const b = stuckBoard(); plantTop(b); plantBottom(b, true);
+    expect(swapOf(findHint(b, { type: 'collect', flowerType: 4 }))).toEqual([0, 2, 1, 2]);
+  });
+
+  it('never moves a blocker', () => {
+    const b = stuckBoard(); plantBottom(b);
+    b[5][2] = { ...b[5][2], type: -1, isBlocker: true };
+    expect(findHint(b)).toBeNull();
   });
 });

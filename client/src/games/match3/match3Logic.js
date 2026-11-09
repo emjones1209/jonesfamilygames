@@ -327,6 +327,30 @@ export function hasValidMove(b) {
   return false;
 }
 
+/** A move to suggest when the player is stuck: the swap whose own matches do
+ *  most for the level's goal (collect that flower, break blockers, or score),
+ *  judged only by what's on the board, as a player would see it. Ties go to
+ *  the first found, top-left. Null if there is no move. */
+export function findHint(b, target = { type: 'score' }) {
+  const ft = target.type === 'collect' ? target.flowerType : -1;
+  let best = null, bestValue = -1;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (b[r][c].isBlocker) continue;
+    for (const [r2, c2] of [[r, c + 1], [r + 1, c]]) {
+      if (r2 >= ROWS || c2 >= COLS || b[r2][c2].isBlocker) continue;
+      const swapped = trySwapBoard(b, r, c, r2, c2);
+      const groups = getMatchGroups(swapped);
+      if (!groups.length) continue;
+      const res = processMatches(swapped, groups, ft);
+      const value = target.type === 'collect' ? res.collected * 10000 + res.score
+        : target.type === 'clear' ? res.blockersRemoved * 10000 + res.score
+        : res.score;
+      if (value > bestValue) { bestValue = value; best = { r1: r, c1: c, r2, c2 }; }
+    }
+  }
+  return best;
+}
+
 /** Rearrange the existing tiles (blockers stay put) into a layout with no
  *  ready-made matches and at least one valid move. */
 export function reshuffleBoard(b) {
