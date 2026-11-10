@@ -35,8 +35,8 @@ describe('Garden Match levels', () => {
     }
   });
 
-  it('go up to level 50, every one in exactly one chapter', () => {
-    expect(LEVELS).toHaveLength(50);
+  it('go up to level 100, every one in exactly one chapter', () => {
+    expect(LEVELS).toHaveLength(100);
     let next = 1;
     for (const ch of CHAPTERS) { expect(ch.from).toBe(next); next = ch.to + 1; }
     expect(next).toBe(LEVELS.length + 1);
