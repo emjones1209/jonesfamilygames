@@ -25,7 +25,7 @@ export default function TriPeaksGame() {
   const [note, setNote] = useNote();
   const history = useHistory();
   // Drag an uncovered card onto the waste
-  const drag = useCardDrag({ onDrop: (i, to) => { if (to?.type === 'waste') tap(i); } });
+  const drag = useCardDrag({ onDrop: (i, to) => to?.type === 'waste' && tap(i) });
   const board = useBoardWidth(900);
 
   const gap = board < 500 ? 3 : 6;
@@ -53,8 +53,8 @@ export default function TriPeaksGame() {
   const undo = () => { const last = history.pop(); if (last) { setGame(last); setShown(null); } };
 
   const tap = i => {
-    if (won || !isFree(game, i)) return;
-    if (canPlay(game, i)) { change(play(game, i)); return; }
+    if (won || !isFree(game, i)) return false;
+    if (canPlay(game, i)) { change(play(game, i)); return true; }
     const top = game.waste.at(-1);
     setNote(`Play a card one higher or lower than the ${top.rank}.`);
   };

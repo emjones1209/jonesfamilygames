@@ -117,11 +117,12 @@ export default function FreeCellGame() {
     else setSel(null);
   };
   // Drag cards (from a column, a cell or a foundation) to where they're to go
-  const canLift = (from, idx) => !auto && !won && (from.type !== 'col' || idx >= runStart(game.cols[from.i]))
-    && destinations(game, from, idx).length > 0;
+  // (A card, or a run in order, can always be picked up; if it's dropped where it can't go, it slides back)
+  const canLift = (from, idx) => !auto && !won && (from.type !== 'col' || idx >= runStart(game.cols[from.i]));
   const drop = ({ from, idx }, to) => {
-    if (to && !same(from, to) && destinations(game, from, idx).some(d => same(d, to))) play(from, idx, to);
-    else setSel(null);
+    if (to && !same(from, to) && destinations(game, from, idx).some(d => same(d, to))) { play(from, idx, to); return true; }
+    setSel(null);
+    return false;
   };
   const lifted = (place, idx) => !!drag.active && same(drag.active.from.from, place) && idx >= drag.active.from.idx;
   // A card that can be dragged: in a wrapper that moves with the finger
