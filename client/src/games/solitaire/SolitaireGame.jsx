@@ -155,10 +155,12 @@ export default function SolitaireGame() {
     else setSel(null);
   };
   // Drag cards (from the waste, a column, or a foundation) to where they're to go
-  const canLift = from => !auto && !won && destinations(game, from).length > 0;
+  // (Any card that's face up can be picked up; if it's dropped where it can't go, it slides back)
+  const canLift = () => !auto && !won;
   const drop = (from, to) => {
-    if (to && !same(from, to) && destinations(game, from).some(d => same(d, to))) play(from, to);
-    else setSel(null);
+    if (to && !same(from, to) && destinations(game, from).some(d => same(d, to))) { play(from, to); return true; }
+    setSel(null);
+    return false;
   };
   const lifted = (place, rowIdx) => !!drag.active && same(drag.active.from, place)
     && (place.type !== 'tableau' || rowIdx >= drag.active.from.rowIdx);

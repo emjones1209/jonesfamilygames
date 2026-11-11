@@ -109,11 +109,12 @@ export default function SpiderGame() {
     else setSel(null);
   };
   // Drag cards (a run of one suit) onto another column
-  const canLift = (from, idx) => !won && game.tableau[from][idx].faceUp && idx >= runStart(game.tableau[from])
-    && destinations(game, from, idx).length > 0;
+  // (A run of one suit can always be picked up; if it's dropped where it can't go, it slides back)
+  const canLift = (from, idx) => !won && game.tableau[from][idx].faceUp && idx >= runStart(game.tableau[from]);
   const drop = ({ from, idx }, to) => {
-    if (to && to.col !== from && destinations(game, from, idx).includes(to.col)) change(move(game, from, idx, to.col));
-    else setSel(null);
+    if (to && to.col !== from && destinations(game, from, idx).includes(to.col)) { change(move(game, from, idx, to.col)); return true; }
+    setSel(null);
+    return false;
   };
   const showHint = () => {
     const h2 = hint(game, new Set([...history.states, game].map(positionKey)));   // (not back to where you've been)

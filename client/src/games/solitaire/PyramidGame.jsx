@@ -78,8 +78,9 @@ export default function PyramidGame() {
   // Drag a card onto one that makes 13 with it
   const canLift = place => !won && (place.type === 'waste' ? game.waste.length > 0 : isFree(game, place.i));
   const drop = (from, to) => {
-    if (to && !same(from, to) && canRemove(game, [from, to])) change(remove(game, [from, to]));
-    else setSel(null);
+    if (to && !same(from, to) && canRemove(game, [from, to])) { change(remove(game, [from, to])); return true; }
+    setSel(null);
+    return false;
   };
   const lifted = place => !!drag.active && same(drag.active.from, place);
   const showHint = () => {

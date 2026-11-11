@@ -7,13 +7,17 @@
  * `onStart(from)` is called (the game picks the cards up, so the places they can go light
  * up) and `drag.active` is { from, dx, dy } — the game moves the cards it's carrying by
  * dx, dy. Let go and `onDrop(from, place)` is called with the place under the finger (or
- * under the middle of the card), or null over nowhere. The click that follows a drag is
- * swallowed, so a drop isn't also taken as a tap.
+ * under the middle of the card), or null over nowhere. `onDrop` returns true if the cards were
+ * played; otherwise they slide back to where they came from (`drag.active.back` is true while
+ * they do, and `dx`, `dy` go back to 0). The click that follows a drag is swallowed, so a drop
+ * isn't also taken as a tap.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lessMotion } from './solitaireHelpers';
 
 const START_AFTER = 6;        // px a press moves before it's a drag
 const CLICK_AFTER_MS = 400;   // how long after a drop clicks are ignored
+const BACK_MS = 180;          // how long cards take to slide back after a drop that didn't play
 
 /** The place marked by data-drop at a point on screen, or null. */
 function placeAt(x, y) {
@@ -37,7 +41,7 @@ export function useCardDrag({ onStart, onDrop }) {
   }, []);
 
   useEffect(() => {
-    let frame = 0;
+    let frame = 0, backTimer = 0;
     const move = e => {
       const p = press.current;
       if (!p || e.pointerId !== p.id) return;
@@ -46,6 +50,7 @@ export function useCardDrag({ onStart, onDrop }) {
         if (Math.hypot(dx, dy) < START_AFTER) return;
         p.started = true;
         p.box = p.el.getBoundingClientRect();
+        clearTimeout(backTimer);
         callbacks.current.onStart?.(p.from);
       }
       cancelAnimationFrame(frame);
@@ -58,18 +63,21 @@ export function useCardDrag({ onStart, onDrop }) {
       cancelAnimationFrame(frame);
       if (!p.started) return;                     // (just a tap: the click handles it)
       droppedAt.current = Date.now();
-      setActive(null);
-      if (e.type === 'pointercancel') { callbacks.current.onDrop(p.from, null); return; }
       const dx = e.clientX - p.x, dy = e.clientY - p.y;
-      const place = placeAt(e.clientX, e.clientY)
-        ?? placeAt(p.box.left + p.box.width / 2 + dx, p.box.top + p.box.height / 2 + dy);
-      callbacks.current.onDrop(p.from, place);
+      const place = e.type === 'pointercancel' ? null
+        : placeAt(e.clientX, e.clientY) ?? placeAt(p.box.left + p.box.width / 2 + dx, p.box.top + p.box.height / 2 + dy);
+      const played = callbacks.current.onDrop(p.from, place);
+      if (played || lessMotion()) { setActive(null); return; }
+      // Nowhere to go: the cards slide back to where they were picked up from
+      setActive({ from: p.from, dx: 0, dy: 0, back: true });
+      backTimer = setTimeout(() => setActive(a => (a?.back ? null : a)), BACK_MS);
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', end);
     window.addEventListener('pointercancel', end);
     return () => {
       cancelAnimationFrame(frame);
+      clearTimeout(backTimer);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);
@@ -91,9 +99,13 @@ export function useCardDrag({ onStart, onDrop }) {
   };
 }
 
-/** Style for a card being carried: moved with the finger, on top, and not in the way of what's under it. */
+/**
+ * Style for a card being carried: moved with the finger, on top, and not in the way of what's
+ * under it (and sliding home again after a drop that didn't play).
+ */
 export const carried = (drag, depth = 0) => ({
   transform: `translate(${drag.active.dx}px, ${drag.active.dy}px)`,
+  transition: drag.active.back ? `transform ${BACK_MS}ms ease-out` : 'none',
   zIndex: 1000 + depth,
   pointerEvents: 'none',
 });
