@@ -199,7 +199,7 @@ describe('Garden Match stars, combos and bonuses', () => {
     expect(isComboSwap(b, 3, 3, 2, 3)).toBe(false);
     expect(hasValidMove(b)).toBe(true);
     const res = playMove(b, 3, 3, 3, 4);
-    expect(res.cheers[0]).toBe('Big Cross!');
+    expect(cleared({ board: res.steps[0] })).toBe(33);   // three rows and three columns
     expect(res.totalScore).toBeGreaterThan(0);
     // With no specials, a swap that makes no match does nothing
     expect(playMove(board(), 0, 0, 0, 1)).toBeNull();
@@ -207,13 +207,13 @@ describe('Garden Match stars, combos and bonuses', () => {
 
   it('combos clear more the bigger the specials', () => {
     const b = board();
-    const size = (k1, k2) => comboBlast(b, 3, 3, k1, k2).cells.length;
+    const size = (k1, k2) => comboBlast(b, 3, 3, k1, k2).length;
     expect(size('row', 'col')).toBe(13);          // a row and a column
     expect(size('row', 'area')).toBe(33);         // three rows and three columns
     expect(size('area', 'area')).toBe(25);        // 5×5
     expect(size('cross', 'area')).toBe(37);       // three rows, three columns and 5×5's corners
     expect(size('cross', 'cross')).toBe(ROWS * COLS);
-    expect(comboBlast(b, 3, 3, 'area', 'row').name).toBe(comboBlast(b, 3, 3, 'row', 'area').name);
+    expect(comboBlast(b, 3, 3, 'area', 'row').sort()).toEqual(comboBlast(b, 3, 3, 'row', 'area').sort());
   });
 
   it('the swapped specials are used up by the combo, not set off alone', () => {
@@ -235,9 +235,9 @@ describe('Garden Match stars, combos and bonuses', () => {
       let calls = 0;
       Math.random = () => (calls++ < 3 ? 0 : ((calls % 5) + 1) / 6 + 0.01);
       const res = fullCascade(b);
-      expect(res.cheers.filter(Boolean)[0]).toBe('Lovely!');
-      // Wave 1 alone would be 300; later waves make it far more
-      expect(res.totalScore).toBeGreaterThan(300 * 2);
+      expect(res.steps.length).toBeGreaterThanOrEqual(4);   // at least two waves
+      // Wave 1 alone would be 300; the 🌸 wave scores at least 300 × 2
+      expect(res.totalScore).toBeGreaterThanOrEqual(300 + 300 * 2);
     } finally { Math.random = real; }
   });
 
@@ -248,7 +248,6 @@ describe('Garden Match stars, combos and bonuses', () => {
     const bonus = leftoverBonus(b, 3);
     expect(bonus.steps[0].flat().filter(cl => cl.special)).toHaveLength(3);
     expect(bonus.totalScore).toBeGreaterThanOrEqual(3 * 500);
-    expect(bonus.cheers[0]).toBe('Bonus blooms!');
   });
 });
 
