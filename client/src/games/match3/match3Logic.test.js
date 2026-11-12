@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   LEVELS, ROWS, COLS, FLOWERS, loadReached, saveReached, reachedFromScores,
   blastArea, getMatchGroups, processMatches, CHAPTERS, findHint, trySwapBoard,
+  LAYOUTS, layoutObstacles, parseLevelTable,
 } from './match3Logic';
 
 describe('Garden Match levels', () => {
@@ -25,9 +26,8 @@ describe('Garden Match levels', () => {
   });
 
   it('ask for a little more each time among the score levels of a chapter', () => {
-    // Levels 1-20 are the first chapter, then each ten is a new one, which starts
-    // a little easier than the last ended
-    const chapter = id => (id <= 20 ? 0 : Math.ceil((id - 20) / 10));
+    // Each chapter starts a little easier than the last ended
+    const chapter = id => CHAPTERS.findIndex(ch => id >= ch.from && id <= ch.to);
     const score = LEVELS.filter(lv => lv.target.type === 'score');
     for (let i = 1; i < score.length; i++) {
       if (chapter(score[i].id) !== chapter(score[i - 1].id)) continue;
@@ -35,11 +35,37 @@ describe('Garden Match levels', () => {
     }
   });
 
-  it('go up to level 100, every one in exactly one chapter', () => {
-    expect(LEVELS).toHaveLength(100);
+  it('go up to level 500, every one in exactly one chapter', () => {
+    expect(LEVELS).toHaveLength(500);
     let next = 1;
     for (const ch of CHAPTERS) { expect(ch.from).toBe(next); next = ch.to + 1; }
     expect(next).toBe(LEVELS.length + 1);
+  });
+});
+
+describe('Garden Match layouts', () => {
+  it('are pictures of the 7×7 board with at least one blocker', () => {
+    for (const [name, rows] of Object.entries(LAYOUTS)) {
+      expect(rows, name).toHaveLength(ROWS);
+      rows.forEach(line => expect(line, name).toMatch(new RegExp(`^[.#]{${COLS}}$`)));
+      expect(layoutObstacles(name).length, name).toBeGreaterThan(0);
+    }
+  });
+
+  it('turn into blocker squares, and a level table into levels', () => {
+    expect(layoutObstacles('corners')).toEqual([
+      { row: 0, col: 0 }, { row: 0, col: 6 }, { row: 3, col: 3 }, { row: 6, col: 0 }, { row: 6, col: 6 },
+    ]);
+    expect(parseLevelTable(`
+      7 score:900     20 corners
+      8 collect:12:3  21 corners
+      9 clear         9 corners
+    `)).toEqual([
+      { id: 7, target: { type: 'score', value: 900 }, moves: 20, obstacles: layoutObstacles('corners') },
+      { id: 8, target: { type: 'collect', value: 12, flowerType: 3 }, moves: 21, obstacles: layoutObstacles('corners') },
+      { id: 9, target: { type: 'clear', value: 5 }, moves: 9, obstacles: layoutObstacles('corners') },
+    ]);
+    expect(() => layoutObstacles('nope')).toThrow();
   });
 });
 
