@@ -13,6 +13,7 @@ import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
 import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
 import { CardCascade } from './CardCascade';
+import { RunCollect } from './RunCollect';
 import api from '../../utils/api';
 
 const SUIT_KEY = 'spiderSuits';
@@ -29,6 +30,7 @@ export default function SpiderGame() {
   const [won, setWon] = useState(false);
   const [cascading, setCascading] = useState(false);
   const [spilled, setSpilled] = useState({});      // run → cards bounced off it
+  const [collecting, setCollecting] = useState([]); // runs just finished, flying off the table: { key, cards, fallback }
   const [note, setNote] = useNote();
   const history = useHistory();
   // (Picking cards up by dragging shows where they can go, as a tap does)
@@ -46,7 +48,32 @@ export default function SpiderGame() {
     return () => clearTimeout(t);
   }, [shown]);
 
+  // The runs a change finishes, with where each card was on screen (to fly them from there)
+  const finishedRuns = next => {
+    if (next.done.length <= game.done.length || lessMotion()) return [];
+    const left = new Set(next.tableau.flat().map(c => c.id));
+    const gone = [...game.tableau.flat(), ...game.stock].filter(c => !left.has(c.id) && !next.stock.some(s => s.id === c.id));
+    const stock = document.querySelector('[data-stock]')?.getBoundingClientRect();
+    const fallback = stock ? { left: stock.left, top: stock.top } : { left: window.innerWidth / 2, top: window.innerHeight };
+    const rectOf = id => {
+      const r = document.querySelector(`[data-card="${CSS.escape(id)}"]`)?.getBoundingClientRect();
+      return r ? { left: r.left, top: r.top } : null;
+    };
+    return next.done.slice(game.done.length).map((suit, k) => {
+      const i = game.done.length + k;
+      // (Two runs of one suit finished at once: each takes one card of each rank)
+      const cards = RANKS.map(rank => {
+        const at = gone.findIndex(c => c.suit === suit && c.rank === rank);
+        const card = at >= 0 ? gone.splice(at, 1)[0] : { id: `${rank}-${suit}-x${i}`, rank, suit };
+        return { card: { ...card, faceUp: true }, rect: rectOf(card.id) };
+      }).reverse();                                  // (King first)
+      return { key: `run${i}`, cards, fallback };
+    });
+  };
+
   const change = next => {
+    const runsDone = finishedRuns(next);
+    if (runsDone.length) setCollecting(c => [...c, ...runsDone]);
     history.push(game);
     setGame(next);
     setSel(null);
@@ -62,7 +89,7 @@ export default function SpiderGame() {
   const restart = (n = suits) => {
     setGame(fresh(n));
     history.clear();
-    setSel(null); setShown(null); setWon(false); setCascading(false); setSpilled({});
+    setSel(null); setShown(null); setWon(false); setCascading(false); setSpilled({}); setCollecting([]);
   };
   const chooseSuits = n => {
     if (n === suits) return;
@@ -71,7 +98,7 @@ export default function SpiderGame() {
     setSuits(n);
     restart(n);
   };
-  const undo = () => { const last = history.pop(); if (last) { setGame(last); setSel(null); setShown(null); } };
+  const undo = () => { const last = history.pop(); if (last) { setGame(last); setSel(null); setShown(null); setCollecting([]); } };
 
   const dealRow = () => {
     const why = whyNoDeal(game);
@@ -161,7 +188,7 @@ export default function SpiderGame() {
         ))}
       </div>
       <div className="flex items-end justify-between mb-2" style={{ minHeight: h }}>
-        <div onClick={dealRow} className="relative cursor-pointer" style={{ width: w + 4 * Math.min(deals, 5), height: h }}
+        <div onClick={dealRow} data-stock className="relative cursor-pointer" style={{ width: w + 4 * Math.min(deals, 5), height: h }}
           aria-label={`Deal a row (${deals} left)`}>
           {deals > 0 ? Array.from({ length: deals }, (_, i) => (
             <div key={i} className="absolute top-0" style={{ left: i * 4 }}>
@@ -175,8 +202,9 @@ export default function SpiderGame() {
           <div className="flex">
             {runs.length ? runs.map((run, i) => {
               const left = run.cards.length - (spilled[run.key] ?? 0);
+              const arriving = collecting.some(c => c.key === run.key);   // (the cards are still on their way)
               return (
-                <div key={run.key} data-cascade={run.key} style={{ marginLeft: i ? -w * 0.6 : 0 }}>
+                <div key={run.key} data-cascade={run.key} style={{ marginLeft: i ? -w * 0.6 : 0, visibility: arriving ? 'hidden' : undefined }}>
                   {left > 0 ? <SCard card={run.cards[left - 1]} w={w} /> : <Slot w={w} />}
                 </div>
               );
@@ -202,7 +230,7 @@ export default function SpiderGame() {
                 const ok = canLift(from, idx);
                 const lifted = drag.active && drag.active.from.from === from && idx >= drag.active.from.idx;
                 return (
-                  <div key={card.id} data-col={from} data-idx={idx} className={`absolute left-0 ${ok ? 'touch-none' : ''}`} {...drag.bind({ from, idx }, ok)}
+                  <div key={card.id} data-card={card.id} data-col={from} data-idx={idx} className={`absolute left-0 ${ok ? 'touch-none' : ''}`} {...drag.bind({ from, idx }, ok)}
                     style={{ top: tops[idx], zIndex: idx, ...(lifted ? carried(drag, idx) : {}) }}
                     onClick={e => { e.stopPropagation(); tapCard(from, idx); }}>
                     <SCard card={card} w={w} mark={mark} />
@@ -214,7 +242,11 @@ export default function SpiderGame() {
         })}
       </div>
 
-      {cascading && (
+      {collecting.map(c => (
+        <RunCollect key={c.key} cards={c.cards} w={w} target={c.key} fallback={c.fallback}
+          onDone={() => setCollecting(cs => cs.filter(x => x.key !== c.key))} />
+      ))}
+      {cascading && !collecting.length && (
         <CardCascade piles={runs}
           onLaunch={key => setSpilled(sp => ({ ...sp, [key]: (sp[key] ?? 0) + 1 }))}
           onDone={() => setCascading(false)} />
