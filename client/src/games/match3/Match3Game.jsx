@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Map as MapIcon } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Button } from '../../components/Button';
 import { DadJokeModal } from '../../components/DadJokeModal';
 import api from '../../utils/api';
@@ -67,7 +67,6 @@ export default function Match3Game() {
   const [touches,      setTouches]      = useState(0);     // counts presses on the board
   const [locked,       setLocked]       = useState(false); // prevent input during cascade
   const [notice,       setNotice]       = useState('');
-  const [cheer,        setCheer]        = useState(null);  // {text, key}: a call-out over the board
 
   // Pending animation timers, cancelled when a level (re)loads or we leave
   const timers = useRef([]);
@@ -94,7 +93,6 @@ export default function Match3Game() {
     setSel(null);
     setPhase('playing');
     setLocked(false);
-    setCheer(null);
   }, []);
 
   // Carry on from the furthest level reached on this device…
@@ -145,17 +143,9 @@ export default function Match3Game() {
     return null;
   };
 
-  /** Show each board in turn, a beat apart, calling out any cheers (combos,
-   *  chains, cascades) as their stage plays. */
-  const cheerSeq = useRef(0);
-  const playSteps = useCallback((steps, cheers, delay = 0) => {
-    const batch = ++cheerSeq.current;
-    steps.forEach((step, i) => later(() => {
-      setBoard(step);
-      if (cheers[i]) setCheer({ text: cheers[i], key: `${batch}-${i}`, batch });
-    }, delay + STEP_MS * (i + 1)));
-    // Fade this batch's call-out a little after its last stage (a later batch's stays)
-    later(() => setCheer(ch => (ch?.batch === batch ? null : ch)), delay + STEP_MS * (steps.length + 3));
+  /** Show each board in turn, a beat apart. */
+  const playSteps = useCallback((steps, delay = 0) => {
+    steps.forEach((step, i) => later(() => setBoard(step), delay + STEP_MS * (i + 1)));
   }, []);
 
   /** Swap two neighbouring tiles (after a tap-tap or a swipe): they slide into
@@ -183,7 +173,7 @@ export default function Match3Game() {
     const newMoves    = movesLeft - 1;
 
     // Play the cascade: matches sparkle away, tiles fall, new ones drop in
-    playSteps(res.steps, res.cheers);
+    playSteps(res.steps);
 
     later(() => {
       setScore(newScore);
@@ -193,7 +183,7 @@ export default function Match3Game() {
       if (isComplete(newScore, newCollect, newBlockers)) {
         // Won: any moves left over go off as bonus stars, then the joke
         const bonus = leftoverBonus(res.board, newMoves);
-        playSteps(bonus.steps, bonus.cheers, STEP_MS * 2);
+        playSteps(bonus.steps, STEP_MS * 2);
         later(() => {
           setScore(newScore + bonus.totalScore);
           setJokeOpen(true);
@@ -458,19 +448,6 @@ export default function Match3Game() {
             );
           })
         )}
-        {/* Combos, chains and cascades get a call-out over the board */}
-        <AnimatePresence>
-          {cheer && (
-            <motion.div key={cheer.key} role="status"
-              className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
-              initial={{ scale: 0.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 1.3, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 18 }}>
-              <span className="rounded-full bg-black/70 px-5 py-2 text-game-gold font-extrabold text-3xl shadow-lg">
-                {cheer.text}
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
       <p className={`text-xs text-center ${notice ? 'text-game-gold font-semibold' : 'text-white/30'}`}>

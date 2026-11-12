@@ -831,8 +831,8 @@ export function isComboSwap(b, r1, c1, r2, c2) {
   return !!(a && z && !a.isBlocker && !z.isBlocker && a.special && z.special);
 }
 
-/** What two specials swapped together make, and the squares it clears around
- *  (r, c), where they meet:
+/** The squares two specials swapped together clear around (r, c), where they
+ *  meet:
  *   🌟+🌟 its row and column   🌟+☀️ three rows and three columns
  *   ☀️+☀️ a 5×5 square          🌈+🌟 / 🌈+☀️ three rows, three columns and a 5×5 square
  *   🌈+🌈 the whole board */
@@ -850,13 +850,12 @@ export function comboBlast(b, r, c, k1, k2) {
     }
   };
   const square = size => { for (let dr = -size; dr <= size; dr++) for (let dc = -size; dc <= size; dc++) add(r + dr, c + dc); };
-  let name;
-  if (pair === 'rainbow+rainbow') { square(Math.max(ROWS, COLS)); name = 'Garden Sweep!'; }
-  else if (pair.includes('rainbow')) { bands(1); square(2); name = 'Rainbow Burst!'; }
-  else if (pair === 'sun+sun') { square(2); name = 'Sunburst!'; }
-  else if (pair === 'star+sun') { bands(1); name = 'Big Cross!'; }
-  else { bands(0); name = 'Star Cross!'; }
-  return { cells: [...cells], name };
+  if (pair === 'rainbow+rainbow') square(Math.max(ROWS, COLS));
+  else if (pair.includes('rainbow')) { bands(1); square(2); }
+  else if (pair === 'sun+sun') square(2);
+  else if (pair === 'star+sun') bands(1);
+  else bands(0);
+  return [...cells];
 }
 
 /** Clear one wave: the matches in `groups`, plus (on the first wave of a move)
@@ -977,25 +976,13 @@ export function applyGravity(b) {
 const fillBoard = b =>
   b.map(row => row.map(cl => (!cl.isBlocker && cl.type < 0 ? mkCell(rnd()) : cl)));
 
-/** Cheers for flowers that keep falling into new matches, by wave. */
-export const CASCADE_CHEERS = ['Lovely!', 'Blooming!', 'Glorious!'];
-
-/** What to call out for a wave, if anything. */
-function cheerFor(wave, res, comboName) {
-  if (comboName) return comboName;
-  if (res.specials >= 2) return `Chain ×${res.specials}!`;
-  if (wave >= 2) return CASCADE_CHEERS[Math.min(wave, CASCADE_CHEERS.length + 1) - 2];
-  return null;
-}
-
 /** Resolve a move. `steps` holds the board after each stage (matches cleared,
- *  then tiles dropped and refilled, repeated) so it can be animated, and
- *  `cheers` what to call out at each stage (or null). Each wave of new
- *  matches scores more: the 2nd ×2, the 3rd ×3, … `first` passes a combo (or
+ *  then tiles dropped and refilled, repeated) so it can be animated. Each
+ *  wave of new matches scores more: the 2nd ×2, the 3rd ×3, … `first` passes a combo (or
  *  specials to set off) to the first wave, as processMatches takes them. */
 export function fullCascade(b, targetType = -1, first = null) {
   let cur = b, totalScore = 0, totalCollected = 0, totalBlockers = 0, wave = 0;
-  const steps = [], cheers = [];
+  const steps = [];
   let groups = getMatchGroups(cur);
   let opts = first;
   while (groups.length > 0 || opts) {
@@ -1005,22 +992,20 @@ export function fullCascade(b, targetType = -1, first = null) {
     totalCollected += res.collected;
     totalBlockers  += res.blockersRemoved;
     steps.push(res.board);
-    cheers.push(cheerFor(wave, res, opts?.comboName));
     cur = fillBoard(applyGravity(res.board));
     steps.push(cur);
-    cheers.push(null);
     groups = getMatchGroups(cur);
     opts = null;
   }
-  return { board: cur, steps, cheers, totalScore, totalCollected, totalBlockers };
+  return { board: cur, steps, totalScore, totalCollected, totalBlockers };
 }
 
 /** The first-wave options for swapping two specials: the tile moved from
  *  (r1, c1) lands on (r2, c2), where the combo goes off. `b` is the board
  *  after the swap. */
 export function comboOpts(b, r1, c1, r2, c2) {
-  const { cells, name } = comboBlast(b, r2, c2, b[r1][c1].special, b[r2][c2].special);
-  return { combo: { cells, consumed: [`${r1},${c1}`, `${r2},${c2}`] }, comboName: name };
+  const cells = comboBlast(b, r2, c2, b[r1][c1].special, b[r2][c2].special);
+  return { combo: { cells, consumed: [`${r1},${c1}`, `${r2},${c2}`] } };
 }
 
 /** Play out a move: swap the two tiles, then set off any combo and matches.
@@ -1050,12 +1035,11 @@ export function leftoverBonus(b, movesLeft) {
   });
   const ignite = [];
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (starred[r][c].special) ignite.push(`${r},${c}`);
-  if (!ignite.length) return { board: b, steps: [], cheers: [], totalScore: 0 };
+  if (!ignite.length) return { board: b, steps: [], totalScore: 0 };
   const res = fullCascade(starred, -1, { ignite, chainBonus: false });
   return {
     ...res,
     steps: [starred, ...res.steps],
-    cheers: ['Bonus blooms!', ...res.cheers.map(() => null)],
     totalScore: res.totalScore + Math.max(0, movesLeft) * LEFTOVER_POINTS,
   };
 }
