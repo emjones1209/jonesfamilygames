@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   LEVELS, ROWS, COLS, FLOWERS, loadReached, saveReached, reachedFromScores,
   blastArea, getMatchGroups, processMatches, CHAPTERS, findHint, trySwapBoard,
+  comboBlast, isComboSwap, playMove, fullCascade, leftoverBonus, hasValidMove,
   LAYOUTS, layoutObstacles, parseLevelTable,
 } from './match3Logic';
 
@@ -136,8 +137,8 @@ describe('Garden Match special tiles', () => {
     expect(blastArea(b, 3, 3, 'cross')).not.toContain('3,0');
   });
 
-  it('a match of 4 makes a star, a match of 5 makes a rainbow', () => {
-    for (const [len, kind] of [[4, 'row'], [5, 'cross']]) {
+  it('a match of 4 across makes a column star, a match of 5 makes a rainbow', () => {
+    for (const [len, kind] of [[4, 'col'], [5, 'cross']]) {
       const b = board();
       expect(getMatchGroups(b)).toHaveLength(0);
       for (let c = 0; c < len; c++) b[6][c] = { ...b[6][c], type: 5 };
@@ -146,6 +147,108 @@ describe('Garden Match special tiles', () => {
       const made = processMatches(b, groups).board[6].filter(cl => cl.special);
       expect(made.map(cl => cl.special)).toEqual([kind]);
     }
+  });
+});
+
+describe('Garden Match stars, combos and bonuses', () => {
+  let id = 0;
+  const board = () => Array.from({ length: ROWS }, (_, r) =>
+    Array.from({ length: COLS }, (_, c) => ({ id: ++id, type: (r * 2 + c) % 3 + (r % 2) * 3, special: null, isBlocker: false })));
+  const special = (b, r, c, kind) => { b[r][c] = { ...b[r][c], special: kind }; };
+  const cleared = res => res.board.flat().filter(cl => !cl.isBlocker && cl.type < 0).length;
+
+  it('a match of 4 up-and-down makes a row star; a column star clears its column', () => {
+    const b = board();
+    for (let r = 0; r < 4; r++) b[r][6] = { ...b[r][6], type: 5 };
+    const groups = getMatchGroups(b);
+    expect(groups).toHaveLength(1);
+    expect(processMatches(b, groups).board.flat().filter(cl => cl.special).map(cl => cl.special)).toEqual(['row']);
+    expect(blastArea(b, 2, 4, 'col').sort()).toEqual(Array.from({ length: ROWS }, (_, r) => `${r},4`).sort());
+  });
+
+  it('a 3×3 block of one flower makes one sun at most per match, and clears', () => {
+    const b = board();
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) b[r][c] = { ...b[r][c], type: 5 };
+    const groups = getMatchGroups(b);
+    expect(groups).toHaveLength(6);
+    const res = processMatches(b, groups);
+    const suns = res.board.flat().filter(cl => cl.special === 'area');
+    expect(suns.length).toBeGreaterThan(0);
+    expect(suns.length).toBeLessThanOrEqual(3);
+    expect(cleared(res)).toBe(9 - suns.length);
+  });
+
+  it('a special set off by another earns a chain bonus', () => {
+    const b = board();
+    special(b, 3, 3, 'row');
+    const alone = processMatches(b, [], -1, { ignite: ['3,3'] });
+    special(b, 3, 5, 'col');   // in the first star's row: it goes off too
+    const chain = processMatches(b, [], -1, { ignite: ['3,3'] });
+    expect(chain.specials).toBe(2);
+    // 6 more flowers from the column, plus the bonus for the 2nd special
+    expect(chain.score).toBe(alone.score + 6 * 60 + 200);
+    // No bonus when asked not to (the leftover-moves bonus)
+    expect(processMatches(b, [], -1, { ignite: ['3,3'], chainBonus: false }).score).toBe(alone.score + 6 * 60);
+  });
+
+  it('two specials swapped together are a combo, even with no match', () => {
+    const b = board();
+    special(b, 3, 3, 'row'); special(b, 3, 4, 'area');
+    expect(getMatchGroups(trySwapBoard(b, 3, 3, 3, 4))).toHaveLength(0);
+    expect(isComboSwap(b, 3, 3, 3, 4)).toBe(true);
+    expect(isComboSwap(b, 3, 3, 2, 3)).toBe(false);
+    expect(hasValidMove(b)).toBe(true);
+    const res = playMove(b, 3, 3, 3, 4);
+    expect(res.cheers[0]).toBe('Big Cross!');
+    expect(res.totalScore).toBeGreaterThan(0);
+    // With no specials, a swap that makes no match does nothing
+    expect(playMove(board(), 0, 0, 0, 1)).toBeNull();
+  });
+
+  it('combos clear more the bigger the specials', () => {
+    const b = board();
+    const size = (k1, k2) => comboBlast(b, 3, 3, k1, k2).cells.length;
+    expect(size('row', 'col')).toBe(13);          // a row and a column
+    expect(size('row', 'area')).toBe(33);         // three rows and three columns
+    expect(size('area', 'area')).toBe(25);        // 5×5
+    expect(size('cross', 'area')).toBe(37);       // three rows, three columns and 5×5's corners
+    expect(size('cross', 'cross')).toBe(ROWS * COLS);
+    expect(comboBlast(b, 3, 3, 'area', 'row').name).toBe(comboBlast(b, 3, 3, 'row', 'area').name);
+  });
+
+  it('the swapped specials are used up by the combo, not set off alone', () => {
+    const b = board();
+    special(b, 0, 0, 'row'); special(b, 0, 1, 'row');
+    const res = playMove(b, 0, 0, 0, 1);
+    // Star+star clears row 0 and column 1 (13 squares), not just row 0 twice
+    expect(cleared({ board: res.steps[0] })).toBe(13);
+  });
+
+  it('each new wave of matches in a cascade scores more', () => {
+    // Stub the refill so the second wave is known: replace Math.random
+    const real = Math.random;
+    try {
+      const b = board();
+      // Wave 1: three 🌷 across the bottom. The three flowers that drop in
+      // across the top are all 🌸, a second wave; after that, mixed flowers
+      for (let c = 0; c < 3; c++) b[6][c] = { ...b[6][c], type: 4 };
+      let calls = 0;
+      Math.random = () => (calls++ < 3 ? 0 : ((calls % 5) + 1) / 6 + 0.01);
+      const res = fullCascade(b);
+      expect(res.cheers.filter(Boolean)[0]).toBe('Lovely!');
+      // Wave 1 alone would be 300; later waves make it far more
+      expect(res.totalScore).toBeGreaterThan(300 * 2);
+    } finally { Math.random = real; }
+  });
+
+  it('moves left over on a win turn into bonus stars', () => {
+    const b = board();
+    const none = leftoverBonus(b, 0);
+    expect(none.totalScore).toBe(0);
+    const bonus = leftoverBonus(b, 3);
+    expect(bonus.steps[0].flat().filter(cl => cl.special)).toHaveLength(3);
+    expect(bonus.totalScore).toBeGreaterThanOrEqual(3 * 500);
+    expect(bonus.cheers[0]).toBe('Bonus blooms!');
   });
 });
 
@@ -182,6 +285,12 @@ describe('Garden Match hints', () => {
   it('goes for the flower being collected', () => {
     const b = stuckBoard(); plantTop(b); plantBottom(b, true);
     expect(swapOf(findHint(b, { type: 'collect', flowerType: 4 }))).toEqual([0, 2, 1, 2]);
+  });
+
+  it('suggests swapping two specials together', () => {
+    const b = stuckBoard();
+    b[3][3] = { ...b[3][3], special: 'area' }; b[4][3] = { ...b[4][3], special: 'area' };
+    expect(swapOf(findHint(b))).toEqual([3, 3, 4, 3]);
   });
 
   it('never moves a blocker', () => {
