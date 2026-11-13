@@ -82,3 +82,15 @@ export function drawGlyph(ctx, suit, color, size, x, y) {
   ctx.drawImage(g, x - s / 2, y - s / 2, s, s);
 }
 
+
+/**
+ * A tap on `el` calls `skip()` — but not for the first `wait` ms, so a tap left over from the
+ * player's last few moves (sending the last cards up, quickly) doesn't skip the animation
+ * before it has started. Gives back a function that stops listening.
+ */
+export function skipOnTap(el, skip, wait = 1200) {
+  const from = performance.now();
+  const tap = () => { if (performance.now() - from >= wait) skip(); };
+  el.addEventListener('pointerdown', tap);
+  return () => el.removeEventListener('pointerdown', tap);
+}

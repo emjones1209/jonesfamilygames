@@ -11,10 +11,11 @@
  *     game gives it, plus `anchor`: where the page's element marked data-finale is on screen.
  *   - `launch(key)` tells the game a card has left pile `key` (so it can show the card under it).
  *   - `settled()` says the main part of the show is over (for a scene that never ends by itself).
- * Tap anywhere to skip it; `onDone()` is called either way. With `keepGoing`, the scene carries on
+ * Tap anywhere to skip it (once it has been going for a moment: see skipOnTap); `onDone()` is called either way. With `keepGoing`, the scene carries on
  * after that (behind the "You win" box) until the game takes it away.
  */
 import { useEffect, useRef } from 'react';
+import { skipOnTap } from './canvasCards';
 
 export function Finale({ scene, piles, layout = {}, label, keepGoing = false, onLaunch, onDone }) {
   const canvas = useRef(null);
@@ -55,8 +56,8 @@ export function Finale({ scene, piles, layout = {}, label, keepGoing = false, on
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    el.addEventListener('pointerdown', finish);
-    return () => { cancelAnimationFrame(raf); el.removeEventListener('pointerdown', finish); };
+    const stopListening = skipOnTap(el, finish);
+    return () => { cancelAnimationFrame(raf); stopListening(); };
     // (it runs once, from the game as it was when it was won)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
