@@ -2,7 +2,7 @@
  * The win animations for Spider, FreeCell, Pyramid and TriPeaks, drawn by Finale.jsx (which
  * explains what a scene is given). Klondike keeps the classic bouncing cards (CardCascade.jsx).
  */
-import { GOLD, part, easeOut, easeInOut, lerp, rand, clamp01, drawCardAt, drawGlyph } from './canvasCards';
+import { GOLD, GOLD_RGB, PALE, part, easeOut, easeInOut, lerp, rand, clamp01, drawCardAt, drawGlyph } from './canvasCards';
 
 const TAU = Math.PI * 2;
 const centre = box => ({ x: box.left + box.width / 2, y: box.top + box.height / 2 });
@@ -100,7 +100,7 @@ export function spiderWeb({ ctx, width, height, piles, spot, launch }) {
     ctx.save();
     ctx.globalAlpha *= alpha;
     ctx.lineCap = 'round';
-    ctx.strokeStyle = `rgba(253, 230, 138, ${0.55 + glow * 0.45})`;
+    ctx.strokeStyle = `rgba(245, 221, 176, ${0.55 + glow * 0.45})`;
     ctx.shadowColor = GOLD;
     ctx.shadowBlur = 6 + glow * 14;
     ctx.lineWidth = 1.4 + glow * 1.2;
@@ -140,7 +140,7 @@ export function spiderWeb({ ctx, width, height, piles, spot, launch }) {
     for (let k = 0; k < 3; k++) {
       const p = part(t, PULSE + k * 330, 1000);
       if (p <= 0 || p >= 1) continue;
-      ctx.strokeStyle = `rgba(250, 204, 21, ${(1 - p) * 0.8})`;
+      ctx.strokeStyle = `rgba(232, 184, 109, ${(1 - p) * 0.8})`;
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.arc(cx, cy, R * (0.2 + p * 1.1), 0, TAU);
@@ -264,8 +264,8 @@ export function fireworks({ ctx, width, height, piles, spot, launch }) {
       if (p >= 1) { flashes.splice(i, 1); continue; }
       const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, f.size * (0.5 + p));
       g.addColorStop(0, `rgba(255,255,255,${0.9 * (1 - p)})`);
-      g.addColorStop(0.4, `rgba(250,204,21,${0.5 * (1 - p)})`);
-      g.addColorStop(1, 'rgba(250,204,21,0)');
+      g.addColorStop(0.4, `rgba(232,184,109,${0.5 * (1 - p)})`);
+      g.addColorStop(1, 'rgba(232,184,109,0)');
       ctx.fillStyle = g;
       ctx.beginPath(); ctx.arc(f.x, f.y, f.size * (0.5 + p), 0, TAU); ctx.fill();
     }
@@ -312,10 +312,13 @@ export function fireworks({ ctx, width, height, piles, spot, launch }) {
 /* ───────────────────────── Pyramid: rebuilt in gold ───────────────────────── */
 
 /**
- * The cards taken away fly back, spinning, and build the pyramid again from the bottom row up,
- * with a spray of sparks as each one lands. The capstone lights up, a beam of light shoots up from
- * it, and a shimmer of gold runs across the pyramid. Then the cards lift off one by one, from the
- * top down, and spiral up the beam into the sky — and the rest of the pile follows them.
+ * The cards taken away fly back, spinning, trailing light, and build the pyramid again from the
+ * bottom row up, with a spray of sparks as each one lands. The capstone lands with a flash and a
+ * shockwave that shakes the pyramid; it lights up, rays of light turn behind it, a beam shoots up
+ * from it to a sun in the sky, and a shimmer of gold runs across the pyramid. Then the cards lift
+ * off one by one, from the top down, and spiral up the beam into the sun — the rest of the pile
+ * after them — and the sun grows with each one. When it has them all it flares, and showers gold
+ * over the whole screen.
  *
  * layout: { spots: [{ x, y, row }] — each place in the pyramid (its top left, from the top left of
  * the pyramid, marked data-finale on the page), capstone first — and w, h: the size of a card }.
@@ -325,81 +328,134 @@ export function pyramidLight({ ctx, width, height, piles, spot, layout, launch }
   const { spots, w, h, anchor } = layout;
   const pile = piles[0];
   const from = centre(spot[pile.key]);
-  // Build from the bottom row up, left to right
-  const order = spots.map((s, i) => ({ ...s, i })).sort((a, b) => b.row - a.row || a.x - b.x);
+  const order = spots.map((s, i) => ({ ...s, i })).sort((a, b) => b.row - a.row || a.x - b.x);   // (bottom row first)
   const top = pile.cards.slice().reverse();                      // (the top of the pile first)
-  const EVERY = 55, FLY = 560, RISE_EVERY = 70, RIDE = 1900;
+  const EVERY = 55, FLY = 560, RISE_EVERY = 70, RIDE = 1700;
   const built = (order.length - 1) * EVERY + FLY;
   const GLOW = built + 100, BEAM = built + 300, SHINE = built + 500, ASCEND = built + 2300;
   const placed = order.map((s, k) => ({ card: top[k], at: k * EVERY, x: anchor.left + s.x + w / 2, y: anchor.top + s.y + h / 2,
     row: s.row, i: s.i, dir: s.i % 2 ? -1 : 1 }));
   const cap = placed.find(p => p.i === 0) ?? placed.at(-1);
-  // Lifting off from the top down; then the cards still in the pile, straight from it
-  const lifting = [...placed].sort((a, b) => a.row - b.row || a.x - b.x);
+  const lifting = [...placed].sort((a, b) => a.row - b.row || a.x - b.x);       // (lifting off from the top down)
   lifting.forEach((p, k) => { p.up = ASCEND + k * RISE_EVERY; });
   const extra = top.slice(placed.length).map((card, j) => ({ card, extra: true, x: from.x, y: from.y, row: 99,
     up: ASCEND + (placed.length + j) * RISE_EVERY * 0.7, i: j, dir: j % 2 ? -1 : 1 }));
-  const END = Math.max(ASCEND, ...[...lifting, ...extra].map(p => p.up)) + RIDE + 400;
+  const riders = [...lifting, ...extra];
+  const FLARE = Math.max(ASCEND, ...riders.map(p => p.up)) + RIDE;
+  const END = FLARE + 3800;
   const spread = Math.max(w * 3, anchor.width);
-  const sparks = [];
   const capTop = cap ? cap.y - h / 2 : height / 3;
   const beamX = cap ? cap.x : width / 2;
+  const sun = { x: beamX, y: Math.max(h * 0.9, 70) };
+  const big = Math.max(width, height);
+  const sparks = [], glitter = [];
+  let absorbed = 0, flared = false;
 
-  // Where a card is while it rides the beam: round and round it, climbing faster and faster
+  // Where a card is while it rides the beam: round and round it, up into the sun
   const ride = (p, t) => {
     const u = part(t, p.up, RIDE);
     const swing = u * TAU * 1.6 + p.i * 0.9;
-    const r = w * lerp(0.7, 1.6, u);
+    const r = w * lerp(0.7, 1.6, Math.sin(u * Math.PI) ** 0.5) * (1 - u ** 4);
     const into = easeOut(clamp01(u * 3));                       // (moving into the beam first)
     return {
       x: lerp(p.x, beamX + Math.sin(swing) * r, into),
-      y: lerp(p.y, -h * 2, u ** 1.7),
-      scale: 1 + 0.25 * Math.cos(swing) * into,                 // (nearer, then further away, as it goes round)
+      y: lerp(p.y, sun.y, u ** 1.5),
+      scale: (1 + 0.25 * Math.cos(swing) * into) * lerp(1, 0.25, u ** 3),   // (nearer, then further; shrinking into the sun)
       angle: Math.sin(swing) * 0.5 * into + u * p.dir * TAU,
       behind: Math.cos(swing) < 0 && into > 0.5,
       u,
     };
   };
+  const ray = (cx, cy, a, len, spreadA, alpha) => {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, len);
+    g.addColorStop(0, `rgba(${PALE},${alpha})`);
+    g.addColorStop(1, `rgba(${GOLD_RGB},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, len, a - spreadA, a + spreadA);
+    ctx.closePath();
+    ctx.fill();
+  };
 
   return t => {
     const dt = tick(t);
-    ctx.globalAlpha = 1 - part(t, END - 500, 500);
+    ctx.globalAlpha = 1 - part(t, END - 600, 600);
+    const flare = part(t, FLARE, 700);
+    const after = 1 - part(t, FLARE + 300, 1200);                 // (the beam and the rays go once the sun has flared)
 
-    // The beam: narrow at the capstone, spreading as it climbs, brighter while the cards ride it
-    const beam = easeOut(part(t, BEAM, 600)) * (1 - part(t, END - 900, 900));
+    // Rays of light turning slowly behind the pyramid, from the capstone
+    const rays = part(t, BEAM, 900) * after;
+    if (rays > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 14; k++) ray(beamX, capTop, (k / 14) * TAU + t / 5000, big * 0.9, 0.07, 0.22 * rays);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // The beam: narrow at the capstone, spreading as it climbs to the sun, brighter while the cards ride it
+    const beam = easeOut(part(t, BEAM, 600)) * after;
     const riding = part(t, ASCEND, 600);
     if (beam > 0) {
       const flicker = 0.85 + 0.15 * Math.sin(t / 60) * Math.sin(t / 37);
-      const nb = w * (0.25 + riding * 0.4) * beam, wt = w * (1.6 + riding * 1.2) * beam;
-      const g = ctx.createLinearGradient(0, capTop, 0, -20);
+      const nb = w * (0.25 + riding * 0.4) * beam, wt = w * (1.2 + riding * 1.2) * beam;
+      const reach = lerp(capTop, sun.y, beam);
+      const g = ctx.createLinearGradient(0, capTop, 0, sun.y);
       g.addColorStop(0, `rgba(255,255,255,${0.95 * flicker})`);
-      g.addColorStop(0.15, `rgba(253,224,71,${0.75 * flicker})`);
-      g.addColorStop(1, 'rgba(250,204,21,0.08)');
+      g.addColorStop(0.15, `rgba(${PALE},${0.8 * flicker})`);
+      g.addColorStop(1, `rgba(${GOLD_RGB},${0.5 * flicker})`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(beamX - nb, capTop);
-      ctx.lineTo(beamX - wt, lerp(capTop, -20, beam));
-      ctx.lineTo(beamX + wt, lerp(capTop, -20, beam));
+      ctx.lineTo(beamX - wt, reach);
+      ctx.lineTo(beamX + wt, reach);
       ctx.lineTo(beamX + nb, capTop);
       ctx.closePath();
       ctx.fill();
       const halo = ctx.createRadialGradient(beamX, capTop, 0, beamX, capTop, w * 2.2);
       halo.addColorStop(0, `rgba(255,255,255,${0.8 * beam})`);
-      halo.addColorStop(0.4, `rgba(250,204,21,${0.35 * beam})`);
-      halo.addColorStop(1, 'rgba(250,204,21,0)');
+      halo.addColorStop(0.4, `rgba(${GOLD_RGB},${0.4 * beam})`);
+      halo.addColorStop(1, `rgba(${GOLD_RGB},0)`);
       ctx.fillStyle = halo;
       ctx.beginPath(); ctx.arc(beamX, capTop, w * 2.2, 0, TAU); ctx.fill();
     }
 
+    // The sun, at the top of the beam: growing with every card it takes in, then flaring
+    const sunUp = part(t, BEAM + 300, 600);
+    if (sunUp > 0 && t < FLARE + 1500) {
+      const grow = absorbed / Math.max(1, riders.length);
+      const r = (w * 0.5 + w * 1.1 * grow) * easeOut(sunUp) * (1 + flare * 3) * (1 - part(t, FLARE + 500, 1000));
+      const pulse = 1 + 0.06 * Math.sin(t / 90);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 10; k++) ray(sun.x, sun.y, (k / 10) * TAU - t / 2500, r * 3.2, 0.12, 0.35 * sunUp);
+      const g = ctx.createRadialGradient(sun.x, sun.y, 0, sun.x, sun.y, r * 1.8 * pulse);
+      g.addColorStop(0, 'rgba(255,255,255,1)');
+      g.addColorStop(0.35, `rgba(${PALE},0.95)`);
+      g.addColorStop(0.6, `rgba(${GOLD_RGB},0.55)`);
+      g.addColorStop(1, `rgba(${GOLD_RGB},0)`);
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(sun.x, sun.y, r * 1.8 * pulse, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
+
     // The pyramid's cards: flying home, sitting in place (each row over the one above), then riding up
+    const shake = t > built && t < built + 350 ? (1 - part(t, built, 350)) * w * 0.08 : 0;
     const home = [], air = [], behind = [], front = [];
+    const takeOff = p => {
+      const r = ride(p, t);
+      if (r.u < 1) { (r.behind ? behind : front).push({ p, r }); return; }
+      if (p.absorbed) return;
+      p.absorbed = true;
+      absorbed++;
+      for (let k = 0; k < 8; k++) {
+        const a = rand(0, TAU);
+        sparks.push({ x: sun.x, y: sun.y, vx: Math.cos(a) * rand(0.1, 0.3), vy: Math.sin(a) * rand(0.1, 0.3), age: 0, life: rand(300, 600) });
+      }
+    };
     for (const p of placed) {
       if (t < p.at) continue;
       if (!p.gone) { p.gone = true; launch(pile.key); }
-      if (t >= p.up) {
-        const r = ride(p, t);
-        if (r.u < 1) (r.behind ? behind : front).push({ p, r });
-      } else if (t >= p.at + FLY) {
+      if (t >= p.up) takeOff(p);
+      else if (t >= p.at + FLY) {
         if (!p.landed) {
           p.landed = true;
           for (let k = 0; k < 10; k++) {
@@ -413,16 +469,31 @@ export function pyramidLight({ ctx, width, height, piles, spot, layout, launch }
     for (const p of extra) {
       if (t < p.up) continue;
       if (!p.gone) { p.gone = true; launch(pile.key); }
-      const r = ride(p, t);
-      if (r.u < 1) (r.behind ? behind : front).push({ p, r });
+      takeOff(p);
     }
     for (const { p, r } of behind) drawCardAt(ctx, p.card, r.x, r.y, w, h, { scale: r.scale, angle: r.angle, alpha: 0.85 });
     home.sort((a, b) => a.row - b.row);
-    for (const p of home) drawCardAt(ctx, p.card, p.x, p.y, w, h, { glow: p === cap ? 30 * part(t, GLOW, 400) + 8 * Math.sin(t / 120) * part(t, GLOW, 400) : 0 });
+    for (const p of home) {
+      const jig = shake ? rand(-shake, shake) : 0;
+      drawCardAt(ctx, p.card, p.x + jig, p.y + (shake ? rand(-shake, shake) : 0), w, h,
+        { glow: p === cap ? 30 * part(t, GLOW, 400) + 8 * Math.sin(t / 120) * part(t, GLOW, 400) : 0 });
+    }
     for (const p of air) {
-      const q = part(t, p.at, FLY), e = easeInOut(q);
-      const x = lerp(from.x, p.x, e), y = lerp(from.y, p.y, e) - Math.sin(q * Math.PI) * h * 1.2;
-      drawCardAt(ctx, p.card, x, y, w, h, { angle: (1 - e) * p.dir * TAU, scale: 1 + Math.sin(q * Math.PI) * 0.3 });
+      const q = part(t, p.at, FLY);
+      const at = qq => {
+        const e = easeInOut(qq);
+        return { x: lerp(from.x, p.x, e), y: lerp(from.y, p.y, e) - Math.sin(qq * Math.PI) * h * 1.2, e };
+      };
+      // A trail of light behind it
+      ctx.globalCompositeOperation = 'lighter';
+      for (let k = 1; k <= 4; k++) {
+        const b = at(Math.max(0, q - k * 0.05));
+        ctx.fillStyle = `rgba(${GOLD_RGB},${0.22 - k * 0.04})`;
+        ctx.beginPath(); ctx.arc(b.x, b.y, w * (0.5 - k * 0.06), 0, TAU); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      const a = at(q);
+      drawCardAt(ctx, p.card, a.x, a.y, w, h, { angle: (1 - a.e) * p.dir * TAU, scale: 1 + Math.sin(q * Math.PI) * 0.3 });
     }
 
     // A band of gold light sweeping across the cards (and only the cards: source-atop)
@@ -431,9 +502,9 @@ export function pyramidLight({ ctx, width, height, piles, spot, layout, launch }
       if (p <= 0 || p >= 1) continue;
       const bx = anchor.left + anchor.width / 2 + dir * lerp(-spread, spread, p);
       const g = ctx.createLinearGradient(bx - w * 1.5, anchor.top, bx + w * 1.5, anchor.top + anchor.height);
-      g.addColorStop(0, 'rgba(250,204,21,0)');
-      g.addColorStop(0.5, 'rgba(250,204,21,0.6)');
-      g.addColorStop(1, 'rgba(250,204,21,0)');
+      g.addColorStop(0, `rgba(${GOLD_RGB},0)`);
+      g.addColorStop(0.5, `rgba(${GOLD_RGB},0.65)`);
+      g.addColorStop(1, `rgba(${GOLD_RGB},0)`);
       ctx.globalCompositeOperation = 'source-atop';
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, width, height);
@@ -441,13 +512,55 @@ export function pyramidLight({ ctx, width, height, piles, spot, layout, launch }
     }
     for (const { p, r } of front) drawCardAt(ctx, p.card, r.x, r.y, w, h, { scale: r.scale, angle: r.angle, glow: 6 });
 
+    // The capstone's landing: a flash and a shockwave across the screen
+    const wave = part(t, built, 900);
+    if (wave > 0 && wave < 1) {
+      ctx.strokeStyle = `rgba(${PALE},${(1 - wave) * 0.9})`;
+      ctx.lineWidth = lerp(w * 0.25, 1, wave);
+      ctx.beginPath(); ctx.arc(cap.x, cap.y, big * wave, 0, TAU); ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${Math.max(0, 0.35 - wave * 1.4)})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    // The flare: a flash, and a shower of gold — glitter and confetti — over everything
+    if (t >= FLARE && !flared) {
+      flared = true;
+      for (let k = 0; k < 320; k++) {
+        const a = rand(0, TAU), v = rand(0.2, 0.8) * (big / 800);
+        glitter.push({ x: sun.x, y: sun.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.7 - 0.12, age: 0, life: rand(2600, 3800),
+          confetti: Math.random() < 0.5, spin: rand(-0.02, 0.02), angle: rand(0, TAU), size: rand(3.5, 7) * Math.max(1, w / 50),
+          color: [`rgba(${GOLD_RGB},`, `rgba(${PALE},`, 'rgba(255,255,255,'][k % 3] });
+      }
+    }
+    if (flare > 0 && flare < 1) {
+      ctx.fillStyle = `rgba(255,250,235,${0.55 * (1 - flare)})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+    for (let i = glitter.length - 1; i >= 0; i--) {
+      const s = glitter[i];
+      s.age += dt;
+      if (s.age >= s.life) { glitter.splice(i, 1); continue; }
+      const drag = 0.997 ** dt;
+      s.vx *= drag; s.vy = s.vy * drag + 0.00025 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.angle += s.spin * dt;   // (it floats down)
+      const life = 1 - s.age / s.life;
+      const twinkle = 0.75 + 0.25 * Math.sin(s.age / 60 + i);
+      ctx.fillStyle = `${s.color}${Math.min(1, life * 2.5) * twinkle})`;
+      ctx.globalCompositeOperation = s.confetti ? 'source-over' : 'lighter';     // (the glitter glows)
+      if (s.confetti) {
+        ctx.save(); ctx.translate(s.x, s.y); ctx.rotate(s.angle);
+        ctx.fillRect(-s.size, -s.size * 0.5 * Math.abs(Math.cos(s.age / 120)), s.size * 2, s.size * Math.abs(Math.cos(s.age / 120)) + 0.5);
+        ctx.restore();
+      } else { ctx.beginPath(); ctx.arc(s.x, s.y, s.size * 0.45, 0, TAU); ctx.fill(); }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
     ctx.globalCompositeOperation = 'lighter';
     for (let i = sparks.length - 1; i >= 0; i--) {
       const s = sparks[i];
       s.age += dt;
       if (s.age >= s.life) { sparks.splice(i, 1); continue; }
       s.vy += 0.0006 * dt; s.x += s.vx * dt; s.y += s.vy * dt;
-      ctx.fillStyle = `rgba(253,224,71,${1 - s.age / s.life})`;
+      ctx.fillStyle = `rgba(${PALE},${1 - s.age / s.life})`;
       ctx.beginPath(); ctx.arc(s.x, s.y, 2, 0, TAU); ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';

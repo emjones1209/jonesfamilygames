@@ -25,7 +25,9 @@ export function drawCard(ctx, card, x, y, w, h) {
   ctx.fillText(SUIT_SYMBOLS[card.suit], x + w / 2, y + h * 0.58);
 }
 
-export const GOLD = '#facc15';
+export const GOLD = '#e8b86d';            // the theme's gold (game-gold, as on the buttons)
+export const GOLD_RGB = '232,184,109';    // (the same, for rgba())
+export const PALE = '245,221,176';        // a paler gold, for the brightest light
 export const clamp01 = x => Math.max(0, Math.min(1, x));
 /** How far through a stretch of time `t` is: 0 before `start`, 1 after `start + length`. */
 export const part = (t, start, length) => clamp01((t - start) / length);
