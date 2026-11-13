@@ -10,7 +10,8 @@ import { newTripeaks, isFree, canPlay, play, draw, hint, isWon, isStuck, left, p
 import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
 import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
-import { CardCascade } from './CardCascade';
+import { Finale } from './Finale';
+import { volcanoes } from './finaleScenes';
 import { Button } from '../../components/Button';
 import api from '../../utils/api';
 
@@ -78,7 +79,7 @@ export default function TriPeaksGame() {
         onUndo={undo} canUndo={history.canUndo && !won} onRestart={restart} onHint={showHint} />
 
       {/* The three peaks */}
-      <div className="relative mx-auto mt-3" style={{ width: 10 * w + 9 * gap, height: 3 * h * 0.5 + h }}>
+      <div data-finale className="relative mx-auto mt-3" style={{ width: 10 * w + 9 * gap, height: 3 * h * 0.5 + h }}>
         {game.peaks.map((card, i) => {
           if (!card) return null;
           const { row, x } = placeOf(i);
@@ -119,7 +120,8 @@ export default function TriPeaksGame() {
       )}
 
       {cascading && (
-        <CardCascade piles={[{ key: 'waste', cards: game.waste }]}
+        <Finale scene={volcanoes} piles={[{ key: 'waste', cards: game.waste }]} label="The peaks erupt."
+          layout={{ w, half: 1.5 * (w + gap) + w / 2, peaks: [0, 1, 2].map(j => placeOf(j).x * (w + gap) + w / 2) }}
           onLaunch={() => setSpilled(n => n + 1)} onDone={() => setCascading(false)} />
       )}
       <WinBox show={won && !cascading} onAgain={restart}

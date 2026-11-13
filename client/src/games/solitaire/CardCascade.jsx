@@ -9,31 +9,10 @@
  * the card under it), and `onDone()` when the last one is gone.
  */
 import { useEffect, useRef } from 'react';
-import { SUIT_SYMBOLS } from '../../utils/cardEngine';
+import { drawCard } from './canvasCards';
 
 const GRAVITY = 0.5;          // px per frame²
 const LAUNCH_EVERY = 14;      // frames between cards leaving the foundations
-
-/** A card face, drawn straight onto the canvas: white, rounded, rank and suit in its colour. */
-function drawCard(ctx, card, x, y, w, h) {
-  const r = Math.max(4, w * 0.1);
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = '#9ca3af';
-  ctx.stroke();
-  ctx.fillStyle = card.suit === 'hearts' || card.suit === 'diamonds' ? '#dc2626' : '#111827';
-  ctx.textBaseline = 'top';
-  ctx.textAlign = 'left';
-  ctx.font = `bold ${Math.round(w * 0.3)}px system-ui, sans-serif`;
-  ctx.fillText(card.rank, x + w * 0.1, y + w * 0.08);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = `${Math.round(w * 0.5)}px system-ui, sans-serif`;
-  ctx.fillText(SUIT_SYMBOLS[card.suit], x + w / 2, y + h * 0.58);
-}
 
 export function CardCascade({ piles, onLaunch, onDone }) {
   const canvas = useRef(null);

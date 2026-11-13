@@ -15,7 +15,8 @@ import {
 import { SCard, Slot, SolitaireHeader, WinBox, AutoHomeToggle } from './SolitaireKit';
 import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, useAutoHome, lessMotion, secondsSince, count } from './solitaireHelpers';
-import { CardCascade } from './CardCascade';
+import { Finale } from './Finale';
+import { fireworks } from './finaleScenes';
 import { Button } from '../../components/Button';
 import api from '../../utils/api';
 
@@ -217,7 +218,7 @@ export default function FreeCellGame() {
       <AutoHomeToggle on={autoHome} onChange={setAutoHome} />
 
       {cascading && (
-        <CardCascade piles={homes}
+        <Finale scene={fireworks} piles={homes} label="Fireworks!"
           onLaunch={key => setSpilled(sp => ({ ...sp, [key]: (sp[key] ?? 0) + 1 }))}
           onDone={() => setCascading(false)} />
       )}

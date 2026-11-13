@@ -12,7 +12,8 @@ import { newSpider, runStart, move, deal, whyNoDeal, destinations, hint, isWon, 
 import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
 import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
-import { CardCascade } from './CardCascade';
+import { Finale } from './Finale';
+import { spiderWeb } from './finaleScenes';
 import { RunCollect } from './RunCollect';
 import api from '../../utils/api';
 
@@ -247,7 +248,7 @@ export default function SpiderGame() {
           onDone={() => setCollecting(cs => cs.filter(x => x.key !== c.key))} />
       ))}
       {cascading && !collecting.length && (
-        <CardCascade piles={runs}
+        <Finale scene={spiderWeb} piles={runs} label="The Kings spin a web."
           onLaunch={key => setSpilled(sp => ({ ...sp, [key]: (sp[key] ?? 0) + 1 }))}
           onDone={() => setCascading(false)} />
       )}
