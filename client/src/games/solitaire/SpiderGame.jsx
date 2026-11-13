@@ -56,9 +56,10 @@ export default function SpiderGame() {
     const gone = [...game.tableau.flat(), ...game.stock].filter(c => !left.has(c.id) && !next.stock.some(s => s.id === c.id));
     const stock = document.querySelector('[data-stock]')?.getBoundingClientRect();
     const fallback = stock ? { left: stock.left, top: stock.top } : { left: window.innerWidth / 2, top: window.innerHeight };
-    const rectOf = id => {
-      const r = document.querySelector(`[data-card="${CSS.escape(id)}"]`)?.getBoundingClientRect();
-      return r ? { left: r.left, top: r.top } : null;
+    const where = id => {
+      const el = document.querySelector(`[data-card="${CSS.escape(id)}"]`);
+      const r = el?.getBoundingClientRect();
+      return r ? { rect: { left: r.left, top: r.top }, col: Number(el.dataset.col) } : { rect: null, col: null };
     };
     return next.done.slice(game.done.length).map((suit, k) => {
       const i = game.done.length + k;
@@ -66,7 +67,7 @@ export default function SpiderGame() {
       const cards = RANKS.map(rank => {
         const at = gone.findIndex(c => c.suit === suit && c.rank === rank);
         const card = at >= 0 ? gone.splice(at, 1)[0] : { id: `${rank}-${suit}-x${i}`, rank, suit };
-        return { card: { ...card, faceUp: true }, rect: rectOf(card.id) };
+        return { card: { ...card, faceUp: true }, ...where(card.id) };
       }).reverse();                                  // (King first)
       return { key: `run${i}`, cards, fallback };
     });
