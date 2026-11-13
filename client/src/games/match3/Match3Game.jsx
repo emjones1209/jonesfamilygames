@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Map as MapIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '../../components/Button';
-import { DadJokeModal } from '../../components/DadJokeModal';
+import { FlowerCelebration } from './FlowerCelebration';
 import api from '../../utils/api';
 import { RulesButton } from '../../components/RulesButton';
 import { useAuth } from '../../context/AuthContext';
@@ -60,7 +60,7 @@ export default function Match3Game() {
   const [score,        setScore]        = useState(0);
   const [collected,    setCollected]    = useState(0);
   const [blockersLeft, setBlockersLeft] = useState(0);
-  const [jokeOpen,     setJokeOpen]     = useState(false);
+  const [celebrating,  setCelebrating]  = useState(false);
   // A suggested move, remembered with the board and touch it was worked out
   // for, so it disappears as soon as the board changes or the player touches it
   const [hint,         setHint]         = useState(null);  // {r1,c1,r2,c2,board,touch}
@@ -125,16 +125,16 @@ export default function Match3Game() {
   // Sitting still? After a few seconds, suggest a move. The wait starts again
   // after every move, every press on the board and every change of screen.
   useEffect(() => {
-    if (!board || phase !== 'playing' || locked || jokeOpen || mapOpen || sel) return;
+    if (!board || phase !== 'playing' || locked || celebrating || mapOpen || sel) return;
     const t = setTimeout(() => {
       const h = findHint(board, level.target);
       if (h) setHint({ ...h, board, touch: touches });
     }, HINT_MS);
     return () => clearTimeout(t);
-  }, [board, phase, locked, jokeOpen, mapOpen, sel, level, touches]);
+  }, [board, phase, locked, celebrating, mapOpen, sel, level, touches]);
 
   const showHint = hint && hint.board === board && hint.touch === touches
-    && phase === 'playing' && !locked && !jokeOpen && !mapOpen && !sel;
+    && phase === 'playing' && !locked && !celebrating && !mapOpen && !sel;
   /** Which way a hinted tile should nudge (toward its partner), or null. */
   const hintNudge = (r, c) => {
     if (!showHint) return null;
@@ -181,12 +181,12 @@ export default function Match3Game() {
       setBlockersLeft(newBlockers);
       setMovesLeft(newMoves);
       if (isComplete(newScore, newCollect, newBlockers)) {
-        // Won: any moves left over go off as bonus stars, then the joke
+        // Won: any moves left over go off as bonus stars, then the flowers celebrate
         const bonus = leftoverBonus(res.board, newMoves);
         playSteps(bonus.steps, STEP_MS * 2);
         later(() => {
           setScore(newScore + bonus.totalScore);
-          setJokeOpen(true);
+          setCelebrating(true);
         }, STEP_MS * (bonus.steps.length + 2) + 250);
         return;
       }
@@ -217,8 +217,8 @@ export default function Match3Game() {
     swapTiles(sel.r, sel.c, r, c);
   }, [board, phase, locked, sel, swapTiles]);
 
-  const handleJokeClose = useCallback(async () => {
-    setJokeOpen(false);
+  const handleCelebrationClose = useCallback(async () => {
+    setCelebrating(false);
     // Unlock the next level straight away, then save the win (with its level,
     // which is how other devices learn how far you've got)
     const next = Math.max(reached, level.id + 1);
@@ -454,7 +454,7 @@ export default function Match3Game() {
         {notice || 'Swipe a flower toward a neighbour to swap them — or tap one, then the other'}
       </p>
 
-      <DadJokeModal isOpen={jokeOpen} onClose={handleJokeClose} />
+      <FlowerCelebration isOpen={celebrating} levelId={level.id} score={score} onClose={handleCelebrationClose} />
       {levelMap}
     </div>
   );
