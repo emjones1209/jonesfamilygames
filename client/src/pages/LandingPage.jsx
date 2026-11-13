@@ -35,6 +35,7 @@ const GAMES = [
   { id: 'match3',       name: 'Garden Match',  emoji: '🌸',  color: 'from-fuchsia-700 to-fuchsia-900', path: '/games/match3',       desc: 'Match flowers to bloom!' },
   { id: 'minesweeper',  name: 'Minesweeper',   emoji: '💣',  color: 'from-zinc-600 to-zinc-900',       path: '/games/minesweeper',  desc: 'Clear the minefield!' },
   { id: 'g2048',        name: '2048',          emoji: '🔢',  color: 'from-yellow-600 to-orange-800',   path: '/games/2048',         desc: 'Slide and join the numbers!' },
+  { id: 'wordspies',    name: 'Word Spies',    emoji: '🕵️',  color: 'from-slate-700 to-emerald-950',   path: '/games/wordspies',    desc: 'Clue words with the family' },
   { id: 'wordsearch',   name: 'Word Search',   emoji: '🔍',  color: 'from-violet-700 to-indigo-900',   path: '/games/wordsearch',   desc: 'A new theme every day!' },
 ];
 
@@ -127,7 +128,7 @@ export default function LandingPage() {
             <span className="text-4xl">👥</span>
             <span>
               <span className="block text-white font-bold">Play Together</span>
-              <span className="block text-white/60 text-xs">Card games, dominoes and dice with the family, each on your own iPad</span>
+              <span className="block text-white/60 text-xs">Card games, dominoes, dice and Word Spies with the family, each on your own iPad</span>
             </span>
           </button>
           {rejoin && (
