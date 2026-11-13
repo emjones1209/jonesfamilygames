@@ -377,6 +377,254 @@ function BusyBee() {
   );
 }
 
+// The flowers ride a Ferris wheel, staying the right way up as it turns
+function FerrisWheel() {
+  const R = 66, D = 9;
+  return (
+    <div className="absolute left-1/2" style={{ top: 108 }}>
+      {/* the stand */}
+      <div className="absolute w-1.5 h-32 bg-white/40 rounded-full origin-top" style={{ transform: 'rotate(25deg)' }} />
+      <div className="absolute w-1.5 h-32 bg-white/40 rounded-full origin-top" style={{ transform: 'rotate(-25deg)' }} />
+      <motion.div className="absolute w-0 h-0"
+        initial={{ scale: 0 }} animate={{ scale: 1, rotate: 360 }}
+        transition={{ scale: { type: 'spring', stiffness: 200, damping: 14 }, rotate: { duration: D, repeat: Infinity, ease: 'linear' } }}>
+        <div className="absolute rounded-full border-4 border-white/40"
+          style={{ width: R * 2, height: R * 2, left: -R, top: -R }} />
+        {FLOWERS.map((f, i) => {
+          const a = (i / FLOWERS.length) * 360;
+          return (
+            <div key={i} className="absolute w-0 h-0" style={{ transform: `rotate(${a}deg)` }}>
+              <div className="absolute h-0.5 bg-white/40 origin-left" style={{ width: R }} />
+              <div className="absolute w-0 h-0" style={{ left: R }}>
+                {/* undo the wheel's turn (and the spoke's) so each flower stays upright */}
+                <motion.span className="absolute text-3xl leading-none w-10 h-10 -ml-5 -mt-5 flex items-center justify-center"
+                  initial={{ rotate: -a }} animate={{ rotate: -a - 360 }}
+                  transition={{ duration: D, repeat: Infinity, ease: 'linear' }}>
+                  <motion.span className="inline-block" animate={{ rotate: [-8, 8, -8] }}
+                    transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}>
+                    {f}
+                  </motion.span>
+                </motion.span>
+              </div>
+            </div>
+          );
+        })}
+        <span className="absolute text-2xl leading-none w-8 h-8 -ml-4 -mt-4 flex items-center justify-center">⭐</span>
+      </motion.div>
+    </div>
+  );
+}
+
+// A disco ball spins, the lights flash, and the flowers dance
+function Disco() {
+  return (
+    <>
+      <motion.div className="absolute inset-0"
+        animate={{ backgroundColor: ['rgba(236,72,153,0.25)', 'rgba(59,130,246,0.25)', 'rgba(250,204,21,0.25)', 'rgba(34,197,94,0.25)', 'rgba(236,72,153,0.25)'] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }} />
+      {[-1, 1].map(side => (
+        <motion.div key={side} className="absolute top-8 left-1/2 w-24 h-56 -ml-12 origin-top bg-gradient-to-b from-white/40 to-transparent"
+          style={{ clipPath: 'polygon(45% 0, 55% 0, 100% 100%, 0 100%)' }}
+          animate={{ rotate: [side * 40, side * -20, side * 40] }}
+          transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }} />
+      ))}
+      <div className="absolute top-0 left-1/2 w-px h-4 bg-white/60" />
+      <motion.span className="absolute top-3 left-1/2 -ml-5 text-4xl leading-none"
+        initial={{ y: -60 }} animate={{ y: 0, rotate: [0, 15, -15, 0] }}
+        transition={{ y: { type: 'spring', stiffness: 120, damping: 10 }, rotate: { duration: 1, repeat: Infinity } }}>
+        🪩
+      </motion.span>
+      <div className="absolute inset-x-0 bottom-4 flex justify-around px-4">
+        {FLOWERS.map((f, i) => (
+          <motion.span key={i} className="text-3xl sm:text-4xl leading-none origin-bottom inline-block"
+            animate={{ y: [0, -24, 0], rotate: i % 2 ? [0, 15, 0, -15, 0] : [0, -15, 0, 15, 0], scaleX: [1, 0.9, 1.1, 1] }}
+            transition={{ delay: (i % 2) * 0.25, duration: 0.5, repeat: Infinity, ease: 'easeInOut' }}>
+            {f}
+          </motion.span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// Flowers pop up out of the grass, have a look around, and duck back down
+function Peekaboo() {
+  const delays = [0.2, 1.1, 0.6, 1.5, 0.9, 0.4];
+  return (
+    <>
+      <div className="absolute inset-x-0 bottom-6 flex justify-around px-4">
+        {FLOWERS.map((f, i) => (
+          <motion.span key={i} className="text-3xl sm:text-4xl leading-none inline-block"
+            initial={{ y: 60 }}
+            animate={{ y: [60, -22, -22, -30, -22, 60], rotate: [0, 0, -15, 15, 0, 0], scale: [1, 1.15, 1, 1, 1, 1] }}
+            transition={{ delay: delays[i], duration: 1.8, times: [0, 0.15, 0.4, 0.6, 0.8, 1], repeat: Infinity, repeatDelay: 0.6 }}>
+            {f}
+          </motion.span>
+        ))}
+      </div>
+      {/* tall grass in front for them to hide behind */}
+      <div className="absolute inset-x-0 bottom-0 h-9 bg-green-700 flex justify-around items-start text-xl leading-none -translate-y-0">
+        {Array.from({ length: 9 }, (_, i) => <span key={i} className="-mt-3">🌿</span>)}
+      </div>
+    </>
+  );
+}
+
+// The flowers topple over one after another like dominoes, then spring back up
+function Dominoes() {
+  return (
+    <div className="absolute inset-x-0 bottom-4 flex justify-around items-end px-2">
+      <motion.span className="text-2xl leading-none inline-block"
+        animate={{ x: [-6, 6, -6] }} transition={{ duration: 3, repeat: Infinity, times: [0, 0.05, 0.3] }}>
+        🐞
+      </motion.span>
+      {FLOWERS.map((f, i) => (
+        <motion.span key={i} className="text-3xl leading-none origin-bottom-right inline-block"
+          animate={{ rotate: [0, 0, 75, 75, -10, 0, 0] }}
+          transition={{ delay: 0.15 + i * 0.12, duration: 3, times: [0, 0.05, 0.12, 0.55, 0.62, 0.68, 1], repeat: Infinity }}>
+          {f}
+        </motion.span>
+      ))}
+    </div>
+  );
+}
+
+// Night falls: the moon comes up, stars twinkle, fireflies drift and the flowers glow
+function NightGarden() {
+  const stars = useMemo(() => Array.from({ length: 14 }, () => ({
+    left: Math.random() * 95, top: Math.random() * 50, delay: Math.random() * 2, size: 0.5 + Math.random() * 0.6,
+  })), []);
+  const flies = useMemo(() => Array.from({ length: 9 }, () => ({
+    left: 10 + Math.random() * 80, top: 40 + Math.random() * 35,
+    x: [0, 20 - Math.random() * 40, 20 - Math.random() * 40, 0],
+    y: [0, 15 - Math.random() * 30, 15 - Math.random() * 30, 0],
+    dur: 3 + Math.random() * 2, blink: 0.8 + Math.random(),
+  })), []);
+  return (
+    <>
+      <motion.div className="absolute inset-0 bg-indigo-950/80" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.5 }} />
+      <motion.span className="absolute right-6 text-5xl leading-none"
+        initial={{ top: 120, opacity: 0 }} animate={{ top: 12, opacity: 1 }} transition={{ duration: 1.8, ease: 'easeOut' }}>
+        🌙
+      </motion.span>
+      {stars.map((st, i) => (
+        <motion.span key={i} className="absolute leading-none" style={{ left: `${st.left}%`, top: `${st.top}%`, fontSize: `${st.size}rem` }}
+          initial={{ opacity: 0 }} animate={{ opacity: [0, 1, 0.3, 1] }}
+          transition={{ delay: 1 + st.delay, duration: 1.6, repeat: Infinity, repeatType: 'reverse' }}>
+          ✦
+        </motion.span>
+      ))}
+      {flies.map((f, i) => (
+        <motion.div key={i} className="absolute w-1.5 h-1.5 rounded-full bg-yellow-200 shadow-[0_0_8px_3px_rgba(253,230,138,0.8)]"
+          style={{ left: `${f.left}%`, top: `${f.top}%` }}
+          initial={{ opacity: 0 }}
+          animate={{ x: f.x, y: f.y, opacity: [0, 1, 0.2, 1] }}
+          transition={{ delay: 1.2, default: { duration: f.dur, repeat: Infinity, ease: 'easeInOut' }, opacity: { delay: 1.2, duration: f.blink, repeat: Infinity, repeatType: 'reverse' } }} />
+      ))}
+      <div className="absolute inset-x-0 bottom-4 flex justify-around px-4">
+        {FLOWERS.map((f, i) => (
+          <motion.span key={i} className="text-3xl sm:text-4xl leading-none inline-block"
+            animate={{ filter: ['drop-shadow(0 0 0px #fde68a)', 'drop-shadow(0 0 10px #fde68a)', 'drop-shadow(0 0 2px #fde68a)'] }}
+            transition={{ delay: 1.5 + i * 0.2, duration: 1.5, repeat: Infinity, repeatType: 'reverse' }}>
+            {f}
+          </motion.span>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// A frog leapfrogs over the flowers, and each one ducks as it goes over
+function FrogHop() {
+  const n = FLOWERS.length, D = 5;
+  const pos = i => `${((i + 0.5) / n) * 100}%`;
+  // Land between flowers, jumping high over each one
+  const left = ['-12%'], y = [0], overAt = [];
+  for (let k = 0; k <= n; k++) {
+    left.push(`${(k / n) * 100}%`, k < n ? pos(k) : '106%'); y.push(0, -75);
+    if (k < n) overAt.push(left.length - 1);
+  }
+  left.push('115%'); y.push(0);
+  const steps = left.length - 1;
+  return (
+    <div className="absolute inset-x-4 bottom-4 top-0">
+      {FLOWERS.map((f, i) => (
+        <motion.span key={i} className="absolute bottom-0 text-3xl leading-none -translate-x-1/2 origin-bottom"
+          style={{ left: pos(i) }}
+          animate={{ scaleY: [1, 0.55, 1.15, 1] }}
+          transition={{ delay: (overAt[i] / steps) * D - 0.15, duration: 0.45, repeat: Infinity, repeatDelay: D - 0.45 }}>
+          {f}
+        </motion.span>
+      ))}
+      <motion.span className="absolute bottom-0 text-4xl leading-none -translate-x-1/2"
+        initial={{ left: '-12%' }}
+        animate={{ left, y }}
+        transition={{ duration: D, repeat: Infinity, ease: 'linear' }}>
+        🐸
+      </motion.span>
+    </div>
+  );
+}
+
+// Flowers drop from the sky and stack up into a wobbly tower
+function FlowerTower() {
+  return (
+    <motion.div className="absolute left-1/2 bottom-6 w-0 h-0 origin-bottom"
+      animate={{ rotate: [0, 4, -4, 3, -3, 0] }}
+      transition={{ delay: FLOWERS.length * 0.45 + 0.4, duration: 2, repeat: Infinity, repeatDelay: 0.5 }}>
+      {FLOWERS.map((f, i) => (
+        <motion.span key={i} className="absolute text-3xl leading-none -translate-x-1/2"
+          style={{ bottom: i * 30 }}
+          initial={{ y: -300, opacity: 0 }}
+          animate={{ y: 0, opacity: 1, scaleY: [1, 1, 0.7, 1], scaleX: [1, 1, 1.25, 1] }}
+          transition={{
+            y: { delay: i * 0.45, type: 'spring', stiffness: 260, damping: 16 },
+            opacity: { delay: i * 0.45, duration: 0.1 },
+            scaleY: { delay: i * 0.45 + 0.2, duration: 0.3 },
+            scaleX: { delay: i * 0.45 + 0.2, duration: 0.3 },
+          }}>
+          {f}
+        </motion.span>
+      ))}
+    </motion.div>
+  );
+}
+
+// Flowers fly in from all around to make a big beating heart
+function FlowerHeart() {
+  const n = 16;
+  const points = Array.from({ length: n }, (_, i) => {
+    const t = (i / n) * Math.PI * 2;
+    return {
+      x: 16 * Math.sin(t) ** 3 * 4.2,
+      y: -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * 4.2,
+      from: { x: Math.cos(t * 3) * 260, y: Math.sin(t * 3) * 260 },
+      f: FLOWERS[i % FLOWERS.length],
+    };
+  });
+  return (
+    <div className="absolute inset-0 flex items-center justify-center">
+      <motion.div className="relative w-0 h-0" style={{ top: 6 }}
+        animate={{ scale: [1, 1.12, 1, 1.12, 1] }}
+        transition={{ delay: 1.6, duration: 1.2, repeat: Infinity, repeatDelay: 0.4 }}>
+        {points.map((p, i) => (
+          <motion.span key={i} className="absolute text-2xl leading-none -translate-x-1/2 -translate-y-1/2"
+            initial={{ x: p.from.x, y: p.from.y, rotate: 360, opacity: 0 }}
+            animate={{ x: p.x, y: p.y, rotate: 0, opacity: 1 }}
+            transition={{ delay: 0.2 + i * 0.06, duration: 0.9, ease: 'easeOut' }}>
+            {p.f}
+          </motion.span>
+        ))}
+        <motion.span className="absolute text-4xl leading-none -translate-x-1/2 -translate-y-1/2"
+          initial={{ scale: 0 }} animate={{ scale: [0, 1.4, 1] }}
+          transition={{ delay: 1.4, duration: 0.5 }}>
+          💖
+        </motion.span>
+      </motion.div>
+    </div>
+  );
+}
+
 export const SHOWS = [
   { title: 'The garden is in bloom!', Show: Bloom },
   { title: "It's raining flowers!",  Show: Shower },
@@ -391,6 +639,14 @@ export const SHOWS = [
   { title: 'Up, up and away!',        Show: Balloons },
   { title: 'Over the rainbow!',       Show: Rainbow },
   { title: 'Busy, busy bee!',         Show: BusyBee },
+  { title: 'All aboard the Ferris wheel!', Show: FerrisWheel },
+  { title: 'Garden disco!',           Show: Disco },
+  { title: 'Peekaboo!',               Show: Peekaboo },
+  { title: 'Flower dominoes!',        Show: Dominoes },
+  { title: 'Goodnight, garden!',      Show: NightGarden },
+  { title: 'Leapfrog!',               Show: FrogHop },
+  { title: 'Flower tower!',           Show: FlowerTower },
+  { title: 'Flowers full of love!',   Show: FlowerHeart },
 ];
 
 export function FlowerCelebration({ isOpen, levelId, score, onClose }) {
