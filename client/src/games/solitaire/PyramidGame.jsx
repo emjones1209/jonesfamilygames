@@ -12,7 +12,8 @@ import {
 import { SCard, Slot, SolitaireHeader, WinBox } from './SolitaireKit';
 import { useCardDrag, carried } from './useCardDrag';
 import { useBoardWidth, cardHeight, useNote, useHistory, lessMotion, secondsSince, count } from './solitaireHelpers';
-import { CardCascade } from './CardCascade';
+import { Finale } from './Finale';
+import { pyramidLight } from './finaleScenes';
 import { Button } from '../../components/Button';
 import api from '../../utils/api';
 
@@ -106,7 +107,7 @@ export default function PyramidGame() {
         onUndo={undo} canUndo={history.canUndo && !won} onRestart={restart} onHint={showHint} />
 
       {/* The pyramid */}
-      <div className="relative mx-auto mt-2" style={{ width: ROWS * w + (ROWS - 1) * gap, height: (ROWS - 1) * h * 0.5 + h }}>
+      <div data-finale className="relative mx-auto mt-2" style={{ width: ROWS * w + (ROWS - 1) * gap, height: (ROWS - 1) * h * 0.5 + h }}>
         {game.pyramid.map((card, i) => {
           if (!card) return null;
           const r = rowOf(i), c = i - indexOf(r, 0);
@@ -165,7 +166,11 @@ export default function PyramidGame() {
       )}
 
       {cascading && (
-        <CardCascade piles={[{ key: 'removed', cards: game.removed }]}
+        <Finale scene={pyramidLight} piles={[{ key: 'removed', cards: game.removed }]} label="The pyramid is rebuilt in gold."
+          layout={{ w, h, spots: game.pyramid.map((_, i) => {
+            const r = rowOf(i), c = i - indexOf(r, 0);
+            return { x: ((ROWS - 1 - r) / 2 + c) * (w + gap), y: r * h * 0.5, row: r };
+          }) }}
           onLaunch={() => setSpilled(n => n + 1)} onDone={() => setCascading(false)} />
       )}
       <WinBox show={won && !cascading} onAgain={restart} lines={[`Cleared on pass ${game.pass} of ${PASSES}`, count(game.moves, 'move')]} />
