@@ -3,7 +3,8 @@
  * Kings first, and bounce across the screen, each leaving a trail of itself behind
  * (the canvas is never cleared), and throwing up a burst of sparkles each time it hits the
  * bottom of the screen (drawn on a second canvas over the first, which is cleared every frame,
- * so they twinkle and fade without leaving trails). Tap anywhere to skip it.
+ * so they twinkle and fade without leaving trails). Tap anywhere to skip it (once it has been
+ * going for a moment: see skipOnTap).
  *
  * `piles` are the piles the cards leave from — [{ key, cards }], each pile bottom card first,
  * drawn on the page in an element marked data-cascade={key}. The top cards go first, taking
@@ -11,7 +12,7 @@
  * the card under it), and `onDone()` when the last one is gone.
  */
 import { useEffect, useRef } from 'react';
-import { drawCard, GOLD_RGB, PALE } from './canvasCards';
+import { drawCard, GOLD_RGB, PALE, skipOnTap } from './canvasCards';
 
 const GRAVITY = 0.5;          // px per frame²
 const LAUNCH_EVERY = 14;      // frames between cards leaving the foundations
@@ -157,8 +158,8 @@ export function CardCascade({ piles, onLaunch, onDone }) {
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    el.addEventListener('pointerdown', finish);
-    return () => { cancelAnimationFrame(raf); el.removeEventListener('pointerdown', finish); };
+    const stopListening = skipOnTap(el, finish);
+    return () => { cancelAnimationFrame(raf); stopListening(); };
     // (it runs once, from the piles as they were when the game was won)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
