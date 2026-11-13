@@ -22,6 +22,7 @@ export default function TriPeaksGame() {
   const [shown, setShown] = useState(null);        // a hint: { play: i } or { draw: true }
   const [won, setWon] = useState(false);
   const [cascading, setCascading] = useState(false);
+  const [erupting, setErupting] = useState(false);  // (the volcanoes keep going behind the "You win" box)
   const [spilled, setSpilled] = useState(0);
   const [note, setNote] = useNote();
   const history = useHistory();
@@ -47,10 +48,11 @@ export default function TriPeaksGame() {
     if (isWon(next)) {
       setWon(true);
       setCascading(!lessMotion());
+      setErupting(!lessMotion());
       api.post('/scores', { game: 'tripeaks', score: next.score + next.stock.length * 5, durationS: secondsSince(next.started) }).catch(() => {});
     }
   };
-  const restart = () => { setGame(fresh()); history.clear(); setShown(null); setWon(false); setCascading(false); setSpilled(0); };
+  const restart = () => { setGame(fresh()); history.clear(); setShown(null); setWon(false); setCascading(false); setErupting(false); setSpilled(0); };
   const undo = () => { const last = history.pop(); if (last) { setGame(last); setShown(null); } };
 
   const tap = i => {
@@ -119,8 +121,8 @@ export default function TriPeaksGame() {
         </div>
       )}
 
-      {cascading && (
-        <Finale scene={volcanoes} piles={[{ key: 'waste', cards: game.waste }]} label="The peaks erupt."
+      {erupting && (
+        <Finale scene={volcanoes} keepGoing piles={[{ key: 'waste', cards: game.waste }]} label="The peaks erupt."
           layout={{ w, half: 1.5 * (w + gap) + w / 2, peaks: [0, 1, 2].map(j => placeOf(j).x * (w + gap) + w / 2) }}
           onLaunch={() => setSpilled(n => n + 1)} onDone={() => setCascading(false)} />
       )}

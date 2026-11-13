@@ -2,7 +2,7 @@
  * A win animation drawn on a canvas over the whole page, for the solitaire games that don't use
  * Klondike's bouncing cards (CardCascade). Each game has its own scene (finaleScenes.js).
  *
- * `scene` is called once with { ctx, width, height, piles, spot, layout, launch } and gives back
+ * `scene` is called once with { ctx, width, height, piles, spot, layout, launch, settled } and gives back
  * a function that draws one frame: it's called with the time since the start (ms), on a cleared
  * canvas, and returns false once the scene is over.
  *   - `piles` are [{ key, cards }] as for CardCascade (each pile bottom card first), drawn on the
@@ -10,11 +10,13 @@
  *   - `layout` is anything else the scene needs from the game (where the pyramid was, say), as the
  *     game gives it, plus `anchor`: where the page's element marked data-finale is on screen.
  *   - `launch(key)` tells the game a card has left pile `key` (so it can show the card under it).
- * Tap anywhere to skip it; `onDone()` is called either way.
+ *   - `settled()` says the main part of the show is over (for a scene that never ends by itself).
+ * Tap anywhere to skip it; `onDone()` is called either way. With `keepGoing`, the scene carries on
+ * after that (behind the "You win" box) until the game takes it away.
  */
 import { useEffect, useRef } from 'react';
 
-export function Finale({ scene, piles, layout = {}, label, onLaunch, onDone }) {
+export function Finale({ scene, piles, layout = {}, label, keepGoing = false, onLaunch, onDone }) {
   const canvas = useRef(null);
   const callbacks = useRef({ onLaunch, onDone });
   useEffect(() => { callbacks.current = { onLaunch, onDone }; });
@@ -33,23 +35,23 @@ export function Finale({ scene, piles, layout = {}, label, onLaunch, onDone }) {
       return [key, box ?? { left: width - 60, top: 20, width: 40, height: 56 }];
     }));
     const anchor = document.querySelector('[data-finale]')?.getBoundingClientRect() ?? { left: 0, top: 0, width, height: height / 2 };
-    const frame = scene({ ctx, width, height, piles, spot, layout: { ...layout, anchor },
-      launch: key => callbacks.current.onLaunch?.(key) });
-
     let raf = 0, start = null, finished = false;
     const finish = () => {
       if (finished) return;
       finished = true;
-      cancelAnimationFrame(raf);
+      if (!keepGoing) cancelAnimationFrame(raf);
       callbacks.current.onDone();
     };
+    const frame = scene({ ctx, width, height, piles, spot, layout: { ...layout, anchor },
+      launch: key => callbacks.current.onLaunch?.(key), settled: finish });
+
     const tick = now => {
       if (start == null) start = now;
       ctx.clearRect(0, 0, width, height);
       ctx.save();
       const more = frame(now - start);
       ctx.restore();
-      if (more === false) { finish(); return; }
+      if (more === false) { finish(); if (!keepGoing) return; }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
