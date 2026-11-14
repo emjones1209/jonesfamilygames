@@ -26,7 +26,7 @@ const LOOKS = {
   g: { solid: 'bg-emerald-500 text-emerald-950 border-2 border-emerald-200', faint: 'bg-[#efe6d2] text-emerald-800 border-[5px] border-emerald-500', badge: '✓' },
 };
 const HIDDEN = 'bg-[#efe6d2] text-stone-900 border-2 border-[#fff8e8]';
-// Together: a bystander turned up here on one side's clue, but the card is still in play
+// Together: a bystander on the other side's key, so you can't guess it any more (they still might)
 const MISSED = 'bg-rose-200 text-rose-950 border-2 border-dashed border-rose-400';
 
 const teamName = (mode, t) => (mode === 'teams' ? `${TEAM_EMOJI[t]} ${TEAMS[t]}` : `${SIDE_EMOJI[t]} Side ${SIDES[t]}`);
@@ -85,8 +85,11 @@ export function WordSpiesTable({ view, names, onAction, onExit, error, reactions
     if (shown) { look = LOOKS[shown].solid; badge = LOOKS[shown].badge; } else if (secret && (secret !== 'n' || over)) {
       look = LOOKS[secret].faint; badge = LOOKS[secret].badge;
     }
-    const missed = !teams ? [0, 1].filter(t => v.missed[t][i]) : [];
-    if (!shown && missed.length > 0 && look === HIDDEN) look = MISSED;
+    // Together: you guess on the other side's clues, so only a bystander on THEIR key rules a word out
+    // for you. One on your own key you already know about, and you can still guess that word.
+    const outForMe = !teams && !shown && v.missed[1 - mySide][i];
+    const outForAll = outForMe && v.missed[mySide][i];
+    if (outForAll) { look = LOOKS.n.solid; badge = LOOKS.n.badge; } else if (outForMe && look === HIDDEN) look = MISSED;
     const can = myGuess && guessable(v, i);
     const w = v.words[i];
     return (
@@ -97,11 +100,9 @@ export function WordSpiesTable({ view, names, onAction, onExit, error, reactions
         style={{ aspectRatio: '1.55', fontSize: `min(${19 / Math.max(w.length, 5)}cqw, 3.4cqw)`, letterSpacing: '0.02em' }}>
         <span className="px-0.5 whitespace-nowrap text-center">{w}</span>
         {badge && <span className="absolute top-0.5 right-1" style={{ fontSize: '2.2cqw' }}>{badge}</span>}
-        {/* Together: a bystander already turned up here on a side's clue */}
-        {missed.length > 0 && !shown && (
-          <span className="absolute bottom-0.5 left-1 font-normal normal-case" style={{ fontSize: '1.9cqw' }}>
-            {missed.map(t => `🚶${SIDES[t]}`).join(' ')}
-          </span>
+        {/* Together: a bystander on the other side's key, so not one for you to guess */}
+        {outForMe && !outForAll && (
+          <span className="absolute bottom-0.5 left-1 font-normal normal-case" style={{ fontSize: '1.9cqw' }}>🚶 not yours</span>
         )}
         {/* At the end: what the other side's key said */}
         {over && !teams && theirs && theirs !== 'n' && (
