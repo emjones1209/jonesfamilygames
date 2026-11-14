@@ -41,6 +41,8 @@ import { rotate as rotateCheckers, unrotateAction as unrotateCheckers, waitingFo
 import { CheckersTable } from '../games/checkers/CheckersTable';
 import { rotate as rotateChess, waitingFor as waitingChess } from '../games/chess/chessEngine';
 import { ChessTable } from '../games/chess/ChessTable';
+import { rotate as rotateWordSpies, waitingOn as waitingOnWordSpies, startProblem as wordSpiesProblem, TURN_CHOICES } from '../games/wordspies/wordSpiesEngine';
+import { WordSpiesTable } from '../games/wordspies/WordSpiesTable';
 import { LAST_TABLE_KEY } from './PlayTogetherPage';
 import { ReactionBursts, ReactionPicker, REACTION_MS } from '../components/Reactions';
 import { TurnAlert, TurnSoundToggle } from '../components/TurnAlert';
@@ -98,6 +100,19 @@ const GAMES = {
     name: 'Five Dice', Table: DiceTable, rotate: rotateDice, minSeats: 2,
     seatNote: '2 to 4 players. Empty seats are left out when the game starts.',
   },
+  // People only: clues need a person's imagination (and robots would know the key)
+  wordspies: {
+    name: 'Word Spies', Table: WordSpiesTable, rotate: rotateWordSpies, minSeats: 2, noRobots: true, teams: true,
+    startProblem: wordSpiesProblem,
+    seatNote: o => (o?.mode === 'teams'
+      ? '☀️ Sun against 🌙 Moon: seats take turns between the teams. 4 to 8 players, at least 2 on each team.'
+      : 'Everyone together against the game: seats take turns between side A and side B, and each side sees its own key. 2 to 8 players.'),
+    teamLabel: (i, o) => (o?.mode === 'teams' ? ['☀️ Sun team', '🌙 Moon team'][i % 2] : ['🔶 Side A', '🔷 Side B'][i % 2]),
+    options: [
+      { key: 'mode', label: 'How to play', values: ['together', 'teams'], names: { together: '🤝 Together', teams: '☀️🌙 Teams' } },
+      { key: 'turns', label: 'Turns', values: TURN_CHOICES, unit: 'turn', when: o => o?.mode !== 'teams' },
+    ],
+  },
 };
 // The seats each game is waiting on (several at once in some games, e.g. everyone
 // passing in Hearts), so the table can tell you when it's your turn
@@ -117,6 +132,7 @@ const WAITING = {
   cribbage: waitingOnCribbage,
   checkers: v => [waitingCheckers(v)],
   chess: v => [waitingChess(v)],
+  wordspies: waitingOnWordSpies,
 };
 const LEVELS = [['easy', 'Easy'], ['medium', 'Medium'], ['hard', 'Hard']];
 const remember = code => { try { localStorage.setItem(LAST_TABLE_KEY, code); } catch { /* private mode */ } };
@@ -210,7 +226,7 @@ export default function TablePage() {
   const you = table.you;
   const isHost = table.hostId === user?.id;
   const seatName = seat => (!seat ? 'Empty seat' : seat.type === 'robot' ? `🤖 ${seat.name}`
-    : seat.name + (seat.away ? ' (robot playing)' : !seat.connected ? (table.status === 'lobby' ? ' (away)' : ' (reconnecting…)') : ''));
+    : seat.name + (seat.away ? (game.noRobots ? ' (left)' : ' (robot playing)') : !seat.connected ? (table.status === 'lobby' ? ' (away)' : ' (reconnecting…)') : ''));
   const banner = !connected && (
     <div className="fixed top-safe left-0 right-0 z-50 bg-amber-500 text-game-bg text-center text-sm font-semibold py-1">
       Reconnecting…
@@ -234,10 +250,14 @@ export default function TablePage() {
     const host = hostSeat?.name ?? 'the host';
     const filled = table.seats.filter(Boolean).length;
     const needed = (game.minSeats ?? n) - filled;
-    const option = game.option;
-    const chosen = option && table.options?.[option.key];
-    const chosenText = option ? `${chosen} ${option.unit}${chosen === 1 ? '' : 's'}` : '';
-    const teamOf = i => (you != null ? (i % 2 === you % 2 ? 'Your team' : 'Other team') : `Team ${i % 2 ? 'B' : 'A'}`);
+    // The settings the host picks (some only matter in one way of playing)
+    const options = (game.options ?? (game.option ? [game.option] : [])).filter(o => !o.when || o.when(table.options));
+    const valueText = (o, v) => o.names?.[v] ?? `${v} ${o.unit}${v === 1 ? '' : 's'}`;
+    const chosenText = options.map(o => valueText(o, table.options?.[o.key])).join('; ');
+    const problem = needed <= 0 && game.startProblem?.(table.seats.map((s, i) => (s ? i : -1)).filter(i => i >= 0), table.options);
+    const seatNote = typeof game.seatNote === 'function' ? game.seatNote(table.options) : game.seatNote;
+    const teamOf = i => (game.teamLabel ? game.teamLabel(i, table.options) + (you != null && i % 2 === you % 2 ? ' (yours)' : '')
+      : you != null ? (i % 2 === you % 2 ? 'Your team' : 'Other team') : `Team ${i % 2 ? 'B' : 'A'}`);
     const moveTo = i => { send('mp:swap', { from: moving, to: i }); setMoving(null); };
     const small = 'text-sm text-white bg-white/10 rounded-lg px-3 min-h-[40px]';
     const invite = async () => {
@@ -270,7 +290,7 @@ export default function TablePage() {
           )}
 
           <div className="card-panel flex flex-col gap-2">
-            <p className="text-white/50 text-xs">{game.seatNote}</p>
+            <p className="text-white/50 text-xs">{seatNote}</p>
             {table.seats.map((seat, i) => (
               <div key={i} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${i === you ? 'bg-game-gold/20 border border-game-gold' : i === moving ? 'bg-white/15 border border-white/40' : 'bg-white/5'}`}>
                 <span className="text-white/40 text-sm w-6">{i + 1}</span>
@@ -286,41 +306,45 @@ export default function TablePage() {
                 ) : (
                   <>
                     {!seat && <button onClick={() => send('mp:sit', { seat: i })} className={small}>Sit here</button>}
-                    {!seat && <button onClick={() => send('mp:robot', { seat: i, on: true })} className={small}>Add robot</button>}
+                    {!seat && !game.noRobots && <button onClick={() => send('mp:robot', { seat: i, on: true })} className={small}>Add robot</button>}
                     {seat && isHost && <button onClick={() => setMoving(i)} className={small}>Move</button>}
                     {seat?.type === 'robot' && <button onClick={() => send('mp:robot', { seat: i, on: false })} className={small}>Remove</button>}
                   </>
                 )}
               </div>
             ))}
-            {isHost && game.teams && <p className="text-white/50 text-xs">Tap Move to choose who partners whom.</p>}
+            {isHost && game.teams && <p className="text-white/50 text-xs">Tap Move to choose {game.teamLabel ? "who's on which side" : 'who partners whom'}.</p>}
           </div>
 
           {isHost ? (
             <div className="card-panel flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-white/70 text-sm">Robots play at</span>
-                <div className="flex gap-1">
-                  {LEVELS.map(([l, label]) => (
-                    <button key={l} onClick={() => send('mp:level', { level: l })}
-                      className={`rounded-lg px-3 min-h-[40px] text-sm ${table.level === l ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white'}`}>{label}</button>
-                  ))}
-                </div>
-              </div>
-              {option && (
+              {!game.noRobots && (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-white/70 text-sm">{option.label}</span>
+                  <span className="text-white/70 text-sm">Robots play at</span>
                   <div className="flex gap-1">
-                    {option.values.map(v => (
-                      <button key={v} onClick={() => send('mp:option', { key: option.key, value: v })}
-                        className={`rounded-lg px-4 min-h-[40px] text-sm ${chosen === v ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white'}`}>{v}</button>
+                    {LEVELS.map(([l, label]) => (
+                      <button key={l} onClick={() => send('mp:level', { level: l })}
+                        className={`rounded-lg px-3 min-h-[40px] text-sm ${table.level === l ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white'}`}>{label}</button>
                     ))}
                   </div>
                 </div>
               )}
-              <Button variant="gold" disabled={needed > 0} onClick={() => send('mp:start')}>
-                {needed > 0 ? `Waiting for ${needed} more (or add robots)`
-                  : filled < n ? `Start with ${filled} players` : 'Start the game'}
+              {options.map(option => (
+                <div key={option.key} className="flex items-center justify-between gap-2">
+                  <span className="text-white/70 text-sm">{option.label}</span>
+                  <div className="flex gap-1">
+                    {option.values.map(v => (
+                      <button key={v} onClick={() => send('mp:option', { key: option.key, value: v })}
+                        className={`rounded-lg px-4 min-h-[40px] text-sm ${table.options?.[option.key] === v ? 'bg-game-gold text-game-bg font-bold' : 'bg-white/10 text-white'}`}>{option.names?.[v] ?? v}</button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {problem && <p className="text-amber-300 text-sm text-center">{problem}</p>}
+              <Button variant="gold" disabled={needed > 0 || !!problem} onClick={() => send('mp:start')}>
+                {needed > 0 ? `Waiting for ${needed} more${game.noRobots ? '' : ' (or add robots)'}`
+                  : problem ? 'Not ready yet'
+                    : filled < n ? `Start with ${filled} players` : 'Start the game'}
               </Button>
               <p className="text-white/40 text-xs text-center">
                 Going back keeps this table open for a few hours, so people you&apos;ve invited can still join. It&apos;ll be on your home screen.
@@ -335,7 +359,7 @@ export default function TablePage() {
                 </p>
               )}
               <p className="text-white/60">
-                Waiting for {host} to start the game… (robots play at {table.level}{option ? `; ${chosenText}` : ''})
+                Waiting for {host} to start the game… ({[game.noRobots ? '' : `robots play at ${table.level}`, chosenText].filter(Boolean).join('; ')})
               </p>
             </div>
           )}
@@ -370,7 +394,12 @@ export default function TablePage() {
   const names = Array.from({ length: n }, (_, i) => {
     const seat = table.seats[(i + you) % n];
     if (i === 0) return 'You';
-    return seat.away ? `${seat.name} 🤖` : seat.name;
+    return seat.away && !game.noRobots ? `${seat.name} 🤖` : seat.name;
+  });
+  // Who has gone (turned the same way as the names), for games that let someone else take over their job
+  const absent = Array.from({ length: n }, (_, i) => {
+    const seat = table.seats[(i + you) % n];
+    return seat.type === 'human' && (!seat.connected || seat.away);
   });
   const shown = {};
   for (const r of reactions) shown[(r.seat - you + n) % n] = r.emoji;
@@ -387,7 +416,7 @@ export default function TablePage() {
     <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm card-panel border-2 border-amber-400 p-3 flex flex-col gap-2 shadow-xl">
       {left.map(i => (
         <div key={`left${i}`} className="flex flex-col gap-2">
-          <p className="text-white text-sm text-center">👋 <b>{table.seats[i].name}</b> has left the table. A robot 🤖 is playing in their seat now.</p>
+          <p className="text-white text-sm text-center">👋 <b>{table.seats[i].name}</b> has left the table. {game.noRobots ? 'They can come back with the table code.' : 'A robot 🤖 is playing in their seat now.'}</p>
           <div className="flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={leave}>Leave too</Button>
             <Button variant="gold" className="flex-1" onClick={() => setToldLeft(w => [...w, i])}>Keep playing</Button>
@@ -398,8 +427,8 @@ export default function TablePage() {
         <div key={i} className="flex flex-col gap-2">
           <p className="text-white text-sm text-center">📵 <b>{table.seats[i].name}</b> has lost their connection.</p>
           <div className="flex gap-2">
-            <Button variant="gold" className="flex-1" onClick={() => send('mp:standIn', { seat: i })}>🤖 Play for {table.seats[i].name}</Button>
-            <Button variant="ghost" className="flex-1" onClick={() => setWaiting(w => [...w, i])}>Keep waiting</Button>
+            {!game.noRobots && <Button variant="gold" className="flex-1" onClick={() => send('mp:standIn', { seat: i })}>🤖 Play for {table.seats[i].name}</Button>}
+            <Button variant="ghost" className="flex-1" onClick={() => setWaiting(w => [...w, i])}>{game.noRobots ? 'OK — we\'ll wait' : 'Keep waiting'}</Button>
           </div>
         </div>
       ))}
@@ -407,7 +436,7 @@ export default function TablePage() {
   );
 
   return (
-    <game.Table view={view} names={names} error={error} reactions={shown}
+    <game.Table view={view} names={names} error={error} reactions={shown} absent={absent}
       // The server fills in your real seat; anything counted from your seat is turned back first
       onAction={action => send('mp:action', { action: game.unrotate ? game.unrotate(action, you, n) : action })}
       onExit={() => navigate('/')}

@@ -28,6 +28,7 @@ An ad-free web app suite of games for the whole family, optimized for iPad.
 - 💣 Minesweeper
 - 🔢 2048
 - 🔍 Word Search (a new theme every day)
+- 🕵️ Word Spies (one-word clues, played together: everyone against the game, or ☀️ Sun vs 🌙 Moon teams — people only, no robots)
 
 ## Features
 - Full user accounts (JWT auth)

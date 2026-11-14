@@ -4,7 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '../components/Button';
 import { request } from '../utils/socket';
 
-// Every game with computer players can be played together
+// Every game with computer players can be played together — and Word Spies, which is for people only
 const GAMES = [
   { id: 'rook', name: 'Rook', emoji: '🐦', note: '4 players · partners' },
   { id: 'golf', name: '6-Card Golf', emoji: '⛳', note: '2–4 players' },
@@ -21,6 +21,7 @@ const GAMES = [
   { id: 'canasta', name: 'Canasta', emoji: '♣️', note: '4 players · partners' },
   { id: 'handfoot', name: 'Hand and Foot', emoji: '🦶', note: '3 players, or 4 as partners' },
   { id: 'bridge', name: 'Bridge', emoji: '🌉', note: '4 players · partners' },
+  { id: 'wordspies', name: 'Word Spies', emoji: '🕵️', note: '2–8 players · people only' },
 ];
 
 export const LAST_TABLE_KEY = 'lastTable';

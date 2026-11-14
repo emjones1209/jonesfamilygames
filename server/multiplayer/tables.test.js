@@ -533,3 +533,63 @@ test('"Rejoin your table" comes from the server, so it works on any device you s
   await until(() => aunt.socket.connected);
   assert.deepEqual(await aunt.emit('mp:mine', null), { tables: [] });
 });
+
+test('Word Spies: people only, teams from the seats, and the key stays secret', async () => {
+  const [mom, dad, kid, gran] = [player(201, 'Mom'), player(202, 'Dad'), player(203, 'Kid'), player(204, 'Gran')];
+  await until(() => [mom, dad, kid, gran].every(p => p.socket.connected));
+  const { code } = await mom.emit('mp:create', { game: 'wordspies' });
+  for (const p of [dad, kid]) await p.emit('mp:join', { code });
+  assert.equal(mom.table.options.mode, 'together');
+
+  // No robots, not even when asked
+  mom.socket.emit('mp:robot', { seat: 3, on: true });
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(mom.table.seats.filter(Boolean).length, 3);
+
+  // Teams need two each: three people aren't enough
+  mom.socket.emit('mp:option', { key: 'mode', value: 'teams' });
+  await until(() => mom.table.options.mode === 'teams');
+  mom.socket.emit('mp:start');
+  await until(() => mom.errors.length > 0);
+  assert.match(mom.errors.at(-1), /at least 2 players each/);
+  assert.equal(mom.table.status, 'lobby');
+
+  await gran.emit('mp:join', { code });
+  mom.socket.emit('mp:start');
+  await until(() => [mom, dad, kid, gran].every(p => p.table?.status === 'playing' && p.table.view));
+  const v = mom.table.view;
+  assert.deepEqual(v.side, [0, 1, 0, 1]);
+  assert.deepEqual(v.cluers, [0, 1]);
+  // The clue givers (Mom and Dad) see the key; the guessers don't — and nobody is sent the whole state
+  assert.equal(mom.table.view.mine.length, 25);
+  assert.equal(dad.table.view.mine.length, 25);
+  assert.equal(kid.table.view.mine, null);
+  assert.equal(gran.table.view.mine, null);
+  for (const p of [mom, dad, kid, gran]) assert.equal(p.table.view.key, undefined);
+
+  // Kid can't take over the clues while Mom's here…
+  kid.socket.emit('mp:action', { action: { type: 'takeClues' } });
+  await until(() => kid.errors.length > 0);
+  assert.match(kid.errors.at(-1), /Mom is still here/);
+
+  // A clue, and a guess by the right team
+  const t = v.turn;
+  const cluer = [mom, dad][t], guesser = [kid, gran][t];
+  cluer.socket.emit('mp:action', { action: { type: 'clue', word: 'xylophone', count: 2 } });
+  await until(() => guesser.table.view.phase === 'guess');
+  assert.equal(guesser.table.view.clue.word, 'xylophone');
+  guesser.socket.emit('mp:action', { action: { type: 'guess', card: 0 } });
+  await until(() => guesser.table.view.shown[0] !== null);
+
+  // …but once Mom has gone, Kid can
+  mom.socket.disconnect();
+  await until(() => kid.table.seats[0].connected === false);
+  kid.socket.emit('mp:action', { action: { type: 'takeClues' } });
+  await until(() => kid.table.view.cluers[0] === 2);
+  assert.equal(kid.table.view.mine.length, 25);
+  // …and no robot is offered to stand in for her
+  await new Promise(r => setTimeout(r, 120));
+  dad.socket.emit('mp:standIn', { seat: 0 });
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(dad.table.seats[0].away, false);
+});

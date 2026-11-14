@@ -40,6 +40,9 @@
 // seats: the table's size; minSeats: fewest players a game can start with (else every seat)
 // moves: a player's own moves; tableMoves: moves anyone at the table can make (e.g. deal again)
 // pace: robots take this many times longer over each step (for games whose turns are several steps)
+// noRobots: people only (no robots in seats, nor standing in for someone who's gone)
+// seatOrder: the game is told which lobby seats were filled (Word Spies' teams alternate round the table)
+// allow(table, move): a game's own check on a move, at the table (returns why it isn't allowed, or null)
 const load = name => require(`../../client/src/games/${name}.js`);
 const GAMES = {
   rook: {
@@ -104,6 +107,18 @@ const GAMES = {
   dice: {
     name: 'Five Dice', seats: 4, minSeats: 2, engine: load('dice/diceEngine'), pace: 1.8,
     moves: ['roll', 'hold', 'score'], tableMoves: ['newGame'],
+  },
+  // A word game for people only: no robots, not even to stand in for someone who's gone
+  wordspies: {
+    name: 'Word Spies', seats: 8, minSeats: 2, engine: load('wordspies/wordSpiesEngine'), noRobots: true, seatOrder: true,
+    moves: ['clue', 'guess', 'endTurn', 'takeClues', 'giveUp'], tableMoves: ['newGame'],
+    options: { mode: { values: ['together', 'teams'], default: 'together' }, turns: { values: [11, 9, 7], default: 9 } },
+    // Taking over the clues (and so seeing the key) only when your clue giver has gone
+    allow: (table, move) => {
+      if (move.type !== 'takeClues') return null;
+      const cluer = table.seats[table.state.cluers?.[table.state.side[move.seat]]];
+      return cluer?.connected ? `${cluer.name} is still here giving the clues.` : null;
+    },
   },
 };
 
@@ -206,7 +221,7 @@ function createTables(io, {
   /** After any change: let robots (and robot stand-ins) move, and collect finished tricks. */
   function schedule(table) {
     clearTimeout(table.timer);
-    if (table.status !== 'playing') return;
+    if (table.status !== 'playing' || GAMES[table.game].noRobots) return;
     const { engine } = GAMES[table.game];
     const s = table.state;
     const seat = waitingOn(engine, s).find(x => table.seats[x].type === 'robot' || table.seats[x].away);
@@ -355,7 +370,7 @@ function createTables(io, {
 
     on('mp:robot', ({ seat, on } = {}) => {
       const table = current();
-      if (!table || !inLobby(table) || seatOf(table, user.id) < 0) return;
+      if (!table || !inLobby(table) || seatOf(table, user.id) < 0 || GAMES[table.game].noRobots) return;
       if (!Number.isInteger(seat) || seat < 0 || seat >= table.seats.length) return;
       if (on && table.seats[seat] === null) table.seats[seat] = { type: 'robot', name: robotName(table) };
       if (!on && table.seats[seat]?.type === 'robot') table.seats[seat] = null;
@@ -389,14 +404,18 @@ function createTables(io, {
     on('mp:start', () => {
       const table = current();
       if (!table || !inLobby(table) || table.hostId !== user.id) return;
-      const { minSeats, engine } = GAMES[table.game];
+      const { minSeats, engine, noRobots, seatOrder } = GAMES[table.game];
       const filled = table.seats.filter(Boolean).length;
+      const who = noRobots ? 'players' : 'players (people or robots)';
       if (minSeats ? filled < minSeats : filled < table.seats.length) {
-        return fail(null, minSeats ? `You need at least ${minSeats} players (people or robots).` : 'Fill every seat (with people or robots) first.');
+        return fail(null, minSeats ? `You need at least ${minSeats} ${who}.` : 'Fill every seat (with people or robots) first.');
       }
+      const kept = table.seats.map((s, i) => (s ? i : -1)).filter(i => i >= 0);
+      const problem = engine.startProblem?.(kept, table.options);
+      if (problem) return fail(null, problem);
       table.seats = table.seats.filter(Boolean);        // play with just the seats that are filled
       table.status = 'playing';
-      table.state = engine.newGame({ players: table.seats.length, ...table.options });
+      table.state = engine.newGame({ players: table.seats.length, ...table.options, ...(seatOrder ? { seatOrder: kept } : {}) });
       broadcast(table);
       schedule(table);
     });
@@ -407,10 +426,12 @@ function createTables(io, {
       const seat = seatOf(table, user.id);
       if (seat < 0) return fail(null, 'You\'re watching — take a seat to play.');
       try {
-        const { moves, tableMoves } = GAMES[table.game];
+        const { moves, tableMoves, allow } = GAMES[table.game];
         if (tableMoves.includes(action.type)) apply(table, { type: action.type });
         else if (moves.includes(action.type)) {
           const { plan, ...move } = action;                  // (robots' plans are the server's business)
+          const refused = allow?.(table, { ...move, seat });
+          if (refused) return fail(null, refused);
           apply(table, { ...move, seat });
         }
       } catch (e) {
@@ -425,7 +446,7 @@ function createTables(io, {
       if (!table || table.status !== 'playing') return;
       const me = seatOf(table, user.id);
       const s = table.seats[seat];
-      if (me < 0 || me === seat || s?.type !== 'human' || !s.gone || s.connected || s.away) return;
+      if (me < 0 || me === seat || s?.type !== 'human' || !s.gone || s.connected || s.away || GAMES[table.game].noRobots) return;
       s.away = true;
       broadcast(table);
       schedule(table);
