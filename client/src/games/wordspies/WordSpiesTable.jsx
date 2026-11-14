@@ -21,11 +21,13 @@ const SIDE_EMOJI = ['🔶', '🔷'];
 const LOOKS = {
   a: { solid: 'bg-amber-400 text-amber-950 border-2 border-amber-200', faint: 'bg-[#efe6d2] text-amber-800 border-[5px] border-amber-500', badge: '☀️' },
   b: { solid: 'bg-indigo-500 text-white border-2 border-indigo-200', faint: 'bg-[#efe6d2] text-indigo-800 border-[5px] border-indigo-500', badge: '🌙' },
-  n: { solid: 'bg-stone-500 text-stone-100 border-2 border-stone-300', faint: 'bg-[#efe6d2] text-stone-900 border-2 border-[#fff8e8]', badge: '🚶' },
+  n: { solid: 'bg-rose-300 text-rose-950 border-2 border-rose-100', faint: 'bg-[#efe6d2] text-stone-900 border-2 border-[#fff8e8]', badge: '🚶' },
   x: { solid: 'bg-black text-white border-2 border-red-500', faint: 'bg-stone-800 text-red-100 border-[5px] border-red-600', badge: '💣' },
   g: { solid: 'bg-emerald-500 text-emerald-950 border-2 border-emerald-200', faint: 'bg-[#efe6d2] text-emerald-800 border-[5px] border-emerald-500', badge: '✓' },
 };
 const HIDDEN = 'bg-[#efe6d2] text-stone-900 border-2 border-[#fff8e8]';
+// Together: a bystander turned up here on one side's clue, but the card is still in play
+const MISSED = 'bg-rose-200 text-rose-950 border-2 border-dashed border-rose-400';
 
 const teamName = (mode, t) => (mode === 'teams' ? `${TEAM_EMOJI[t]} ${TEAMS[t]}` : `${SIDE_EMOJI[t]} Side ${SIDES[t]}`);
 
@@ -84,6 +86,7 @@ export function WordSpiesTable({ view, names, onAction, onExit, error, reactions
       look = LOOKS[secret].faint; badge = LOOKS[secret].badge;
     }
     const missed = !teams ? [0, 1].filter(t => v.missed[t][i]) : [];
+    if (!shown && missed.length > 0 && look === HIDDEN) look = MISSED;
     const can = myGuess && guessable(v, i);
     const w = v.words[i];
     return (
