@@ -377,41 +377,58 @@ function BusyBee() {
   );
 }
 
-// The flowers ride a Ferris wheel, staying the right way up as it turns
+// The flowers ride a Ferris wheel, staying the right way up as it turns.
+// The wheel is a real-sized box that spins; the flowers are separate pieces that
+// travel round the rim (no zero-size or counter-rotating wrappers, which iPhone
+// Safari can fail to draw).
 function FerrisWheel() {
-  const R = 66, D = 9;
+  const R = 66, D = 9, STEPS = 36, SIZE = R * 2;
+  const n = FLOWERS.length;
+  // points round the circle, starting at angle a (degrees) and going clockwise
+  const path = a => {
+    const xs = [], ys = [];
+    for (let s = 0; s <= STEPS; s++) {
+      const rad = ((a + (s / STEPS) * 360) * Math.PI) / 180;
+      xs.push(Math.cos(rad) * R);
+      ys.push(Math.sin(rad) * R);
+    }
+    return { x: xs, y: ys };
+  };
   return (
-    <div className="absolute left-1/2" style={{ top: 108 }}>
+    <motion.div className="absolute left-1/2"
+      style={{ top: 108 - R, width: SIZE, height: SIZE, marginLeft: -R }}
+      initial={{ scale: 0 }} animate={{ scale: 1 }}
+      transition={{ type: 'spring', stiffness: 200, damping: 14 }}>
       {/* the stand */}
-      <div className="absolute w-1.5 h-32 bg-white/40 rounded-full origin-top" style={{ transform: 'rotate(25deg)' }} />
-      <div className="absolute w-1.5 h-32 bg-white/40 rounded-full origin-top" style={{ transform: 'rotate(-25deg)' }} />
-      <motion.div className="absolute w-0 h-0"
-        initial={{ scale: 0 }} animate={{ scale: 1, rotate: 360 }}
-        transition={{ scale: { type: 'spring', stiffness: 200, damping: 14 }, rotate: { duration: D, repeat: Infinity, ease: 'linear' } }}>
-        <div className="absolute rounded-full border-4 border-white/40"
-          style={{ width: R * 2, height: R * 2, left: -R, top: -R }} />
-        {FLOWERS.map((f, i) => {
-          const a = (i / FLOWERS.length) * 360;
-          return (
-            <div key={i} className="absolute w-0 h-0" style={{ transform: `rotate(${a}deg)` }}>
-              <div className="absolute h-0.5 bg-white/40 origin-left" style={{ width: R }} />
-              <div className="absolute w-0 h-0" style={{ left: R }}>
-                {/* undo the wheel's turn (and the spoke's) so each flower stays upright */}
-                <motion.span className="absolute text-3xl leading-none w-10 h-10 -ml-5 -mt-5 flex items-center justify-center"
-                  initial={{ rotate: -a }} animate={{ rotate: -a - 360 }}
-                  transition={{ duration: D, repeat: Infinity, ease: 'linear' }}>
-                  <motion.span className="inline-block" animate={{ rotate: [-8, 8, -8] }}
-                    transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}>
-                    {f}
-                  </motion.span>
-                </motion.span>
-              </div>
-            </div>
-          );
-        })}
-        <span className="absolute text-2xl leading-none w-8 h-8 -ml-4 -mt-4 flex items-center justify-center">⭐</span>
+      <div className="absolute w-1.5 h-32 bg-white/40 rounded-full origin-top"
+        style={{ left: R - 3, top: R, transform: 'rotate(25deg)' }} />
+      <div className="absolute w-1.5 h-32 bg-white/40 rounded-full origin-top"
+        style={{ left: R - 3, top: R, transform: 'rotate(-25deg)' }} />
+      {/* the wheel and its spokes */}
+      <motion.div className="absolute inset-0 rounded-full border-4 border-white/40"
+        animate={{ rotate: 360 }}
+        transition={{ duration: D, repeat: Infinity, ease: 'linear' }}>
+        {FLOWERS.map((_, i) => (
+          <div key={i} className="absolute left-1/2 h-0.5 bg-white/40 origin-left"
+            style={{ top: 'calc(50% - 1px)', width: R - 4, transform: `rotate(${(i / n) * 360}deg)` }} />
+        ))}
       </motion.div>
-    </div>
+      {/* the riders */}
+      {FLOWERS.map((f, i) => (
+        <motion.span key={i}
+          className="absolute text-3xl leading-none w-10 h-10 flex items-center justify-center"
+          style={{ left: R - 20, top: R - 20 }}
+          animate={path((i / n) * 360)}
+          transition={{ duration: D, repeat: Infinity, ease: 'linear' }}>
+          <motion.span className="inline-block" animate={{ rotate: [-8, 8, -8] }}
+            transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}>
+            {f}
+          </motion.span>
+        </motion.span>
+      ))}
+      <span className="absolute text-2xl leading-none w-8 h-8 flex items-center justify-center"
+        style={{ left: R - 16, top: R - 16 }}>⭐</span>
+    </motion.div>
   );
 }
 
@@ -447,24 +464,29 @@ function Disco() {
   );
 }
 
-// Flowers pop up out of the grass, have a look around, and duck back down
+// Flowers pop up out of the grass, have a look around, and duck back down.
+// Each flower hides inside its own clipped window that sits just above the
+// grass, so nothing has to be drawn behind an overlapping layer (which iPhone
+// Safari can get wrong).
 function Peekaboo() {
   const delays = [0.2, 1.1, 0.6, 1.5, 0.9, 0.4];
   return (
     <>
-      <div className="absolute inset-x-0 bottom-6 flex justify-around px-4">
+      <div className="absolute inset-x-0 bottom-9 flex justify-around px-4">
         {FLOWERS.map((f, i) => (
-          <motion.span key={i} className="text-3xl sm:text-4xl leading-none inline-block"
-            initial={{ y: 60 }}
-            animate={{ y: [60, -22, -22, -30, -22, 60], rotate: [0, 0, -15, 15, 0, 0], scale: [1, 1.15, 1, 1, 1, 1] }}
-            transition={{ delay: delays[i], duration: 1.8, times: [0, 0.15, 0.4, 0.6, 0.8, 1], repeat: Infinity, repeatDelay: 0.6 }}>
-            {f}
-          </motion.span>
+          <div key={i} className="relative overflow-hidden h-24 w-12 flex items-end justify-center">
+            <motion.span className="text-3xl sm:text-4xl leading-none inline-block"
+              initial={{ y: 50 }}
+              animate={{ y: [50, -6, -6, -14, -6, 50], rotate: [0, 0, -15, 15, 0, 0], scale: [1, 1.15, 1, 1, 1, 1] }}
+              transition={{ delay: delays[i], duration: 1.8, times: [0, 0.15, 0.4, 0.6, 0.8, 1], repeat: Infinity, repeatDelay: 0.6 }}>
+              {f}
+            </motion.span>
+          </div>
         ))}
       </div>
-      {/* tall grass in front for them to hide behind */}
-      <div className="absolute inset-x-0 bottom-0 h-9 bg-green-700 flex justify-around items-start text-xl leading-none -translate-y-0">
-        {Array.from({ length: 9 }, (_, i) => <span key={i} className="-mt-3">🌿</span>)}
+      {/* tall grass for them to hide in */}
+      <div className="absolute inset-x-0 bottom-0 h-9 bg-green-700 flex justify-around items-start text-xl leading-none">
+        {Array.from({ length: 9 }, (_, i) => <span key={i}>🌿</span>)}
       </div>
     </>
   );
